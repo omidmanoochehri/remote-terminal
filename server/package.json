@@ -1,0 +1,14 @@
+{
+  "name": "remote-terminal-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "WebSocket relay that pairs an Android phone with a Windows terminal agent by room token.",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

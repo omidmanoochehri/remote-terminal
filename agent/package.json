@@ -1,0 +1,15 @@
+{
+  "name": "remote-terminal-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Windows agent that exposes a real terminal (PTY) over the relay server.",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@homebridge/node-pty-prebuilt-multiarch": "^0.13.1",
+    "ws": "^8.18.0"
+  }
+}

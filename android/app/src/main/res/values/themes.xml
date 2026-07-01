@@ -1,0 +1,8 @@
+<resources>
+    <!-- Framework Material theme (dark), so no com.google.android.material dep. -->
+    <style name="Theme.RemoteTerminal" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/term_bg</item>
+        <item name="android:statusBarColor">@color/bar_bg</item>
+        <item name="android:colorAccent">@color/accent</item>
+    </style>
+</resources>

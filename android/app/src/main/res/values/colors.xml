@@ -1,0 +1,8 @@
+<resources>
+    <color name="term_bg">#FF0C0C0C</color>
+    <color name="term_fg">#FFE6E6E6</color>
+    <color name="accent">#FF2E7D32</color>
+    <color name="accent_dark">#FF1B5E20</color>
+    <color name="bar_bg">#FF1A1A1A</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>

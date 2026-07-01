@@ -1,0 +1,22 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# Android / Gradle
+android/build/
+android/app/build/
+android/.gradle/
+android/local.properties
+*.apk
+*.aab
+
+# Release signing secrets — never commit
+android/keystore.properties
+android/keystore/
+
+# win-pilot MCP runtime scratch (logs, screenshots, recordings) — not project code
+runtime/
+
+# OS / editor
+.DS_Store
+Thumbs.db
