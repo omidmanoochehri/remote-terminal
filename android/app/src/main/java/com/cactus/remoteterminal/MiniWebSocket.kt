@@ -9,13 +9,13 @@ import java.net.URI
 import java.security.SecureRandom
 
 /**
- * A minimal RFC 6455 WebSocket client (text frames only, ws:// no TLS).
+ * A minimal RFC 6455 WebSocket client (text frames), supporting both `ws://`
+ * and `wss://` (TLS via the platform SSL factory).
  *
- * Hand-rolled so the Android app needs ZERO third-party dependencies — the
- * build environment here cannot reach Google's Maven repo, so OkHttp and other
- * AndroidX artifacts are unavailable. This covers exactly what the relay needs:
- * an HTTP Upgrade handshake, masked client text frames, and decoding server
- * text/ping/close frames.
+ * Hand-rolled so the networking path stays dependency-free. This covers exactly
+ * what the relay needs: an HTTP Upgrade handshake, masked client text frames,
+ * decoding server text/ping/close frames, and a periodic client ping to keep
+ * idle NAT paths open.
  */
 class MiniWebSocket(private val url: String, private val listener: Listener) {
 
@@ -38,6 +38,17 @@ class MiniWebSocket(private val url: String, private val listener: Listener) {
         Thread(r, "mini-ws-tx").apply { isDaemon = true }
     }
 
+    // Periodic client ping (opcode 0x9) so idle NAT mappings don't get reaped.
+    private val heartbeat = java.util.concurrent.Executors.newSingleThreadScheduledExecutor { r ->
+        Thread(r, "mini-ws-hb").apply { isDaemon = true }
+    }
+
+    private fun startHeartbeat() {
+        heartbeat.scheduleWithFixedDelay({
+            if (!closed) enqueue(0x9, ByteArray(0))
+        }, 25, 25, java.util.concurrent.TimeUnit.SECONDS)
+    }
+
     fun connect() {
         Thread({ runLoop() }, "mini-ws").apply { isDaemon = true }.start()
     }
@@ -45,15 +56,21 @@ class MiniWebSocket(private val url: String, private val listener: Listener) {
     private fun runLoop() {
         try {
             val uri = URI(url)
-            require(uri.scheme == "ws") { "only ws:// is supported" }
+            val secure = uri.scheme == "wss"
+            require(uri.scheme == "ws" || secure) { "only ws:// and wss:// are supported" }
             val host = uri.host
-            val port = if (uri.port > 0) uri.port else 80
+            val port = if (uri.port > 0) uri.port else if (secure) 443 else 80
             val path = buildString {
                 append(if (uri.rawPath.isNullOrEmpty()) "/" else uri.rawPath)
                 if (!uri.rawQuery.isNullOrEmpty()) append("?").append(uri.rawQuery)
             }
 
-            val sock = Socket(host, port)
+            val sock = if (secure) {
+                (javax.net.ssl.SSLSocketFactory.getDefault().createSocket(host, port)
+                    as javax.net.ssl.SSLSocket).also { it.startHandshake() }
+            } else {
+                Socket(host, port)
+            }
             socket = sock
             val input = sock.getInputStream()
             val output = sock.getOutputStream()
@@ -61,12 +78,14 @@ class MiniWebSocket(private val url: String, private val listener: Listener) {
 
             handshake(output, input, host, port, path)
             listener.onOpen()
+            startHeartbeat()
 
             val din = DataInputStream(input)
             readFrames(din)
         } catch (t: Throwable) {
             if (!closed) listener.onError(t)
         } finally {
+            heartbeat.shutdownNow()
             closeQuietly()
             if (!closed) listener.onClose("connection ended")
         }
@@ -183,6 +202,7 @@ class MiniWebSocket(private val url: String, private val listener: Listener) {
     fun close() {
         if (closed) return
         closed = true
+        heartbeat.shutdownNow()
         try {
             sender.execute {
                 try { sendFrame(0x8, ByteArray(0)) } catch (_: Throwable) {}

@@ -1,0 +1,13 @@
+{
+  "host": "0.0.0.0",
+  "port": 8080,
+  "maxFrameBytes": 1048576,
+  "maxConns": 1000,
+  "maxConnsPerIp": 20,
+  "msgPerSec": 200,
+  "heartbeatMs": 30000,
+  "logLevel": "info",
+  "authToken": "",
+  "pairing": { "enabled": false, "ttlSec": 300 },
+  "tls": { "cert": "", "key": "" }
+}

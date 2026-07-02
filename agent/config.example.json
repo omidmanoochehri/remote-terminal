@@ -1,0 +1,12 @@
+{
+  "server": "wss://relay.example.com:8080",
+  "room": "my-pc",
+  "token": "",
+  "shell": "powershell.exe",
+  "replayBytes": 262144,
+  "maxInputBytes": 1048576,
+  "inheritEnv": false,
+  "logLevel": "info",
+  "baseBackoffMs": 1000,
+  "maxBackoffMs": 30000
+}

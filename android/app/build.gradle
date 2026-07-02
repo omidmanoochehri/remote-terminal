@@ -16,8 +16,8 @@ android {
         applicationId "com.cactus.remoteterminal"
         minSdk 24
         targetSdk 35
-        versionCode 1
-        versionName "0.1.0"
+        versionCode 2
+        versionName "0.2.0"
     }
 
     signingConfigs {
@@ -54,7 +54,11 @@ android {
     }
 }
 
-// No third-party runtime dependencies: this environment cannot reach Google's
-// Maven repo, so the app is framework-only with a hand-rolled WebSocket client.
+// UI dependencies. These resolve through the Aliyun mirrors configured in the
+// root build (dl.google.com is blocked here). The WebSocket client stays
+// hand-rolled (MiniWebSocket) — no networking libs are pulled in.
 dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'com.google.android.material:material:1.11.0'
 }

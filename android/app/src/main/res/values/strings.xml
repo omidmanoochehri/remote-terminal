@@ -1,3 +1,20 @@
 <resources>
     <string name="app_name">Remote Terminal</string>
+    <string name="connect">Connect</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="send">Send</string>
+    <string name="type_hint">type a command</string>
+    <string name="profiles">Profiles</string>
+    <string name="zoom_in">Larger font</string>
+    <string name="zoom_out">Smaller font</string>
+    <string name="add_profile">Add profile</string>
+    <string name="edit_profile">Edit profile</string>
+    <string name="delete">Delete</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="p_name">Name</string>
+    <string name="p_server">Server URL (ws:// or wss://)</string>
+    <string name="p_room">Room</string>
+    <string name="p_token">Auth token (optional)</string>
+    <string name="p_pair">Pairing code (optional)</string>
 </resources>

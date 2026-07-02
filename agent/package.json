@@ -1,8 +1,8 @@
 {
   "name": "remote-terminal-agent",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Windows agent that exposes a real terminal (PTY) over the relay server.",
+  "description": "Windows agent that exposes a real terminal (PTY) over the relay, with restricted env, exponential-backoff reconnect and auth token support.",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {

@@ -2,6 +2,11 @@
 node_modules/
 npm-debug.log*
 
+# Local runtime config (may contain auth tokens / cert paths) — commit *.example.json only
+server/config.json
+agent/config.json
+.env
+
 # Android / Gradle
 android/build/
 android/app/build/
