@@ -1,0 +1,23 @@
+<resources>
+    <!-- Terminal surface -->
+    <color name="term_bg">#FF0C0C0C</color>
+    <color name="term_fg">#FFE6E6E6</color>
+
+    <!-- Chrome / Material palette -->
+    <color name="bar_bg">#FF161616</color>
+    <color name="surface">#FF1A1A1A</color>
+    <color name="surface_variant">#FF242424</color>
+    <color name="on_surface">#FFE6E6E6</color>
+    <color name="on_surface_muted">#FF9E9E9E</color>
+    <color name="outline">#FF3A3A3A</color>
+
+    <color name="accent">#FF4CAF50</color>
+    <color name="accent_dark">#FF1B5E20</color>
+    <color name="on_accent">#FF06210A</color>
+
+    <color name="status_ok">#FF66BB6A</color>
+    <color name="status_warn">#FFFFB74D</color>
+    <color name="status_err">#FFEF5350</color>
+
+    <color name="white">#FFFFFFFF</color>
+</resources>

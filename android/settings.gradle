@@ -1,0 +1,15 @@
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositories {
+        // This environment reaches Google/Maven Central only via Aliyun mirrors
+        // (dl.google.com is blocked). These proxy Google Maven + Maven Central.
+        maven { url 'https://maven.aliyun.com/repository/public' }
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.name = "RemoteTerminal"
+include ':app'

@@ -1,0 +1,64 @@
+apply plugin: 'com.android.application'
+apply plugin: 'org.jetbrains.kotlin.android'
+
+// Load release signing credentials from ../keystore.properties (gitignored).
+def keystorePropsFile = rootProject.file('keystore.properties')
+def keystoreProps = new Properties()
+if (keystorePropsFile.exists()) {
+    keystoreProps.load(new FileInputStream(keystorePropsFile))
+}
+
+android {
+    namespace 'com.cactus.remoteterminal'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.cactus.remoteterminal"
+        minSdk 24
+        targetSdk 35
+        versionCode 2
+        versionName "0.2.0"
+    }
+
+    signingConfigs {
+        release {
+            if (keystoreProps.containsKey('storeFile')) {
+                storeFile rootProject.file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // Use the release key when it is configured; otherwise the build
+            // still produces an (unsigned) APK you can sign later.
+            if (keystoreProps.containsKey('storeFile')) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+// UI dependencies. These resolve through the Aliyun mirrors configured in the
+// root build (dl.google.com is blocked here). The WebSocket client stays
+// hand-rolled (MiniWebSocket) — no networking libs are pulled in.
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'com.google.android.material:material:1.11.0'
+}

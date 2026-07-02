@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/term_bg">
+
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/bar_bg"
+        app:title="@string/app_name"
+        app:titleTextColor="@color/on_surface"
+        app:titleCentered="false" />
+
+    <!-- Connection strip: status chip · profile label · connect -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="@color/bar_bg"
+        android:gravity="center_vertical"
+        android:paddingStart="12dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="8dp">
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/statusChip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="disconnected"
+            android:textColor="@color/on_surface"
+            app:chipBackgroundColor="@color/surface_variant"
+            app:chipStrokeColor="@color/outline"
+            app:chipStrokeWidth="1dp"
+            app:chipMinHeight="30dp"
+            app:ensureMinTouchTargetSize="false" />
+
+        <TextView
+            android:id="@+id/profileLabel"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="8dp"
+            android:background="?attr/selectableItemBackground"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textColor="@color/on_surface_muted"
+            android:textSize="13sp"
+            android:text="no profile" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/connectBtn"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:text="@string/connect" />
+    </LinearLayout>
+
+    <!-- Terminal: custom VT/ANSI view (colours, scrollback, live keys) -->
+    <com.cactus.remoteterminal.TerminalView
+        android:id="@+id/terminal"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@color/term_bg" />
+
+    <!-- Modifier + special keys row -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/bar_bg"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/keyRow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp" />
+    </HorizontalScrollView>
+
+    <!-- Input row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="@color/bar_bg"
+        android:gravity="center_vertical"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="8dp">
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/inputLayout"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="@string/type_hint">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/input"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:imeOptions="actionSend"
+                android:inputType="text|textNoSuggestions"
+                android:maxLines="1" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/sendBtn"
+            style="@style/Widget.Material3.Button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:minWidth="0dp"
+            android:text="@string/send" />
+    </LinearLayout>
+</LinearLayout>
