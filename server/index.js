@@ -1,88 +1,72 @@
 'use strict';
 
 /*
- * Remote Terminal — relay server.
+ * Remote Terminal — relay server (protocol v3).
  *
- * Pairs one `agent` (Windows machine) with one `phone` (Android app) inside a
- * "room" and forwards messages between them. See ../PROTOCOL.md for the wire
- * format. The relay is a transparent pipe for terminal traffic; it only
- * originates control/keepalive messages and enforces connection limits.
+ * Accounts own agents (machines) and devices (phones); agents host terminal
+ * sessions. The relay authenticates bearer tokens, authorizes every routed
+ * message, tracks presence and attachments, enforces limits, and forwards
+ * opaque terminal traffic. It never executes anything. See ../PROTOCOL.md.
+ *
+ * Module map: config.js (settings) · logger.js · state.js (persisted identity)
+ * · registry.js (in-memory world) · auth.js · http.js (identity endpoints)
+ * · protocol.js (validation) · router.js (authz + routing) · legacy.js (v2).
  */
 
 const http = require('http');
 const https = require('https');
 const fs = require('fs');
-const path = require('path');
 const { URL } = require('url');
 const { WebSocketServer } = require('ws');
 
 const { loadConfig } = require('./config');
 const { makeLogger } = require('./logger');
-const { authorize } = require('./auth');
+const { State } = require('./state');
+const { Registry } = require('./registry');
+const { PairingStore } = require('./pairing');
+const { Router } = require('./router');
+const { createHttpHandler } = require('./http');
+const { createLegacy } = require('./legacy');
+const { bearerFromReq, clientIp, authenticate } = require('./auth');
+const { PROTOCOL_VERSION, CLOSE, ERR } = require('./protocol');
+const { newId } = require('./tokens');
+const { MessageBudget } = require('./limits');
 
 const cfg = loadConfig();
 const log = makeLogger(cfg.logLevel);
+const state = new State(cfg.stateFile, log).load();
+const registry = new Registry(state, cfg, log);
+const pairing = new PairingStore(cfg.pairing);
+const router = new Router({ cfg, log, registry });
+const legacy = cfg.legacyV2 ? createLegacy({ cfg, log }) : null;
 
-// Wire-protocol version and the optional features this relay implements itself.
-const PROTOCOL_VERSION = 2;
-const SERVER_CAPS = ['ping'].concat(cfg.authToken ? ['auth'] : []);
-
-/** @type {Map<string, {agent: import('ws').WebSocket|null, phone: import('ws').WebSocket|null}>} */
-const rooms = new Map();
+const startedAt = Date.now();
 const ipCounts = new Map();
 let totalConns = 0;
-let connSeq = 0;
-const startedAt = Date.now();
 
-function getRoom(room) {
-  let r = rooms.get(room);
-  if (!r) { r = { agent: null, phone: null }; rooms.set(room, r); }
-  return r;
-}
-
-function peerRole(role) { return role === 'agent' ? 'phone' : 'agent'; }
-
-function send(ws, obj) {
-  if (ws && ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj));
-}
-
-function clientIp(req) {
-  const xff = req.headers['x-forwarded-for'];
-  if (xff) return String(xff).split(',')[0].trim();
-  return req.socket.remoteAddress || 'unknown';
+function stats() {
+  let phonesOnline = 0;
+  for (const set of registry.phonesByAccount.values()) phonesOnline += set.size;
+  return {
+    uptimeSec: Math.round((Date.now() - startedAt) / 1000),
+    connections: totalConns,
+    agentsOnline: registry.countOnlineAgents(),
+    phonesOnline,
+    sessions: registry.countOnlineSessions(),
+    protocol: PROTOCOL_VERSION,
+    caps: router.caps(),
+    legacyRooms: legacy ? legacy.rooms.size : undefined,
+  };
 }
 
 /* ------------------------------- HTTP server ------------------------------ */
 
-function httpHandler(req, res) {
-  if (req.url === '/health') {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('ok');
-    return;
-  }
-  if (req.url === '/stats') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      uptimeSec: Math.round((Date.now() - startedAt) / 1000),
-      rooms: rooms.size,
-      connections: totalConns,
-      protocol: PROTOCOL_VERSION,
-      caps: SERVER_CAPS,
-    }));
-    return;
-  }
-  res.writeHead(426, { 'Content-Type': 'text/plain' });
-  res.end('Upgrade Required: connect with a WebSocket');
-}
+const httpHandler = createHttpHandler({ cfg, log, registry, pairing, router, stats });
 
-// TLS (wss://) when a cert/key pair is configured, else plain ws://.
 let server;
 let scheme = 'ws';
 if (cfg.tls && cfg.tls.cert && cfg.tls.key) {
-  server = https.createServer(
-    { cert: fs.readFileSync(cfg.tls.cert), key: fs.readFileSync(cfg.tls.key) },
-    httpHandler,
-  );
+  server = https.createServer({ cert: fs.readFileSync(cfg.tls.cert), key: fs.readFileSync(cfg.tls.key) }, httpHandler);
   scheme = 'wss';
 } else {
   server = http.createServer(httpHandler);
@@ -92,124 +76,129 @@ const wss = new WebSocketServer({ server, maxPayload: cfg.maxFrameBytes });
 
 /* ------------------------------- connections ------------------------------ */
 
+function refuse(ws, code, closeCode, message) {
+  try { if (ws.readyState === ws.OPEN) ws.send(JSON.stringify({ type: 'error', code, message })); } catch (_) { /* ignore */ }
+  try { ws.close(closeCode, message.slice(0, 120)); } catch (_) { /* ignore */ }
+}
+
 wss.on('connection', (ws, req) => {
-  const id = ++connSeq;
-  const ip = clientIp(req);
+  const connId = newId('c');
+  const ip = clientIp(req, cfg);
 
   // Global + per-IP connection caps to blunt connection-storm abuse.
-  const perIp = (ipCounts.get(ip) || 0);
+  const perIp = ipCounts.get(ip) || 0;
   if (totalConns >= cfg.maxConns || perIp >= cfg.maxConnsPerIp) {
-    log.warn('connection rejected: limit', { id, ip, perIp, totalConns });
-    send(ws, { type: 'error', message: 'connection limit reached' });
-    ws.close();
-    return;
+    log.warn('connection rejected: limit', { connId, ip, perIp, totalConns });
+    return refuse(ws, ERR.LIMIT, CLOSE.LIMIT, 'connection limit reached');
   }
 
-  let role, room, token, pair;
-  try {
-    const url = new URL(req.url, `http://${req.headers.host}`);
-    role = url.searchParams.get('role');
-    room = url.searchParams.get('room');
-    token = url.searchParams.get('token') || bearer(req);
-    pair = url.searchParams.get('pair');
-  } catch (_) { /* validated below */ }
-
-  if (role !== 'agent' && role !== 'phone') {
-    send(ws, { type: 'error', message: 'role must be "agent" or "phone"' });
-    ws.close();
-    return;
+  let url;
+  try { url = new URL(req.url, `http://${req.headers.host || 'relay'}`); } catch (_) {
+    return refuse(ws, ERR.BAD_REQUEST, 1008, 'bad url');
   }
-  if (!room) {
-    send(ws, { type: 'error', message: 'missing room' });
-    ws.close();
-    return;
-  }
-  const auth = authorize({ cfg, role, room, token, pair });
-  if (!auth.ok) {
-    log.warn('unauthorized', { id, ip, role, room, reason: auth.reason });
-    send(ws, { type: 'error', message: auth.reason || 'unauthorized' });
-    ws.close();
-    return;
-  }
+  const token = bearerFromReq(req, url);
+  const v = url.searchParams.get('v');
+  const role = url.searchParams.get('role');
 
-  // Accepted: account for it.
-  totalConns++;
-  ipCounts.set(ip, perIp + 1);
-  ws._isAlive = true;
-  ws._winStart = Date.now();
-  ws._winCount = 0;
-  ws.on('pong', () => { ws._isAlive = true; });
-
-  const r = getRoom(room);
-  if (r[role] && r[role].readyState === r[role].OPEN) {
-    log.info('replacing existing role', { room, role });
-    try { r[role].close(); } catch (_) {}
-  }
-  r[role] = ws;
-
-  log.info('connected', { id, ip, role, room });
-  send(ws, { type: 'welcome', role, room, v: PROTOCOL_VERSION, caps: SERVER_CAPS });
-  if (auth.paired) send(ws, auth.paired); // e.g. a freshly minted pairing code
-
-  const peer = r[peerRole(role)];
-  if (peer && peer.readyState === peer.OPEN) {
-    send(ws, { type: 'status', peer: 'connected' });
-    send(peer, { type: 'status', peer: 'connected' });
-  }
-
-  ws.on('message', (raw) => {
-    // Per-connection message rate limit (rolling 1s window).
-    const now = Date.now();
-    if (now - ws._winStart >= 1000) { ws._winStart = now; ws._winCount = 0; }
-    if (++ws._winCount > cfg.msgPerSec) {
-      log.warn('rate limit exceeded; closing', { id, room, role });
-      send(ws, { type: 'error', message: 'rate limit exceeded' });
-      ws.close();
-      return;
-    }
-
-    // Intercept tiny app-level keepalive pings without disturbing the pipe.
-    const s = raw.toString();
-    if (s.length < 32 && s.indexOf('"ping"') !== -1) {
-      try { if (JSON.parse(s).type === 'ping') { send(ws, { type: 'pong' }); return; } } catch (_) {}
-    }
-
-    const current = getRoom(room);
-    const target = current[peerRole(role)];
-    if (target && target.readyState === target.OPEN) target.send(s);
-  });
-
-  ws.on('close', () => {
+  const account = () => { totalConns++; ipCounts.set(ip, perIp + 1); };
+  const unaccount = () => {
     totalConns--;
     const n = (ipCounts.get(ip) || 1) - 1;
     if (n <= 0) ipCounts.delete(ip); else ipCounts.set(ip, n);
+  };
 
-    const current = rooms.get(room);
-    if (!current) return;
-    if (current[role] === ws) current[role] = null;
-    log.info('disconnected', { id, role, room });
-    const other = current[peerRole(role)];
-    if (other && other.readyState === other.OPEN) send(other, { type: 'status', peer: 'disconnected' });
-    if (!current.agent && !current.phone) rooms.delete(room);
+  // Protocol negotiation: v3 only, unless legacy room mode is enabled.
+  if (v !== String(PROTOCOL_VERSION)) {
+    if (legacy && url.searchParams.get('room')) {
+      account();
+      ws._isAlive = true;
+      ws.on('pong', () => { ws._isAlive = true; });
+      ws.on('close', unaccount);
+      ws.on('error', (err) => log.warn('legacy: socket error', { connId, err: err.message }));
+      if (!legacy.handleConnection(ws, url, token, connId)) { /* refused: close handler unaccounts */ }
+      return;
+    }
+    log.warn('connection rejected: unsupported protocol version', { connId, ip, v });
+    return refuse(ws, ERR.UNSUPPORTED_VERSION, CLOSE.UPGRADE_REQUIRED, `protocol v${PROTOCOL_VERSION} required`);
+  }
+  if (role !== 'agent' && role !== 'phone') return refuse(ws, ERR.BAD_REQUEST, 1008, 'role must be "agent" or "phone"');
+
+  const principal = authenticate(registry, token);
+  if (!principal || (role === 'agent' && principal.kind !== 'agent') || (role === 'phone' && principal.kind !== 'device')) {
+    log.warn('unauthorized', { connId, ip, role, reason: principal ? 'token/role mismatch' : 'invalid token' });
+    return refuse(ws, ERR.UNAUTHORIZED, CLOSE.UNAUTHORIZED, 'unauthorized');
+  }
+
+  const conn = {
+    id: connId, ws, role, ip, v: PROTOCOL_VERSION,
+    accountId: principal.record.accountId,
+    agentId: principal.kind === 'agent' ? principal.record.agentId : null,
+    deviceId: principal.kind === 'device' ? principal.record.deviceId : null,
+    attachments: new Set(),   // "agentId|sessionId" keys this phone is attached to
+    agentsTouched: new Set(), // agents that know this phone as a client
+    lagging: new Set(),
+    lagTimer: null,
+    log: null,
+  };
+  conn.log = log.child({ connId, role, v: PROTOCOL_VERSION, agentId: conn.agentId || undefined, deviceId: conn.deviceId || undefined });
+
+  // One live connection per agent: a newer one replaces the older.
+  if (role === 'agent') {
+    const rt = registry.rt(conn.agentId);
+    if (rt.conn && rt.conn.ws.readyState === rt.conn.ws.OPEN) {
+      conn.log.info('replacing existing agent connection', { oldConnId: rt.conn.id });
+      const old = rt.conn;
+      rt.conn = null;
+      router.forceClose(old, CLOSE.REPLACED, 'replaced');
+    }
+  }
+
+  account();
+  registry.addConn(conn);
+  ws._isAlive = true;
+  ws.on('pong', () => { ws._isAlive = true; });
+  conn.log.info('connected', { ip });
+
+  const budget = new MessageBudget(role === 'agent' ? cfg.agentMsgPerSec : cfg.msgPerSec);
+
+  ws.on('message', (raw) => {
+    if (!budget.allow()) {
+      conn.log.warn('rate limit exceeded; closing');
+      return refuse(ws, ERR.RATE_LIMITED, CLOSE.RATE_LIMITED, 'rate limit exceeded');
+    }
+    let msg;
+    try { msg = JSON.parse(raw.toString()); } catch (_) {
+      return router.error(conn, ERR.BAD_REQUEST, 'invalid JSON');
+    }
+    try {
+      if (role === 'phone') router.handlePhone(conn, msg);
+      else router.handleAgent(conn, msg);
+    } catch (err) {
+      conn.log.error('routing failure', { err: err.message, type: msg && msg.type });
+      router.error(conn, ERR.INTERNAL, 'internal error');
+    }
   });
 
-  ws.on('error', (err) => log.warn('socket error', { id, room, role, err: err.message }));
-});
+  ws.on('close', (code) => {
+    unaccount();
+    registry.removeConn(conn);
+    if (role === 'phone') router.onPhoneClosed(conn); else router.onAgentClosed(conn);
+    conn.log.info('disconnected', { code });
+  });
 
-function bearer(req) {
-  const h = req.headers['authorization'];
-  if (h && /^Bearer\s+/i.test(h)) return h.replace(/^Bearer\s+/i, '').trim();
-  return null;
-}
+  ws.on('error', (err) => conn.log.warn('socket error', { err: err.message }));
+
+  if (role === 'phone') router.onPhoneConnected(conn); else router.onAgentConnected(conn);
+});
 
 /* ------------------------------- heartbeat -------------------------------- */
 
 // WebSocket-level ping/pong reaps half-open sockets (NAT drops, crashed peers).
 const heartbeat = setInterval(() => {
   for (const ws of wss.clients) {
-    if (ws._isAlive === false) { try { ws.terminate(); } catch (_) {} continue; }
+    if (ws._isAlive === false) { try { ws.terminate(); } catch (_) { /* ignore */ } continue; }
     ws._isAlive = false;
-    try { ws.ping(); } catch (_) {}
+    try { ws.ping(); } catch (_) { /* ignore */ }
   }
 }, cfg.heartbeatMs);
 
@@ -221,9 +210,10 @@ function shutdown(sig) {
   shuttingDown = true;
   log.info('shutting down', { sig });
   clearInterval(heartbeat);
+  state.flush();
   for (const ws of wss.clients) {
-    send(ws, { type: 'error', message: 'server shutting down' });
-    try { ws.close(); } catch (_) {}
+    try { ws.send(JSON.stringify({ type: 'error', code: ERR.LIMIT, message: 'server shutting down' })); } catch (_) { /* ignore */ }
+    try { ws.close(CLOSE.LIMIT, 'server shutting down'); } catch (_) { /* ignore */ }
   }
   wss.close(() => server.close(() => process.exit(0)));
   setTimeout(() => process.exit(0), 3000).unref();
@@ -233,9 +223,11 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 server.listen(cfg.port, cfg.host, () => {
   log.info('relay listening', {
-    url: `${scheme}://${cfg.host}:${cfg.port}`,
-    health: `/health`, stats: `/stats`, auth: !!cfg.authToken,
+    url: `${scheme}://${cfg.host}:${cfg.port}`, protocol: PROTOCOL_VERSION,
+    enrollment: cfg.authToken ? 'token' : 'OPEN (dev only)', legacyV2: cfg.legacyV2,
+    stateFile: cfg.stateFile,
   });
+  if (!cfg.authToken) log.warn('no ENROLL_TOKEN configured: enrolment is open to anyone who can reach this relay');
 });
 
-module.exports = { server, wss, rooms }; // exported for tests
+module.exports = { server, wss, registry, router, stats }; // exported for tests

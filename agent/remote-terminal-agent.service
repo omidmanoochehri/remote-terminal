@@ -1,0 +1,34 @@
+# systemd unit for the Remote Terminal agent. install-linux.sh fills in the
+# __PLACEHOLDERS__ and installs this as /etc/systemd/system/remote-terminal-agent.service.
+#
+# The service runs as an unprivileged user; every terminal it opens runs as
+# that user too. Pick the user deliberately (install-linux.sh --user).
+
+[Unit]
+Description=Remote Terminal agent (terminal sessions for the Remote Terminal relay)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+Group=__GROUP__
+Environment=CONFIG=__CONFIG_DIR__/config.json
+Environment=NODE_ENV=production
+WorkingDirectory=__INSTALL_DIR__
+ExecStart=__NODE__ __INSTALL_DIR__/index.js
+Restart=always
+RestartSec=5
+KillMode=control-group
+TimeoutStopSec=15
+LimitNOFILE=65536
+
+# Optional hardening for locked-down machines. These also apply to the shells
+# the agent spawns, so they forbid sudo (NoNewPrivileges) and system-wide
+# writes (ProtectSystem) inside remote terminals. Enable them consciously.
+#NoNewPrivileges=true
+#ProtectSystem=full
+#PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

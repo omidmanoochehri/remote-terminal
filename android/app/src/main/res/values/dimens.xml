@@ -1,0 +1,21 @@
+<resources>
+    <!-- Spacing scale -->
+    <dimen name="space_xs">4dp</dimen>
+    <dimen name="space_s">8dp</dimen>
+    <dimen name="space_m">12dp</dimen>
+    <dimen name="space_l">16dp</dimen>
+    <dimen name="space_xl">24dp</dimen>
+
+    <dimen name="screen_padding">16dp</dimen>
+    <dimen name="list_item_padding">14dp</dimen>
+    <dimen name="status_dot">10dp</dimen>
+    <dimen name="bar_height_compact">40dp</dimen>
+    <dimen name="touch_target">48dp</dimen>
+
+    <!-- Terminal chrome -->
+    <dimen name="terminal_bar_height">56dp</dimen>
+    <dimen name="terminal_tab_height">38dp</dimen>
+    <dimen name="terminal_tabs_row_height">54dp</dimen>
+    <dimen name="corner_card">20dp</dimen>
+    <dimen name="corner_pill">19dp</dimen>
+</resources>

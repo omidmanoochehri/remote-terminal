@@ -1,0 +1,25 @@
+<resources>
+    <!-- App chrome (dark): near-black surfaces with a bright, calm green accent. -->
+    <color name="app_bg">#FF0C1015</color>
+    <color name="app_surface">#FF141A21</color>
+    <color name="app_surface_variant">#FF1E2630</color>
+    <color name="app_on_surface">#FFE7ECF3</color>
+    <color name="app_on_surface_muted">#FF97A3B3</color>
+    <color name="app_outline">#FF2A3341</color>
+    <color name="app_primary">#FF3FD69A</color>
+    <color name="app_on_primary">#FF00281B</color>
+    <color name="app_primary_container">#FF15402F</color>
+    <color name="app_on_primary_container">#FFB6F5D9</color>
+    <color name="app_bar">#FF10161D</color>
+
+    <color name="key_bg">#FF222B36</color>
+    <color name="key_fg">#FFE7ECF3</color>
+    <color name="key_active_bg">#FF3FD69A</color>
+    <color name="key_active_fg">#FF00281B</color>
+    <color name="key_locked_bg">#FF1C8A63</color>
+
+    <color name="status_online">#FF3FD69A</color>
+    <color name="status_reconnecting">#FFF0B429</color>
+    <color name="status_offline">#FF77828F</color>
+    <color name="status_error">#FFFF6B61</color>
+</resources>

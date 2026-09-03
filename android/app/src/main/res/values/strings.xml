@@ -1,20 +1,211 @@
 <resources>
     <string name="app_name">Remote Terminal</string>
-    <string name="connect">Connect</string>
-    <string name="disconnect">Disconnect</string>
+
+    <!-- Connection states -->
+    <string name="state_connected">Connected</string>
+    <string name="state_connecting">Connecting…</string>
+    <string name="state_reconnecting">Reconnecting…</string>
+    <string name="state_reconnecting_in">Reconnecting in %1$ds…</string>
+    <string name="state_offline">Offline</string>
+    <string name="state_disconnected">Not connected</string>
+    <string name="state_unpaired">Not paired</string>
+    <string name="state_failed">Cannot connect: %1$s</string>
+    <string name="retry_now">Retry</string>
+
+    <!-- Machines -->
+    <string name="machines">Machines</string>
+    <string name="machine_online">Online</string>
+    <string name="machine_offline">Offline</string>
+    <string name="machine_last_seen">Last seen %1$s</string>
+    <string name="machine_never_seen">Never connected</string>
+    <plurals name="machine_sessions">
+        <item quantity="one">%d terminal</item>
+        <item quantity="other">%d terminals</item>
+    </plurals>
+    <string name="machines_empty_title">No machines yet</string>
+    <string name="machines_empty_text">Install the agent on a computer with this account\'s enrolment token. It appears here automatically when it connects.</string>
+    <string name="machines_empty_action">How to install the agent</string>
+    <string name="machines_help">On the computer:\n\nWindows:\n  install-windows.ps1 -Install -Server wss://relay -EnrollToken …\n\nUbuntu / Linux:\n  sudo ./install-linux.sh --server wss://relay --enroll-token …\n\nThe machine appears in this list once it connects to the relay.</string>
+    <string name="devices">Paired phones</string>
+    <string name="settings">Settings</string>
+    <string name="refresh">Refresh</string>
+
+    <!-- Agent detail -->
+    <string name="agent_version">Agent %1$s</string>
+    <string name="agent_terminals">Terminals</string>
+    <string name="agent_no_terminals">No terminals yet. Start one below.</string>
+    <string name="agent_offline_hint">This machine is offline. Terminals cannot be started until it reconnects.</string>
+    <string name="new_terminal">New terminal</string>
+    <string name="rename_machine">Rename machine</string>
+    <string name="remove_machine">Remove machine</string>
+    <string name="remove_machine_confirm">Remove “%1$s”?\n\nIts agent token is revoked immediately; the agent must be enrolled again to reconnect. Running terminals on it are closed.</string>
+    <string name="copy_hostname">Copy hostname</string>
+    <string name="copied">Copied</string>
+    <string name="agent_info">Machine info</string>
+    <string name="agent_info_text">Name: %1$s\nHostname: %2$s\nPlatform: %3$s\nOS: %4$s\nArchitecture: %5$s\nAgent version: %6$s\nShells: %7$s\nAgent ID: %8$s</string>
+    <string name="session_state_running">active</string>
+    <string name="session_state_detached">detached</string>
+    <string name="session_state_exited">exited (%1$d)</string>
+    <string name="session_age">%1$s</string>
+    <string name="session_attached_count">%1$d attached</string>
+
+    <!-- Terminal -->
+    <string name="terminal">Terminal</string>
+    <string name="tab_new">New</string>
+    <string name="tab_close">Close tab</string>
+    <string name="tab_keep_running">Keep running</string>
+    <string name="tab_keep_running_desc">Close the tab but leave the shell running on the machine. You can reopen it from the machine screen.</string>
+    <string name="tab_terminate">Terminate</string>
+    <string name="tab_terminate_desc">End the shell process and everything running in it.</string>
+    <string name="tab_close_title">Close “%1$s”?</string>
+    <string name="rename_terminal">Rename terminal</string>
+    <string name="terminal_title_hint">Name</string>
+    <string name="search">Search</string>
+    <string name="search_hint">Find in scrollback</string>
+    <string name="search_none">No matches</string>
+    <string name="search_count">%1$d of %2$d</string>
+    <string name="search_prev">Previous match</string>
+    <string name="search_next">Next match</string>
+    <string name="close_search">Close search</string>
+    <string name="show_keyboard">Keyboard</string>
+    <string name="command_bar">Command bar</string>
+    <string name="shortcuts">Shortcuts</string>
+    <string name="select_all">Select all</string>
+    <string name="copy">Copy</string>
+    <string name="paste">Paste</string>
+    <string name="paste_confirm_title">Paste %1$d lines?</string>
+    <string name="paste_confirm_text">The clipboard contains several lines. Each line ends with Enter and will run as a command.</string>
+    <string name="paste_confirm_ok">Paste</string>
+    <string name="clear_terminal">Clear screen</string>
+    <string name="paste_image">Paste image</string>
+    <string name="paste_image_none">No image on the clipboard. Copy or share an image first.</string>
+    <string name="paste_image_unsupported">This machine\'s agent is too old to receive files.</string>
+    <string name="paste_image_uploading">Uploading image…</string>
+    <string name="paste_image_done">Saved to %1$s</string>
+    <string name="paste_image_failed">Could not send the image: %1$s</string>
+    <string name="paste_image_too_large">Image is larger than %1$d MiB.</string>
+    <string name="new_lines">↓ %1$d new lines</string>
+    <string name="new_lines_one">↓ 1 new line</string>
+    <string name="jump_to_bottom">Jump to newest output</string>
+    <string name="command_hint">Command (Enter sends)</string>
     <string name="send">Send</string>
-    <string name="type_hint">type a command</string>
-    <string name="profiles">Profiles</string>
-    <string name="zoom_in">Larger font</string>
-    <string name="zoom_out">Smaller font</string>
-    <string name="add_profile">Add profile</string>
-    <string name="edit_profile">Edit profile</string>
-    <string name="delete">Delete</string>
-    <string name="save">Save</string>
+    <string name="terminal_offline">Machine offline — waiting to reconnect</string>
+    <string name="terminal_attaching">Attaching…</string>
+    <string name="terminal_exited">Process exited</string>
+    <string name="terminal_closed">Terminal closed</string>
+    <string name="terminal_gone">This terminal no longer exists on the machine</string>
+    <string name="terminal_not_connected">Not connected</string>
+    <string name="reopen_terminal">Start a new terminal</string>
+    <string name="terminal_content_description">Terminal output</string>
+    <string name="key_alternates">Long-press for %1$s</string>
+    <string name="toggle_symbol_row">Switch key row</string>
+    <string name="modifier_ctrl">Ctrl</string>
+    <string name="modifier_alt">Alt</string>
+
+    <!-- New terminal sheet -->
+    <string name="choose_shell">Choose a shell</string>
+    <string name="shell_default">default</string>
+    <string name="creating_terminal">Starting terminal…</string>
+
+    <!-- Shortcuts sheet -->
+    <string name="shortcuts_keys">Keys</string>
+    <string name="shortcuts_commands">Commands</string>
+    <string name="shortcuts_commands_hint">Commands run when tapped (Enter is sent). Edit them in Settings.</string>
+
+    <!-- Pairing -->
+    <string name="pair_title">Pair this phone</string>
+    <string name="pair_intro">On a machine that runs the agent, get a pairing code:\n\n  node index.js --pair\n\nor from another paired phone: Paired phones → Add phone.</string>
+    <string name="pair_relay_url">Relay URL</string>
+    <string name="pair_relay_hint">wss://relay.example.com</string>
+    <string name="pair_code">Pairing code</string>
+    <string name="pair_code_hint">6 digits</string>
+    <string name="pair_device_name">Name of this phone</string>
+    <string name="pair_action">Pair</string>
+    <string name="pair_working">Pairing…</string>
+    <string name="pair_error_url">Enter the relay URL (wss://…)</string>
+    <string name="pair_error_code">Enter the 6-digit code</string>
+    <string name="pair_insecure_title">Unencrypted connection</string>
+    <string name="pair_insecure_text">%1$s uses ws:// without TLS. Your device token and everything you type would travel in clear text. Use wss:// unless this is a private test network.</string>
+    <string name="pair_insecure_continue">Use anyway</string>
+    <string name="pair_failed">Pairing failed: %1$s</string>
+    <string name="unpair">Unpair this phone</string>
+    <string name="unpair_confirm">Unpair this phone?\n\nThe device token is deleted locally. Open terminals keep running on the machines; pair again to get back to them.</string>
+    <string name="unpaired_notice">This phone was unpaired. Pair it again to continue.</string>
+
+    <!-- Devices -->
+    <string name="device_this_phone">This phone</string>
+    <string name="device_last_seen">Last seen %1$s</string>
+    <string name="device_online">Online now</string>
+    <string name="add_phone">Add phone</string>
+    <string name="add_phone_text">Enter this code on the other phone within %1$d minutes:</string>
+    <string name="add_phone_relay">Relay: %1$s</string>
+    <string name="revoke_device">Revoke</string>
+    <string name="revoke_device_confirm">Revoke “%1$s”?\n\nIt is disconnected immediately and must pair again.</string>
+    <string name="rename_device">Rename this phone</string>
+    <string name="devices_empty">No paired phones.</string>
+
+    <!-- Settings -->
+    <string name="pref_cat_terminal">Terminal</string>
+    <string name="pref_font_size">Font size</string>
+    <string name="pref_line_spacing">Line spacing</string>
+    <string name="pref_cursor_style">Cursor style</string>
+    <string name="pref_cursor_blink">Blinking cursor</string>
+    <string name="pref_terminal_theme">Colour scheme</string>
+    <string name="pref_scrollback">Scrollback lines</string>
+    <string name="pref_keep_awake">Keep screen on</string>
+    <string name="pref_cat_app">App</string>
+    <string name="pref_app_theme">App theme</string>
+    <string name="pref_haptics">Haptic feedback</string>
+    <string name="pref_bell">Terminal bell</string>
+    <string name="pref_osc52">Allow programs to set the clipboard (OSC 52)</string>
+    <string name="pref_paste_confirm">Confirm multi-line paste from</string>
+    <string name="pref_command_bar">Show command bar by default</string>
+    <string name="pref_cat_keys">Keyboard</string>
+    <string name="pref_keys_row1">Key row 1</string>
+    <string name="pref_keys_row2">Key row 2 (symbols)</string>
+    <string name="pref_keys_row3">Key row 3 (alternate)</string>
+    <string name="pref_keys_help">Space-separated keys. Names: ESC CTRL ALT SHIFT TAB ENTER BKSP UP DOWN LEFT RIGHT HOME END PGUP PGDN INS DEL F1–F12. Any other token is typed literally; write a|b for a long-press alternate.</string>
+    <string name="pref_commands">Command shortcuts</string>
+    <string name="pref_commands_help">One per line: label = command</string>
+    <string name="pref_cat_notifications">Notifications</string>
+    <string name="pref_notify_offline">Machine goes offline while in use</string>
+    <string name="pref_notify_exit">Terminal process exits</string>
+    <string name="pref_notify_bell">Terminal bell</string>
+    <string name="pref_cat_account">Account</string>
+    <string name="pref_relay">Relay</string>
+    <string name="pref_device_id">Device ID</string>
+    <string name="pref_devices">Paired phones</string>
+    <string name="pref_unpair">Unpair this phone</string>
+    <string name="pref_about">Remote Terminal %1$s · protocol v%2$d</string>
+
+    <!-- Notifications -->
+    <string name="channel_status">Machine status</string>
+    <string name="channel_status_desc">A machine you were using went offline</string>
+    <string name="channel_terminal">Terminal events</string>
+    <string name="channel_terminal_desc">Process exits and terminal bells</string>
+    <string name="notif_offline_title">%1$s went offline</string>
+    <string name="notif_offline_text">Terminals will resume when it reconnects.</string>
+    <string name="notif_exit_title">“%1$s” exited</string>
+    <string name="notif_exit_text">%1$s · exit code %2$d</string>
+    <string name="notif_bell_title">Bell in “%1$s”</string>
+    <string name="notifications_permission_hint">Allow notifications to be told when a machine goes offline or a command finishes.</string>
+
+    <!-- Common -->
+    <string name="ok">OK</string>
     <string name="cancel">Cancel</string>
-    <string name="p_name">Name</string>
-    <string name="p_server">Server URL (ws:// or wss://)</string>
-    <string name="p_room">Room</string>
-    <string name="p_token">Auth token (optional)</string>
-    <string name="p_pair">Pairing code (optional)</string>
+    <string name="save">Save</string>
+    <string name="delete">Delete</string>
+    <string name="remove">Remove</string>
+    <string name="rename">Rename</string>
+    <string name="close">Close</string>
+    <string name="back">Back</string>
+    <string name="more">More</string>
+    <string name="error_generic">Something went wrong: %1$s</string>
+    <string name="time_just_now">just now</string>
+    <string name="time_minutes">%1$dm ago</string>
+    <string name="time_hours">%1$dh ago</string>
+    <string name="time_days">%1$dd ago</string>
+    <string name="duration_minutes">%1$dm</string>
+    <string name="duration_hours">%1$dh</string>
+    <string name="duration_days">%1$dd</string>
 </resources>

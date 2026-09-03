@@ -1,13 +1,12 @@
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
-        // This environment reaches Google/Maven Central only via Aliyun mirrors
-        // (dl.google.com is blocked). These proxy Google Maven + Maven Central.
+        google()
+        mavenCentral()
+        // Fallback mirrors for environments where dl.google.com / Maven Central are blocked.
         maven { url 'https://maven.aliyun.com/repository/public' }
         maven { url 'https://maven.aliyun.com/repository/google' }
         maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
-        google()
-        mavenCentral()
     }
 }
 

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item android:id="@+id/action_rename" android:title="@string/rename_machine" app:showAsAction="never" />
+    <item android:id="@+id/action_copy_hostname" android:title="@string/copy_hostname" app:showAsAction="never" />
+    <item android:id="@+id/action_info" android:title="@string/agent_info" app:showAsAction="never" />
+    <item android:id="@+id/action_remove" android:title="@string/remove_machine" app:showAsAction="never" />
+</menu>

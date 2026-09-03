@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Remembers a view's designed padding so window insets can be re-applied idempotently. -->
+    <item name="tag_base_padding" type="id" />
+</resources>

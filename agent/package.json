@@ -1,12 +1,14 @@
 {
   "name": "remote-terminal-agent",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
-  "description": "Windows agent that exposes a real terminal (PTY) over the relay, with restricted env, exponential-backoff reconnect and auth token support.",
+  "description": "Cross-platform (Windows / Linux) agent that hosts persistent terminal sessions (PTY) for the Remote Terminal relay, protocol v3.",
   "main": "index.js",
   "type": "commonjs",
+  "bin": { "remote-terminal-agent": "index.js" },
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "node --test --test-timeout=60000"
   },
   "dependencies": {
     "@homebridge/node-pty-prebuilt-multiarch": "^0.13.1",

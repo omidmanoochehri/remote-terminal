@@ -1,11 +1,20 @@
 {
-  "server": "wss://relay.example.com:8080",
-  "room": "my-pc",
-  "token": "",
-  "shell": "powershell.exe",
+  "server": "wss://relay.example.com",
+  "enrollToken": "the-relay-ENROLL_TOKEN",
+  "name": "Office PC",
+
+  "stateFile": "./state.json",
+  "defaultShell": "",
+  "shells": null,
+
   "replayBytes": 262144,
   "maxInputBytes": 1048576,
+  "maxSessions": 16,
+  "sessionIdleTimeoutSec": 21600,
+  "exitedRetentionSec": 300,
+
   "inheritEnv": false,
+  "allowRoot": false,
   "logLevel": "info",
   "baseBackoffMs": 1000,
   "maxBackoffMs": 30000

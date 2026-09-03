@@ -1,55 +1,75 @@
 'use strict';
 
 /*
- * Connection authorization for the relay.
+ * Authentication helpers (protocol v3).
  *
- * Two independent mechanisms, both optional (a bare room token still works for
- * local/dev, matching v1):
- *   1. A shared `authToken` — every client must present it (query `token=` or
- *      an `Authorization: Bearer` header).
- *   2. Short-lived pairing codes — the agent registers a room and is issued a
- *      numeric code; the phone joins by presenting that code (`pair=`).
- *
- * See ./pairing.js for the code store and ../PROTOCOL.md for the messages.
+ * There is exactly one way to authenticate a WebSocket: a bearer token that
+ * is either an agent token or a device token (see PROTOCOL.md §3). Enrolment
+ * and pairing — the flows that *mint* those tokens — live in http.js and use
+ * the enrolment token / pairing codes checked here.
  */
 
-const crypto = require('crypto');
-const { PairingStore } = require('./pairing');
+const { safeEqual } = require('./tokens');
 
-const pairing = new PairingStore();
+const DEFAULT_ACCOUNT = 'default';
 
-/** Constant-time string compare to avoid leaking the token via timing. */
-function safeEqual(a, b) {
-  const ba = Buffer.from(String(a));
-  const bb = Buffer.from(String(b));
-  if (ba.length !== bb.length) return false;
-  return crypto.timingSafeEqual(ba, bb);
+/** Bearer token from the Authorization header, else `token=` in the query. */
+function bearerFromReq(req, url) {
+  const h = req.headers['authorization'];
+  if (h && /^Bearer\s+/i.test(h)) {
+    const t = h.replace(/^Bearer\s+/i, '').trim();
+    if (t) return t;
+  }
+  if (url) {
+    const q = url.searchParams.get('token');
+    if (q) return q;
+  }
+  return null;
 }
 
 /**
- * @returns {{ok: boolean, reason?: string, paired?: object}}
- *   `paired` (when present) is a control message to send back to the client,
- *   e.g. a freshly minted pairing code for an agent.
+ * The client address used for per-IP limits. `X-Forwarded-For` is only
+ * trusted behind a proxy the operator has declared (TRUST_PROXY=1), and then
+ * only the address appended by that proxy (the last hop) — never the first,
+ * which is attacker-controlled.
  */
-function authorize({ cfg, role, room, token, pair }) {
-  // 1) Shared token gate (if configured).
-  if (cfg.authToken) {
-    if (!token || !safeEqual(token, cfg.authToken)) return { ok: false, reason: 'unauthorized' };
-  }
-
-  // 2) Pairing (if enabled). Agents mint codes; phones must present a valid one.
-  if (cfg.pairing && cfg.pairing.enabled) {
-    if (role === 'agent') {
-      const code = pairing.mint(room, cfg.pairing.ttlSec);
-      return { ok: true, paired: { type: 'paired', code: code.code, expires: code.expires } };
-    }
-    if (role === 'phone') {
-      if (!pair || !pairing.redeem(room, pair)) return { ok: false, reason: 'invalid or expired pairing code' };
-      return { ok: true };
+function clientIp(req, cfg) {
+  if (cfg.trustProxy) {
+    const xff = req.headers['x-forwarded-for'];
+    if (xff) {
+      const parts = String(xff).split(',').map((s) => s.trim()).filter(Boolean);
+      if (parts.length) return parts[parts.length - 1];
     }
   }
-
-  return { ok: true };
+  return req.socket.remoteAddress || 'unknown';
 }
 
-module.exports = { authorize, pairing, safeEqual };
+/**
+ * Resolve the account an enrolment token grants. With no configured token the
+ * relay runs in open-enrolment (development) mode and every enrolment lands
+ * in the default account.
+ * @returns {string|null} accountId
+ */
+function checkEnrollToken(cfg, token) {
+  const accounts = cfg.accounts || [];
+  if (!cfg.authToken && accounts.length === 0) return DEFAULT_ACCOUNT; // open enrolment (dev)
+  if (!token) return null;
+  if (cfg.authToken && safeEqual(token, cfg.authToken)) return DEFAULT_ACCOUNT;
+  for (const acc of accounts) if (safeEqual(token, acc.enrollToken)) return acc.accountId;
+  return null;
+}
+
+/**
+ * Resolve a bearer token to a principal.
+ * @returns {{kind:'agent'|'device', record:object}|null}
+ */
+function authenticate(registry, token) {
+  if (!token || typeof token !== 'string' || token.length > 256) return null;
+  const agent = registry.findAgentByToken(token);
+  if (agent) return { kind: 'agent', record: agent };
+  const device = registry.findDeviceByToken(token);
+  if (device) return { kind: 'device', record: device };
+  return null;
+}
+
+module.exports = { bearerFromReq, clientIp, checkEnrollToken, authenticate, DEFAULT_ACCOUNT };

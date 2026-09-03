@@ -1,48 +1,74 @@
 'use strict';
 
 /*
- * Short-lived pairing codes. An agent registering a room mints a numeric code
- * with a TTL; a phone redeems it once to join. Codes are single-use and per
- * room, so the room id itself carries no authority.
+ * Short-lived pairing codes (protocol v3).
+ *
+ * An authenticated principal (an agent or an already-paired device) mints a
+ * numeric code bound to its account. A phone redeems the code exactly once to
+ * obtain a device token. Codes expire, are single-use, one-per-issuer (minting
+ * again replaces the previous code), and are invalidated after too many wrong
+ * guesses while they are outstanding. IP and global attempt budgets live in
+ * the HTTP layer (see http.js); this store only knows about codes.
  */
 
-const crypto = require('crypto');
-
-/** A cryptographically-random zero-padded numeric code. */
-function numericCode(digits) {
-  const max = 10 ** digits;
-  const n = crypto.randomInt(0, max);
-  return String(n).padStart(digits, '0');
-}
+const { numericCode } = require('./tokens');
 
 class PairingStore {
-  constructor(digits = 6) {
+  constructor({ digits = 6, ttlSec = 300, maxWrongGuesses = 25, now = Date.now } = {}) {
     this.digits = digits;
-    /** @type {Map<string, {code: string, expires: number}>} */
-    this.byRoom = new Map();
+    this.ttlMs = ttlSec * 1000;
+    this.maxWrongGuesses = maxWrongGuesses;
+    this.now = now;
+    /** @type {Map<string, {code:string, accountId:string, issuedBy:string, expires:number, wrong:number}>} */
+    this.byCode = new Map();
+    /** @type {Map<string, string>} issuer id -> code */
+    this.byIssuer = new Map();
   }
 
-  mint(room, ttlSec) {
-    const code = numericCode(this.digits);
-    const expires = Date.now() + ttlSec * 1000;
-    this.byRoom.set(room, { code, expires });
-    return { code, expires: Math.round(expires / 1000) };
+  /** Mint a code for `accountId` on behalf of `issuedBy` (agent or device id). */
+  mint({ accountId, issuedBy }) {
+    this.prune();
+    const prev = this.byIssuer.get(issuedBy);
+    if (prev) this.byCode.delete(prev);
+    let code;
+    do { code = numericCode(this.digits); } while (this.byCode.has(code));
+    const expires = this.now() + this.ttlMs;
+    this.byCode.set(code, { code, accountId, issuedBy, expires, wrong: 0 });
+    this.byIssuer.set(issuedBy, code);
+    return { code, expiresAt: expires, ttlSec: Math.round(this.ttlMs / 1000) };
   }
 
-  redeem(room, code) {
-    const entry = this.byRoom.get(room);
-    if (!entry) return false;
-    if (Date.now() > entry.expires) { this.byRoom.delete(room); return false; }
-    if (String(code) !== entry.code) return false;
-    this.byRoom.delete(room); // single use
-    return true;
+  /**
+   * Redeem a code. Returns {ok:true, accountId, issuedBy} or {ok:false}.
+   * A wrong guess counts against every outstanding code (defence in depth on
+   * top of the per-IP / global budgets), and codes past the guess cap die.
+   */
+  redeem(code) {
+    this.prune();
+    const key = String(code == null ? '' : code);
+    const entry = this.byCode.get(key);
+    if (!entry) {
+      for (const e of this.byCode.values()) {
+        if (++e.wrong >= this.maxWrongGuesses) this.remove(e);
+      }
+      return { ok: false };
+    }
+    this.remove(entry); // single use
+    return { ok: true, accountId: entry.accountId, issuedBy: entry.issuedBy };
   }
 
-  /** Drop expired entries (call periodically if long-running). */
+  remove(entry) {
+    this.byCode.delete(entry.code);
+    if (this.byIssuer.get(entry.issuedBy) === entry.code) this.byIssuer.delete(entry.issuedBy);
+  }
+
+  /** Drop expired entries. */
   prune() {
-    const now = Date.now();
-    for (const [room, e] of this.byRoom) if (now > e.expires) this.byRoom.delete(room);
+    const now = this.now();
+    for (const e of this.byCode.values()) if (now > e.expires) this.remove(e);
   }
+
+  get size() { return this.byCode.size; }
 }
 
-module.exports = { PairingStore, numericCode };
+module.exports = { PairingStore };

@@ -1,13 +1,43 @@
 {
   "host": "0.0.0.0",
   "port": 8080,
+  "publicUrl": "wss://relay.example.com",
+  "logLevel": "info",
+  "stateFile": "./data/state.json",
+  "trustProxy": false,
+  "legacyV2": false,
+
+  "enrollToken": "change-me-to-a-long-random-secret",
+  "accounts": [],
+
   "maxFrameBytes": 1048576,
   "maxConns": 1000,
   "maxConnsPerIp": 20,
   "msgPerSec": 200,
+  "agentMsgPerSec": 2000,
   "heartbeatMs": 30000,
-  "logLevel": "info",
-  "authToken": "",
-  "pairing": { "enabled": false, "ttlSec": 300 },
+  "backpressureHighBytes": 4194304,
+  "backpressureLowBytes": 524288,
+
+  "pairing": {
+    "ttlSec": 300,
+    "digits": 6,
+    "maxWrongGuesses": 25,
+    "perIpPerMin": 5,
+    "lockoutSec": 900,
+    "globalPerMin": 100,
+    "globalLockoutSec": 60,
+    "enrollPerIpPerMin": 10
+  },
+
+  "limits": {
+    "maxSessionsPerAgent": 16,
+    "maxSessionsPerAccount": 64,
+    "maxAgentsPerAccount": 50,
+    "maxDevicesPerAccount": 20,
+    "sessionCreatePerMin": 30,
+    "maxInputBytes": 1048576
+  },
+
   "tls": { "cert": "", "key": "" }
 }

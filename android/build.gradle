@@ -1,13 +1,14 @@
 // Legacy buildscript-classpath form on purpose: it resolves the real AGP
-// artifact directly. Repos point at Aliyun mirrors because dl.google.com is
-// blocked in this environment (the local Gradle cache was populated via Aliyun).
+// artifact directly. Google/Maven Central come first; the Aliyun mirrors stay
+// as fallbacks for build environments where dl.google.com is blocked.
 buildscript {
     repositories {
+        google()
+        mavenCentral()
+        // Fallback mirrors for environments where dl.google.com / Maven Central are blocked.
         maven { url 'https://maven.aliyun.com/repository/public' }
         maven { url 'https://maven.aliyun.com/repository/google' }
         maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
-        google()
-        mavenCentral()
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:8.7.3'

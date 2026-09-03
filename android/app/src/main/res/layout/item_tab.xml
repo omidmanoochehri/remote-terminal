@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="wrap_content"
+    android:layout_height="@dimen/terminal_tab_height"
+    android:layout_marginEnd="@dimen/space_s"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingStart="@dimen/space_m"
+    android:paddingEnd="@dimen/space_s"
+    android:background="@drawable/bg_tab"
+    android:clickable="true"
+    android:focusable="true">
+
+    <TextView
+        android:id="@+id/tabTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:maxWidth="150dp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textAppearance="?attr/textAppearanceLabelLarge"
+        android:textColor="?attr/colorOnSurface" />
+
+    <TextView
+        android:id="@+id/tabBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="18dp"
+        android:layout_marginStart="@dimen/space_s"
+        android:minWidth="18dp"
+        android:gravity="center"
+        android:paddingStart="5dp"
+        android:paddingEnd="5dp"
+        android:background="@drawable/bg_badge"
+        android:textAppearance="?attr/textAppearanceLabelSmall"
+        android:textColor="?attr/colorOnPrimary"
+        android:textSize="11sp"
+        android:visibility="gone" />
+
+    <ImageButton
+        android:id="@+id/tabClose"
+        android:layout_width="26dp"
+        android:layout_height="26dp"
+        android:layout_marginStart="6dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@drawable/ic_close"
+        android:scaleType="centerInside"
+        android:padding="6dp"
+        android:contentDescription="@string/tab_close"
+        app:tint="?attr/colorOnSurfaceVariant" />
+</LinearLayout>

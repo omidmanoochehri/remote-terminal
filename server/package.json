@@ -1,8 +1,8 @@
 {
   "name": "remote-terminal-server",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
-  "description": "WebSocket relay that pairs an Android phone with a Windows terminal agent by room, with auth, pairing codes, rate limiting and heartbeat.",
+  "description": "Relay for Remote Terminal (protocol v3): enrolment, pairing, device tokens, multi-agent session routing, presence, limits.",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {

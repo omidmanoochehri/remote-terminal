@@ -25,3 +25,10 @@ runtime/
 # OS / editor
 .DS_Store
 Thumbs.db
+
+# Relay persisted identity + agent identity (token hashes / tokens) — never commit
+server/data/
+agent/state.json
+
+# Claude Code worktrees / local session files
+.claude/

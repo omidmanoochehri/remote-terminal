@@ -1,23 +1,33 @@
 <resources>
-    <!-- Terminal surface -->
+    <!-- App chrome (light). Night overrides live in values-night. -->
+    <color name="app_bg">#FFF5F7FA</color>
+    <color name="app_surface">#FFFFFFFF</color>
+    <color name="app_surface_variant">#FFEBEEF3</color>
+    <color name="app_on_surface">#FF10151C</color>
+    <color name="app_on_surface_muted">#FF5A6573</color>
+    <color name="app_outline">#FFD5DAE2</color>
+    <color name="app_primary">#FF0E7A5F</color>
+    <color name="app_on_primary">#FFFFFFFF</color>
+    <color name="app_primary_container">#FFC6EFDF</color>
+    <color name="app_on_primary_container">#FF00251A</color>
+    <color name="app_bar">#FFFFFFFF</color>
+
+    <!-- Extra-keys bar -->
+    <color name="key_bg">#FFE7EBF1</color>
+    <color name="key_fg">#FF19202A</color>
+    <color name="key_active_bg">#FF0E7A5F</color>
+    <color name="key_active_fg">#FFFFFFFF</color>
+    <color name="key_locked_bg">#FF08553F</color>
+
+    <!-- Presence (also carried by text/glyph, never colour alone) -->
+    <color name="status_online">#FF12A277</color>
+    <color name="status_reconnecting">#FFD98A15</color>
+    <color name="status_offline">#FF97A1AF</color>
+    <color name="status_error">#FFD2382F</color>
+
+    <!-- Terminal defaults (the scheme is applied at runtime; these are fallbacks) -->
     <color name="term_bg">#FF0C0C0C</color>
     <color name="term_fg">#FFE6E6E6</color>
-
-    <!-- Chrome / Material palette -->
-    <color name="bar_bg">#FF161616</color>
-    <color name="surface">#FF1A1A1A</color>
-    <color name="surface_variant">#FF242424</color>
-    <color name="on_surface">#FFE6E6E6</color>
-    <color name="on_surface_muted">#FF9E9E9E</color>
-    <color name="outline">#FF3A3A3A</color>
-
-    <color name="accent">#FF4CAF50</color>
-    <color name="accent_dark">#FF1B5E20</color>
-    <color name="on_accent">#FF06210A</color>
-
-    <color name="status_ok">#FF66BB6A</color>
-    <color name="status_warn">#FFFFB74D</color>
-    <color name="status_err">#FFEF5350</color>
-
     <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
 </resources>

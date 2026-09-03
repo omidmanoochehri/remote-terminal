@@ -2,9 +2,12 @@
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile
 
-# The custom terminal view is inflated from activity_main.xml by class name, so
-# keep its (Context, AttributeSet) constructor. AGP's default view rules cover
-# this too, but be explicit.
--keep class com.cactus.remoteterminal.TerminalView {
+# Custom views are inflated from layouts by class name: keep their
+# (Context, AttributeSet) constructors. AGP's default rules cover this too,
+# but be explicit.
+-keep class com.cactus.remoteterminal.terminal.TerminalView {
+    public <init>(android.content.Context, android.util.AttributeSet);
+}
+-keep class com.cactus.remoteterminal.terminal.ExtraKeysView {
     public <init>(android.content.Context, android.util.AttributeSet);
 }

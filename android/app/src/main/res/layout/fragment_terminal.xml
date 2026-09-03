@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/app_bar">
+
+    <!-- Header: machine identity + actions, then the tab strip, on one surface -->
+    <LinearLayout
+        android:id="@+id/headerContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="?attr/colorSurface">
+
+        <LinearLayout
+            android:id="@+id/topBar"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/terminal_bar_height"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="@dimen/space_xs"
+            android:paddingEnd="@dimen/space_xs">
+
+            <ImageButton
+                android:id="@+id/backButton"
+                style="@style/Widget.RemoteTerminal.IconButton"
+                android:src="@drawable/ic_arrow_back"
+                android:contentDescription="@string/back" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="@dimen/space_s"
+                android:layout_marginEnd="@dimen/space_s"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/machineName"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textAppearance="?attr/textAppearanceTitleMedium"
+                    android:textColor="?attr/colorOnSurface"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <View
+                        android:id="@+id/machineDot"
+                        android:layout_width="8dp"
+                        android:layout_height="8dp"
+                        android:background="@drawable/bg_status_dot"
+                        android:importantForAccessibility="no" />
+
+                    <TextView
+                        android:id="@+id/machineStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:textAppearance="?attr/textAppearanceLabelSmall"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <ImageButton
+                android:id="@+id/searchButton"
+                style="@style/Widget.RemoteTerminal.IconButton"
+                android:src="@drawable/ic_search"
+                android:contentDescription="@string/search" />
+
+            <ImageButton
+                android:id="@+id/keyboardButton"
+                style="@style/Widget.RemoteTerminal.IconButton"
+                android:src="@drawable/ic_keyboard"
+                android:contentDescription="@string/show_keyboard" />
+
+            <ImageButton
+                android:id="@+id/moreButton"
+                style="@style/Widget.RemoteTerminal.IconButton"
+                android:src="@drawable/ic_more_vert"
+                android:contentDescription="@string/more" />
+        </LinearLayout>
+
+        <!-- Terminal tabs: chips with room to breathe -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/tabs"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/terminal_tabs_row_height"
+            android:paddingStart="@dimen/space_m"
+            android:paddingEnd="@dimen/space_m"
+            android:paddingTop="@dimen/space_xs"
+            android:paddingBottom="@dimen/space_m"
+            android:clipToPadding="false" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="?attr/colorOutline"
+            android:importantForAccessibility="no" />
+    </LinearLayout>
+
+    <!-- Search bar (hidden until requested) -->
+    <LinearLayout
+        android:id="@+id/searchBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="8dp"
+        android:background="?attr/colorSurfaceVariant"
+        android:visibility="gone">
+
+        <EditText
+            android:id="@+id/searchInput"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:hint="@string/search_hint"
+            android:inputType="text|textNoSuggestions"
+            android:imeOptions="actionSearch"
+            android:maxLines="1"
+            android:background="@null"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:importantForAutofill="no" />
+
+        <TextView
+            android:id="@+id/searchCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:textAppearance="?attr/textAppearanceLabelMedium"
+            android:textColor="?attr/colorOnSurfaceVariant" />
+
+        <ImageButton
+            android:id="@+id/searchPrev"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_chevron_up"
+            android:contentDescription="@string/search_prev"
+            app:tint="?attr/colorOnSurface" />
+
+        <ImageButton
+            android:id="@+id/searchNext"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_chevron_down"
+            android:contentDescription="@string/search_next"
+            app:tint="?attr/colorOnSurface" />
+
+        <ImageButton
+            android:id="@+id/searchClose"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_close"
+            android:contentDescription="@string/close_search"
+            app:tint="?attr/colorOnSurface" />
+    </LinearLayout>
+
+    <!-- The terminal itself, with the status banner and "new lines" chip layered on top -->
+    <FrameLayout
+        android:id="@+id/terminalFrame"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@color/term_bg">
+
+        <com.cactus.remoteterminal.terminal.TerminalView
+            android:id="@+id/terminal"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <TextView
+            android:id="@+id/banner"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|center_horizontal"
+            android:layout_marginTop="8dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="5dp"
+            android:paddingBottom="5dp"
+            android:background="@drawable/bg_banner"
+            android:textAppearance="?attr/textAppearanceLabelMedium"
+            android:visibility="gone" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/newLinesChip"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="12dp"
+            android:contentDescription="@string/jump_to_bottom"
+            android:visibility="gone"
+            app:icon="@drawable/ic_arrow_downward" />
+    </FrameLayout>
+
+    <!-- Bottom chrome: padded clear of the navigation bar and the keyboard -->
+    <LinearLayout
+        android:id="@+id/bottomBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@color/app_bar">
+
+    <com.cactus.remoteterminal.terminal.ExtraKeysView
+        android:id="@+id/extraKeys"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <!-- Optional command bar -->
+    <LinearLayout
+        android:id="@+id/commandBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="8dp"
+        android:paddingEnd="4dp"
+        android:paddingBottom="4dp"
+        android:background="@color/app_bar"
+        android:visibility="gone">
+
+        <EditText
+            android:id="@+id/commandInput"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:hint="@string/command_hint"
+            android:fontFamily="@font/terminal_mono"
+            android:inputType="text|textNoSuggestions"
+            android:imeOptions="actionSend"
+            android:maxLines="1"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:importantForAutofill="no" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/sendButton"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/send" />
+    </LinearLayout>
+    </LinearLayout>
+</LinearLayout>
