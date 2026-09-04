@@ -24,10 +24,10 @@
     </string-array>
 
     <string-array name="terminal_theme_entries">
-        <item>Default Dark</item><item>AMOLED</item><item>Light</item><item>Solarized Dark</item><item>Gruvbox Dark</item>
+        <item>Remote Terminal</item><item>Default Dark</item><item>AMOLED</item><item>Light</item><item>Solarized Dark</item><item>Gruvbox Dark</item>
     </string-array>
     <string-array name="terminal_theme_values">
-        <item>dark</item><item>amoled</item><item>light</item><item>solarized_dark</item><item>gruvbox</item>
+        <item>remote</item><item>dark</item><item>amoled</item><item>light</item><item>solarized_dark</item><item>gruvbox</item>
     </string-array>
 
     <string-array name="app_theme_entries">

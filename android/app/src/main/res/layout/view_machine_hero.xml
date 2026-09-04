@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Machine hero: the identity block that stays put while the three tabs below
+  it change. Presence is a labelled pill, never a bare colour.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/hero"
+    android:layout_width="match_parent"
+    android:layout_height="120dp"
+    android:layout_marginStart="@dimen/rt_gutter"
+    android:layout_marginEnd="@dimen/rt_gutter"
+    android:orientation="horizontal"
+    android:baselineAligned="false"
+    android:gravity="center_vertical"
+    android:paddingStart="@dimen/rt_gutter"
+    android:paddingEnd="@dimen/rt_gutter"
+    android:background="@drawable/rt_card_lg">
+
+    <FrameLayout
+        android:layout_width="66dp"
+        android:layout_height="76dp"
+        android:background="@drawable/rt_icon_tile_accent">
+
+        <ImageView
+            android:id="@+id/heroIcon"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_rt_server"
+            android:contentDescription="@string/a11y_machine_icon"
+            app:tint="@color/rt_primary" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="18dp"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:id="@+id/heroBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="23dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="11dp"
+            android:paddingEnd="13dp"
+            android:background="@drawable/rt_badge">
+
+            <View
+                android:id="@+id/heroDot"
+                android:layout_width="6dp"
+                android:layout_height="6dp"
+                android:background="@drawable/rt_dot"
+                android:importantForAccessibility="no" />
+
+            <TextView
+                android:id="@+id/heroStatus"
+                style="@style/RtText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="7dp"
+                android:textSize="9sp"
+                android:textStyle="bold"
+                android:textColor="@color/rt_primary"
+                tools:text="Online" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/heroName"
+            style="@style/RtText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="cactus-server" />
+
+        <TextView
+            android:id="@+id/heroOs"
+            style="@style/RtText.Body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:textColor="@color/rt_text_muted"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="Ubuntu 24.04.4 LTS  •  x64" />
+
+        <TextView
+            android:id="@+id/heroAgent"
+            style="@style/RtText.Meta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="Agent 0.3.0" />
+    </LinearLayout>
+</LinearLayout>

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One stored command; tapping copies it, the menu can remove it. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/row"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="@dimen/rt_gutter"
+    android:layout_marginEnd="@dimen/rt_gutter"
+    android:layout_marginTop="8dp"
+    android:minHeight="48dp"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingStart="13dp"
+    android:paddingEnd="4dp"
+    android:paddingTop="10dp"
+    android:paddingBottom="10dp"
+    android:background="@drawable/rt_card_clickable"
+    android:clickable="true"
+    android:focusable="true">
+
+    <ImageView
+        android:layout_width="@dimen/rt_icon_md"
+        android:layout_height="@dimen/rt_icon_md"
+        android:src="@drawable/ic_rt_terminal"
+        android:importantForAccessibility="no"
+        app:tint="@color/rt_text_muted" />
+
+    <TextView
+        android:id="@+id/commandText"
+        style="@style/RtText.Mono"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="12dp"
+        android:textSize="10.5sp"
+        android:maxLines="2"
+        android:ellipsize="end"
+        tools:text="npm run dev" />
+
+    <ImageButton
+        android:id="@+id/commandMenu"
+        style="@style/Widget.RemoteTerminal.IconButton"
+        android:src="@drawable/ic_rt_more"
+        android:padding="13dp"
+        android:contentDescription="@string/more" />
+</LinearLayout>

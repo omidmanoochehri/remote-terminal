@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icon button with a visible well (the keyboard key in the terminal header). -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="@color/rt_primary_soft">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient android:angle="315"
+                android:startColor="@color/rt_surface_bright_top"
+                android:endColor="@color/rt_surface_bright_bottom" />
+            <stroke android:width="@dimen/rt_stroke" android:color="@color/rt_outline_strong" />
+            <corners android:radius="@dimen/rt_radius_field" />
+        </shape>
+    </item>
+</ripple>

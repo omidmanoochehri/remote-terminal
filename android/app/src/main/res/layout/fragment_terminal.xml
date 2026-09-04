@@ -1,50 +1,79 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Terminal session. The header identifies the machine with the terminal mark
+  (not the app mark), the tab strip carries the open sessions, and the grid
+  sits in a rounded well with the command bar, the key grid and a status
+  footer beneath it.
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@color/app_bar">
+    android:orientation="vertical">
 
-    <!-- Header: machine identity + actions, then the tab strip, on one surface -->
     <LinearLayout
         android:id="@+id/headerContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:background="?attr/colorSurface">
+        android:orientation="vertical">
 
         <LinearLayout
             android:id="@+id/topBar"
             android:layout_width="match_parent"
-            android:layout_height="@dimen/terminal_bar_height"
+            android:layout_height="wrap_content"
+            android:minHeight="@dimen/terminal_bar_height"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingStart="@dimen/space_xs"
-            android:paddingEnd="@dimen/space_xs">
+            android:paddingStart="10dp"
+            android:paddingEnd="2dp">
 
             <ImageButton
                 android:id="@+id/backButton"
-                style="@style/Widget.RemoteTerminal.IconButton"
-                android:src="@drawable/ic_arrow_back"
-                android:contentDescription="@string/back" />
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:padding="7dp"
+                android:scaleType="fitCenter"
+                android:background="@drawable/rt_icon_button"
+                android:src="@drawable/ic_rt_arrow_left"
+                android:contentDescription="@string/back"
+                app:tint="@color/rt_text" />
+
+            <FrameLayout
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/rt_terminal_mark">
+
+                <ImageView
+                    android:layout_width="17dp"
+                    android:layout_height="17dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_rt_terminal_square"
+                    android:importantForAccessibility="no"
+                    app:tint="@color/rt_primary" />
+            </FrameLayout>
 
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginStart="@dimen/space_s"
-                android:layout_marginEnd="@dimen/space_s"
+                android:layout_marginStart="9dp"
+                android:layout_marginEnd="4dp"
                 android:orientation="vertical">
 
                 <TextView
                     android:id="@+id/machineName"
+                    style="@style/RtText"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textAppearance="?attr/textAppearanceTitleMedium"
-                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
                     android:maxLines="1"
-                    android:ellipsize="end" />
+                    android:ellipsize="end"
+                    tools:text="Cactus Server" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -55,157 +84,214 @@
 
                     <View
                         android:id="@+id/machineDot"
-                        android:layout_width="8dp"
-                        android:layout_height="8dp"
-                        android:background="@drawable/bg_status_dot"
+                        android:layout_width="6dp"
+                        android:layout_height="6dp"
+                        android:layout_marginEnd="6dp"
+                        android:background="@drawable/rt_dot"
                         android:importantForAccessibility="no" />
 
                     <TextView
                         android:id="@+id/machineStatus"
-                        android:layout_width="wrap_content"
+                        style="@style/RtText"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="6dp"
-                        android:textAppearance="?attr/textAppearanceLabelSmall"
+                        android:layout_weight="1"
+                        android:textSize="8.5sp"
+                        android:textColor="@color/rt_text_muted"
                         android:maxLines="1"
-                        android:ellipsize="end" />
+                        android:ellipsize="end"
+                        tools:text="192.168.1.10  •  Ubuntu 24.04" />
                 </LinearLayout>
             </LinearLayout>
 
             <ImageButton
                 android:id="@+id/searchButton"
-                style="@style/Widget.RemoteTerminal.IconButton"
-                android:src="@drawable/ic_search"
-                android:contentDescription="@string/search" />
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
+                android:background="@drawable/rt_icon_button"
+                android:src="@drawable/ic_rt_search"
+                android:contentDescription="@string/search"
+                app:tint="@color/rt_text" />
 
             <ImageButton
                 android:id="@+id/keyboardButton"
-                style="@style/Widget.RemoteTerminal.IconButton"
-                android:src="@drawable/ic_keyboard"
-                android:contentDescription="@string/show_keyboard" />
+                android:layout_width="34dp"
+                android:layout_height="31dp"
+                android:layout_marginStart="6dp"
+                android:padding="7dp"
+                android:scaleType="fitCenter"
+                android:background="@drawable/rt_icon_button_boxed"
+                android:src="@drawable/ic_rt_keyboard"
+                android:contentDescription="@string/keyboard_toggle"
+                app:tint="@color/rt_text" />
 
             <ImageButton
                 android:id="@+id/moreButton"
-                style="@style/Widget.RemoteTerminal.IconButton"
-                android:src="@drawable/ic_more_vert"
-                android:contentDescription="@string/more" />
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:padding="9dp"
+                android:scaleType="fitCenter"
+                android:background="@drawable/rt_icon_button"
+                android:src="@drawable/ic_rt_more"
+                android:contentDescription="@string/more"
+                app:tint="@color/rt_text" />
         </LinearLayout>
 
-        <!-- Terminal tabs: chips with room to breathe -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/tabs"
             android:layout_width="match_parent"
             android:layout_height="@dimen/terminal_tabs_row_height"
-            android:paddingStart="@dimen/space_m"
-            android:paddingEnd="@dimen/space_m"
-            android:paddingTop="@dimen/space_xs"
-            android:paddingBottom="@dimen/space_m"
-            android:clipToPadding="false" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="?attr/colorOutline"
-            android:importantForAccessibility="no" />
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="7dp"
+            android:clipToPadding="false"
+            android:scrollbars="none" />
     </LinearLayout>
 
     <!-- Search bar (hidden until requested) -->
     <LinearLayout
         android:id="@+id/searchBar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="43dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="6dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="8dp"
-        android:background="?attr/colorSurfaceVariant"
+        android:paddingStart="12dp"
+        android:paddingEnd="2dp"
+        android:background="@drawable/rt_field"
         android:visibility="gone">
+
+        <ImageView
+            android:layout_width="@dimen/rt_icon_md"
+            android:layout_height="@dimen/rt_icon_md"
+            android:src="@drawable/ic_rt_search"
+            android:importantForAccessibility="no"
+            app:tint="@color/rt_text_muted" />
 
         <EditText
             android:id="@+id/searchInput"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_weight="1"
+            style="@style/RtFieldInput"
+            android:layout_marginStart="6dp"
+            android:textSize="10.5sp"
             android:hint="@string/search_hint"
             android:inputType="text|textNoSuggestions"
             android:imeOptions="actionSearch"
-            android:maxLines="1"
-            android:background="@null"
-            android:textAppearance="?attr/textAppearanceBodyMedium"
-            android:importantForAutofill="no" />
+            tools:ignore="Autofill" />
 
         <TextView
             android:id="@+id/searchCount"
+            style="@style/RtText.RowMeta"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:paddingStart="6dp"
-            android:paddingEnd="6dp"
-            android:textAppearance="?attr/textAppearanceLabelMedium"
-            android:textColor="?attr/colorOnSurfaceVariant" />
+            android:paddingEnd="6dp" />
 
         <ImageButton
             android:id="@+id/searchPrev"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_chevron_up"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:padding="8dp"
+            android:scaleType="fitCenter"
+            android:background="@drawable/rt_icon_button"
+            android:src="@drawable/ic_rt_chevron_up"
             android:contentDescription="@string/search_prev"
-            app:tint="?attr/colorOnSurface" />
+            app:tint="@color/rt_text_secondary" />
 
         <ImageButton
             android:id="@+id/searchNext"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_chevron_down"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:padding="8dp"
+            android:scaleType="fitCenter"
+            android:background="@drawable/rt_icon_button"
+            android:src="@drawable/ic_rt_chevron_down"
             android:contentDescription="@string/search_next"
-            app:tint="?attr/colorOnSurface" />
+            app:tint="@color/rt_text_secondary" />
 
         <ImageButton
             android:id="@+id/searchClose"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_close"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:padding="9dp"
+            android:scaleType="fitCenter"
+            android:background="@drawable/rt_icon_button"
+            android:src="@drawable/ic_rt_close"
             android:contentDescription="@string/close_search"
-            app:tint="?attr/colorOnSurface" />
+            app:tint="@color/rt_text_secondary" />
     </LinearLayout>
 
-    <!-- The terminal itself, with the status banner and "new lines" chip layered on top -->
+    <!-- The terminal grid inside its well, with the status banner over it -->
     <FrameLayout
         android:id="@+id/terminalFrame"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:background="@color/term_bg">
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:background="@drawable/rt_terminal_surface">
 
         <com.cactus.remoteterminal.terminal.TerminalView
             android:id="@+id/terminal"
             android:layout_width="match_parent"
-            android:layout_height="match_parent" />
+            android:layout_height="match_parent"
+            android:layout_margin="6dp" />
 
         <TextView
             android:id="@+id/banner"
+            style="@style/RtText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="top|center_horizontal"
-            android:layout_marginTop="8dp"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:paddingTop="5dp"
-            android:paddingBottom="5dp"
-            android:background="@drawable/bg_banner"
-            android:textAppearance="?attr/textAppearanceLabelMedium"
-            android:visibility="gone" />
+            android:layout_marginTop="10dp"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:paddingTop="7dp"
+            android:paddingBottom="7dp"
+            android:background="@drawable/rt_badge_neutral"
+            android:textSize="9.5sp"
+            android:textColor="@color/rt_text_secondary"
+            android:visibility="gone"
+            tools:text="Attaching…"
+            tools:visibility="visible" />
 
-        <com.google.android.material.button.MaterialButton
+        <LinearLayout
             android:id="@+id/newLinesChip"
-            style="@style/Widget.Material3.Button.TonalButton"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_height="32dp"
             android:layout_gravity="bottom|center_horizontal"
             android:layout_marginBottom="12dp"
-            android:contentDescription="@string/jump_to_bottom"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:paddingStart="12dp"
+            android:paddingEnd="14dp"
+            android:background="@drawable/rt_badge"
+            android:clickable="true"
+            android:focusable="true"
             android:visibility="gone"
-            app:icon="@drawable/ic_arrow_downward" />
+            android:contentDescription="@string/jump_to_bottom">
+
+            <ImageView
+                android:layout_width="@dimen/rt_icon_sm"
+                android:layout_height="@dimen/rt_icon_sm"
+                android:layout_marginEnd="7dp"
+                android:src="@drawable/ic_rt_arrow_down"
+                android:importantForAccessibility="no"
+                app:tint="@color/rt_primary" />
+
+            <TextView
+                android:id="@+id/newLinesText"
+                style="@style/RtText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="9.5sp"
+                android:textStyle="bold"
+                android:textColor="@color/rt_primary" />
+        </LinearLayout>
     </FrameLayout>
 
     <!-- Bottom chrome: padded clear of the navigation bar and the keyboard -->
@@ -214,45 +300,136 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:background="@color/app_bar">
+        android:paddingTop="9dp"
+        android:paddingBottom="6dp">
 
-    <com.cactus.remoteterminal.terminal.ExtraKeysView
-        android:id="@+id/extraKeys"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
+        <LinearLayout
+            android:id="@+id/commandBar"
+            android:layout_width="match_parent"
+            android:layout_height="43dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="12dp"
+            android:paddingEnd="5dp"
+            android:background="@drawable/rt_field"
+            android:visibility="gone">
 
-    <!-- Optional command bar -->
-    <LinearLayout
-        android:id="@+id/commandBar"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingStart="8dp"
-        android:paddingEnd="4dp"
-        android:paddingBottom="4dp"
-        android:background="@color/app_bar"
-        android:visibility="gone">
+            <TextView
+                style="@style/RtText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="17sp"
+                android:textColor="@color/rt_text_secondary"
+                android:importantForAccessibility="no"
+                android:text="@string/command_prompt_glyph" />
 
-        <EditText
-            android:id="@+id/commandInput"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_weight="1"
-            android:hint="@string/command_hint"
-            android:fontFamily="@font/terminal_mono"
-            android:inputType="text|textNoSuggestions"
-            android:imeOptions="actionSend"
-            android:maxLines="1"
-            android:textAppearance="?attr/textAppearanceBodyMedium"
-            android:importantForAutofill="no" />
+            <EditText
+                android:id="@+id/commandInput"
+                style="@style/RtFieldInput"
+                android:layout_marginStart="6dp"
+                android:textSize="10.5sp"
+                android:fontFamily="@font/terminal_mono"
+                android:hint="@string/command_placeholder"
+                android:inputType="text|textNoSuggestions"
+                android:imeOptions="actionSend"
+                tools:ignore="Autofill" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/sendButton"
-            style="@style/Widget.Material3.Button.TextButton"
-            android:layout_width="wrap_content"
+            <ImageButton
+                android:id="@+id/sendButton"
+                android:layout_width="36dp"
+                android:layout_height="33dp"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
+                android:background="@drawable/rt_send_button"
+                android:src="@drawable/ic_rt_send"
+                android:contentDescription="@string/send"
+                app:tint="@color/white" />
+        </LinearLayout>
+
+        <com.cactus.remoteterminal.terminal.ExtraKeysView
+            android:id="@+id/extraKeys"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/send" />
-    </LinearLayout>
+            android:layout_marginTop="9dp" />
+
+        <!-- Session status: state, transport, how long it has been up -->
+        <LinearLayout
+            android:id="@+id/statusFooter"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="14dp"
+            android:paddingEnd="6dp">
+
+            <View
+                android:id="@+id/footerDot"
+                android:layout_width="@dimen/status_dot"
+                android:layout_height="@dimen/status_dot"
+                android:background="@drawable/rt_dot"
+                android:importantForAccessibility="no" />
+
+            <TextView
+                android:id="@+id/footerState"
+                style="@style/RtText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="9dp"
+                android:textSize="10sp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                tools:text="Connected" />
+
+            <ImageView
+                android:id="@+id/footerTransportIcon"
+                android:layout_width="@dimen/rt_icon_sm"
+                android:layout_height="@dimen/rt_icon_sm"
+                android:src="@drawable/ic_rt_terminal_square"
+                android:importantForAccessibility="no"
+                app:tint="@color/rt_text_secondary" />
+
+            <TextView
+                android:id="@+id/footerTransport"
+                style="@style/RtText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="7dp"
+                android:layout_marginEnd="16dp"
+                android:textSize="8.5sp"
+                android:textColor="@color/rt_text_secondary"
+                tools:text="bash" />
+
+            <ImageView
+                android:layout_width="@dimen/rt_icon_sm"
+                android:layout_height="@dimen/rt_icon_sm"
+                android:src="@drawable/ic_rt_clock"
+                android:importantForAccessibility="no"
+                app:tint="@color/rt_text_secondary" />
+
+            <TextView
+                android:id="@+id/footerUptime"
+                style="@style/RtText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="7dp"
+                android:textSize="8.5sp"
+                android:textColor="@color/rt_text_secondary"
+                tools:text="1h 29m" />
+
+            <ImageButton
+                android:id="@+id/footerSettings"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:layout_marginStart="10dp"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
+                android:background="@drawable/rt_icon_button"
+                android:src="@drawable/ic_rt_settings"
+                android:contentDescription="@string/terminal_settings"
+                app:tint="@color/rt_text_secondary" />
+        </LinearLayout>
     </LinearLayout>
 </LinearLayout>

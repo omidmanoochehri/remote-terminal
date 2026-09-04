@@ -1,7 +1,6 @@
 package com.cactus.remoteterminal.terminal
 
 import android.content.Context
-import android.content.res.ColorStateList
 import android.os.SystemClock
 import android.util.AttributeSet
 import android.view.Gravity
@@ -9,10 +8,10 @@ import android.view.HapticFeedbackConstants
 import android.view.View
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.appcompat.widget.TooltipCompat
 import androidx.core.content.ContextCompat
 import com.cactus.remoteterminal.R
-import com.google.android.material.button.MaterialButton
 
 /**
  * The terminal's extra-keys bar: configurable rows of special keys, sticky
@@ -46,11 +45,12 @@ class ExtraKeysView @JvmOverloads constructor(context: Context, attrs: Attribute
     private var rowSpecs: List<List<KeySpec>> = emptyList()
     private var alternateIndex = 0   // which of rows[1..] is shown as the second row
     private var compactIndex = 0
-    private val modifierButtons = ArrayList<Pair<ModifierState.Which, MaterialButton>>()
+    private val modifierButtons = ArrayList<Pair<ModifierState.Which, TextView>>()
 
     init {
         orientation = VERTICAL
-        setBackgroundColor(ContextCompat.getColor(context, R.color.app_bar))
+        // The bar sits on the screen backdrop; the keys carry their own surface.
+        setBackgroundColor(0x00000000)
         modifiers.onChanged = { refreshModifierButtons() }
     }
 
@@ -75,27 +75,42 @@ class ExtraKeysView @JvmOverloads constructor(context: Context, attrs: Attribute
     }
 
     private fun buildRow(specs: List<KeySpec>, swap: Boolean): View {
-        val scroll = HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false; overScrollMode = OVER_SCROLL_NEVER }
-        val row = LinearLayout(context).apply { orientation = HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(4), dp(2), dp(4), dp(2)) }
-        if (swap) row.addView(makeButton(KeySpec("⇄", Action.SwapRow)).apply { contentDescription = context.getString(R.string.toggle_symbol_row) })
+        val scroll = HorizontalScrollView(context).apply {
+            isHorizontalScrollBarEnabled = false
+            overScrollMode = OVER_SCROLL_NEVER
+            clipToPadding = false
+        }
+        val row = LinearLayout(context).apply {
+            orientation = HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(5), dp(3), dp(5), dp(3))
+        }
+        if (swap) row.addView(makeButton(KeySpec("⌘", Action.SwapRow)).apply { contentDescription = context.getString(R.string.toggle_symbol_row) })
         for (spec in specs) row.addView(makeButton(spec))
         scroll.addView(row, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
         return scroll
     }
 
-    private fun makeButton(spec: KeySpec): MaterialButton {
-        val b = MaterialButton(context, null, com.google.android.material.R.attr.materialButtonStyle).apply {
+    /**
+     * One key. A plain text view rather than a MaterialButton so it can use the
+     * design system's key background (a state-list with an activated state for
+     * a held modifier) instead of a Material tint.
+     */
+    private fun makeButton(spec: KeySpec): TextView {
+        val b = TextView(context).apply {
             text = spec.label
             isAllCaps = false
-            textSize = 13f
-            typeface = androidx.core.content.res.ResourcesCompat.getFont(context, R.font.terminal_mono)
-                ?: android.graphics.Typeface.MONOSPACE
-            minWidth = dp(44); minimumWidth = dp(44)
-            minHeight = dp(40); minimumHeight = dp(40)
-            insetTop = 0; insetBottom = 0
-            cornerRadius = dp(8)
-            setPadding(dp(10), 0, dp(10), 0)
-            layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, dp(40)).apply { marginStart = dp(3); marginEnd = dp(3) }
+            textSize = 9.5f
+            gravity = Gravity.CENTER
+            maxLines = 1
+            typeface = android.graphics.Typeface.DEFAULT
+            minWidth = dp(56); minimumWidth = dp(56)
+            minHeight = dp(35); minimumHeight = dp(35)
+            background = ContextCompat.getDrawable(context, R.drawable.rt_key)
+            setPadding(dp(8), 0, dp(8), 0)
+            isClickable = true
+            isFocusable = true
+            layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, dp(35)).apply { marginStart = dp(3); marginEnd = dp(3) }
             paintNormal(this)
         }
         when (val a = spec.action) {
@@ -135,25 +150,35 @@ class ExtraKeysView @JvmOverloads constructor(context: Context, attrs: Attribute
 
     private fun haptic(v: View) { if (hapticsEnabled) v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP) }
 
-    private fun paintNormal(b: MaterialButton) {
-        b.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(context, R.color.key_bg))
-        b.setTextColor(ContextCompat.getColor(context, R.color.key_fg))
-        b.rippleColor = ColorStateList.valueOf(ContextCompat.getColor(context, R.color.app_on_surface_muted))
+    private fun paintNormal(b: TextView) {
+        b.isActivated = false
+        b.setTextColor(ContextCompat.getColor(context, R.color.rt_text_secondary))
     }
 
+    /**
+     * A held modifier is shown three ways at once: the key lights up, its label
+     * gains a marker, and the state is announced — never colour alone.
+     */
     private fun refreshModifierButtons() {
         for ((which, b) in modifierButtons) {
-            when (modifiers.mode(which)) {
-                ModifierState.Mode.OFF -> { paintNormal(b); b.text = b.text.toString().removeSuffix(" ●").removeSuffix(" 🔒") }
-                ModifierState.Mode.ONESHOT -> {
-                    b.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(context, R.color.key_active_bg))
-                    b.setTextColor(ContextCompat.getColor(context, R.color.key_active_fg))
-                    b.text = baseLabel(which) + " ●"
-                }
-                ModifierState.Mode.LOCKED -> {
-                    b.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(context, R.color.key_locked_bg))
-                    b.setTextColor(ContextCompat.getColor(context, R.color.key_active_fg))
-                    b.text = baseLabel(which) + " 🔒"
+            val mode = modifiers.mode(which)
+            b.isActivated = mode != ModifierState.Mode.OFF
+            b.setTextColor(
+                ContextCompat.getColor(
+                    context,
+                    if (mode == ModifierState.Mode.OFF) R.color.rt_text_secondary else R.color.rt_primary
+                )
+            )
+            b.text = when (mode) {
+                ModifierState.Mode.OFF -> baseLabel(which)
+                ModifierState.Mode.ONESHOT -> baseLabel(which) + " ●"
+                ModifierState.Mode.LOCKED -> baseLabel(which) + " ⇩"
+            }
+            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                b.stateDescription = when (mode) {
+                    ModifierState.Mode.OFF -> context.getString(R.string.a11y_not_selected)
+                    ModifierState.Mode.ONESHOT -> context.getString(R.string.a11y_selected)
+                    ModifierState.Mode.LOCKED -> context.getString(R.string.a11y_selected)
                 }
             }
         }

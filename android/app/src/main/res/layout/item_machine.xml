@@ -1,96 +1,182 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.material.card.MaterialCardView
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+  Machine card on the Machines screen: identity and presence, three facts, and
+  a single primary action that states plainly when the machine cannot be
+  reached instead of offering a dead button.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginStart="@dimen/space_m"
-    android:layout_marginEnd="@dimen/space_m"
-    android:layout_marginTop="@dimen/space_s"
-    android:clickable="true"
-    android:focusable="true">
+    android:orientation="vertical"
+    android:background="@drawable/rt_card"
+    android:paddingStart="@dimen/rt_card_padding"
+    android:paddingEnd="@dimen/rt_card_padding"
+    android:paddingTop="@dimen/rt_card_padding_wide"
+    android:paddingBottom="@dimen/rt_card_padding_wide">
 
     <LinearLayout
+        android:id="@+id/identity"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:padding="@dimen/space_l">
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true">
 
         <FrameLayout
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:background="@drawable/bg_icon_circle">
+            android:layout_width="@dimen/rt_tile_lg"
+            android:layout_height="@dimen/rt_tile_lg"
+            android:background="@drawable/rt_icon_tile_quiet">
 
             <ImageView
-                android:id="@+id/platformIcon"
+                android:id="@+id/machineIcon"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:layout_gravity="center"
-                android:src="@drawable/ic_computer"
-                app:tint="?attr/colorOnSurfaceVariant" />
+                android:src="@drawable/ic_rt_server"
+                android:contentDescription="@string/a11y_machine_icon"
+                app:tint="@color/rt_primary" />
         </FrameLayout>
 
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginStart="@dimen/space_l"
+            android:layout_marginStart="12dp"
             android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/name"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textAppearance="?attr/textAppearanceTitleMedium"
-                android:textColor="?attr/colorOnSurface"
-                android:maxLines="1"
-                android:ellipsize="end" />
-
-            <TextView
-                android:id="@+id/subtitle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:textAppearance="?attr/textAppearanceBodySmall"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:maxLines="1"
-                android:ellipsize="end" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_s"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/machineName"
+                    style="@style/RtText.CardTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    tools:text="Cactus Server" />
+
+                <ImageView
+                    android:id="@+id/favouriteMark"
+                    android:layout_width="@dimen/rt_icon_sm"
+                    android:layout_height="@dimen/rt_icon_sm"
+                    android:layout_marginStart="6dp"
+                    android:src="@drawable/ic_rt_star"
+                    android:visibility="gone"
+                    android:contentDescription="@string/action_favourite"
+                    app:tint="@color/rt_amber" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/machineSubtitle"
+                style="@style/RtText.RowMeta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                tools:text="cactus-server · Ubuntu 24.04.4 LTS" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="7dp"
                 android:orientation="horizontal"
                 android:gravity="center_vertical">
 
                 <View
-                    android:id="@+id/dot"
-                    android:layout_width="8dp"
-                    android:layout_height="8dp"
-                    android:background="@drawable/bg_status_dot"
+                    android:id="@+id/statusDot"
+                    android:layout_width="@dimen/status_dot"
+                    android:layout_height="@dimen/status_dot"
+                    android:background="@drawable/rt_dot"
                     android:importantForAccessibility="no" />
 
                 <TextView
-                    android:id="@+id/status"
-                    android:layout_width="wrap_content"
+                    android:id="@+id/statusText"
+                    style="@style/RtText"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_weight="1"
                     android:layout_marginStart="6dp"
-                    android:textAppearance="?attr/textAppearanceLabelMedium" />
-
-                <TextView
-                    android:id="@+id/sessions"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/space_s"
-                    android:paddingStart="@dimen/space_s"
-                    android:paddingEnd="@dimen/space_s"
-                    android:paddingTop="2dp"
-                    android:paddingBottom="2dp"
-                    android:background="@drawable/bg_pill"
-                    android:textAppearance="?attr/textAppearanceLabelSmall"
-                    android:textColor="?attr/colorOnPrimaryContainer" />
+                    android:textSize="10sp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    tools:text="Online · Last seen now" />
             </LinearLayout>
         </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/machineMenu"
+            style="@style/Widget.RemoteTerminal.IconButton"
+            android:layout_marginTop="-2dp"
+            android:src="@drawable/ic_rt_more"
+            android:padding="13dp"
+            android:contentDescription="@string/a11y_machine_menu" />
     </LinearLayout>
-</com.google.android.material.card.MaterialCardView>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:orientation="horizontal"
+        android:baselineAligned="false">
+
+        <include
+            android:id="@+id/statTerminals"
+            layout="@layout/view_stat_box" />
+
+        <Space
+            android:layout_width="9dp"
+            android:layout_height="1dp" />
+
+        <include
+            android:id="@+id/statAgent"
+            layout="@layout/view_stat_box" />
+
+        <Space
+            android:layout_width="9dp"
+            android:layout_height="1dp" />
+
+        <include
+            android:id="@+id/statThird"
+            layout="@layout/view_stat_box" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/primaryAction"
+        android:layout_width="match_parent"
+        android:layout_height="33dp"
+        android:layout_marginTop="11dp"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:background="@drawable/rt_cta_bg"
+        android:clickable="true"
+        android:focusable="true">
+
+        <ImageView
+            android:id="@+id/primaryActionIcon"
+            android:layout_width="@dimen/rt_icon_sm"
+            android:layout_height="@dimen/rt_icon_sm"
+            android:layout_marginEnd="10dp"
+            android:src="@drawable/ic_rt_terminal_square"
+            android:importantForAccessibility="no"
+            app:tint="@color/rt_on_primary" />
+
+        <TextView
+            android:id="@+id/primaryActionLabel"
+            style="@style/RtText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="10.5sp"
+            android:textStyle="bold"
+            android:textColor="@color/rt_on_primary"
+            android:text="@string/action_connect" />
+    </LinearLayout>
+</LinearLayout>

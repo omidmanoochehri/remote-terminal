@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Machine heading above its terminals on the All terminals screen. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:minHeight="30dp"
+    android:paddingStart="@dimen/rt_gutter"
+    android:paddingEnd="@dimen/rt_gutter"
+    android:background="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true">
+
+    <TextView
+        android:id="@+id/groupName"
+        style="@style/RtText.GroupLabel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:maxLines="1"
+        android:ellipsize="end"
+        tools:text="CACTUS SERVER" />
+
+    <TextView
+        android:id="@+id/groupStatus"
+        style="@style/RtText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:textSize="9.5sp"
+        android:textColor="@color/rt_status_online"
+        tools:text="Online" />
+</LinearLayout>

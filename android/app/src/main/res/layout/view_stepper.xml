@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Three-step progress for pairing: Connection, Verify, Finish. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/stepper"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="18dp"
+    android:layout_marginEnd="18dp"
+    android:orientation="horizontal"
+    android:gravity="center_vertical">
+
+    <TextView
+        android:id="@+id/step1"
+        style="@style/RtBadge"
+        android:background="@drawable/rt_step_pill"
+        android:text="@string/step_connection" />
+
+    <View
+        android:id="@+id/stepLine1"
+        android:layout_width="0dp"
+        android:layout_weight="1"
+        android:layout_height="1dp"
+        android:layout_marginStart="4dp"
+        android:layout_marginEnd="4dp"
+        android:background="@color/rt_divider"
+        android:importantForAccessibility="no" />
+
+    <TextView
+        android:id="@+id/step2"
+        style="@style/RtBadge"
+        android:background="@drawable/rt_step_pill"
+        android:text="@string/step_verify" />
+
+    <View
+        android:id="@+id/stepLine2"
+        android:layout_width="0dp"
+        android:layout_weight="1"
+        android:layout_height="1dp"
+        android:layout_marginStart="4dp"
+        android:layout_marginEnd="4dp"
+        android:background="@color/rt_divider"
+        android:importantForAccessibility="no" />
+
+    <TextView
+        android:id="@+id/step3"
+        style="@style/RtBadge"
+        android:background="@drawable/rt_step_pill"
+        android:text="@string/step_finish" />
+</LinearLayout>

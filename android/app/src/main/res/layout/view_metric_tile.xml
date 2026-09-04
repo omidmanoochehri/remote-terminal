@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Metric tile: caption, glyph, value and a meter. When the agent does not
+  report the value the tile shows a dash and an empty meter rather than a
+  plausible-looking number.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="0dp"
+    android:layout_height="93dp"
+    android:layout_weight="1"
+    android:orientation="vertical"
+    android:paddingStart="13dp"
+    android:paddingEnd="13dp"
+    android:paddingTop="14dp"
+    android:paddingBottom="14dp"
+    android:background="@drawable/rt_tile">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/metricCaption"
+            style="@style/RtText.RowMeta"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="CPU" />
+
+        <ImageView
+            android:id="@+id/metricIcon"
+            android:layout_width="@dimen/rt_icon_md"
+            android:layout_height="@dimen/rt_icon_md"
+            android:importantForAccessibility="no"
+            tools:src="@drawable/ic_rt_cpu" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/metricValue"
+        style="@style/RtText.MetricValue"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="9dp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        tools:text="18%" />
+
+    <Space
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <com.cactus.remoteterminal.ui.design.MeterView
+        android:id="@+id/metricMeter"
+        android:layout_width="match_parent"
+        android:layout_height="4dp" />
+</LinearLayout>

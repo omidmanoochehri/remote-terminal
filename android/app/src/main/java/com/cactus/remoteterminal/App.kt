@@ -32,6 +32,7 @@ class App : Application() {
         agents = AgentRepository(this, client)
         sessions = SessionRepository(client, agents, settings)
         notifier = Notifier(this, settings, client, agents, sessions)
+        client.keepAliveInBackground = { sessions.wantsBackgroundKeepAlive() }
         sessions.onClipboard = { _, text ->
             if (settings.osc52Clipboard) {
                 val cm = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager

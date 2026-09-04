@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The soft green bloom the artboards place in the top-right corner. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <gradient
+        android:type="radial"
+        android:centerX="0.95"
+        android:centerY="0.02"
+        android:gradientRadius="420dp"
+        android:startColor="@color/rt_glow"
+        android:endColor="@android:color/transparent" />
+</shape>

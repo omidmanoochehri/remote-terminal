@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Toggle track: deep green when on, grey well when off. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_checked="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#FF13492A" />
+            <corners android:radius="13dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/rt_surface_bright_top" />
+            <stroke android:width="@dimen/rt_stroke" android:color="@color/rt_divider" />
+            <corners android:radius="13dp" />
+        </shape>
+    </item>
+</selector>

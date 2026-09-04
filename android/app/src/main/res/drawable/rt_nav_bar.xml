@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Floating bottom navigation bar. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/rt_surface_nav" />
+    <stroke android:width="@dimen/rt_stroke" android:color="@color/rt_outline" />
+    <corners android:radius="@dimen/rt_radius_nav" />
+</shape>

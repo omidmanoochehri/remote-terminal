@@ -1,51 +1,67 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- One open terminal in the tab strip; the active tab is washed green. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="wrap_content"
-    android:layout_height="@dimen/terminal_tab_height"
-    android:layout_marginEnd="@dimen/space_s"
+    android:layout_height="36dp"
+    android:layout_marginEnd="6dp"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:paddingStart="@dimen/space_m"
-    android:paddingEnd="@dimen/space_s"
-    android:background="@drawable/bg_tab"
+    android:paddingStart="11dp"
+    android:paddingEnd="6dp"
+    android:background="@drawable/rt_terminal_tab"
     android:clickable="true"
     android:focusable="true">
 
+    <ImageView
+        android:id="@+id/tabIcon"
+        android:layout_width="@dimen/rt_icon_sm"
+        android:layout_height="@dimen/rt_icon_sm"
+        android:layout_marginEnd="8dp"
+        android:src="@drawable/ic_rt_terminal_square"
+        android:importantForAccessibility="no"
+        app:tint="@color/rt_text_secondary" />
+
     <TextView
         android:id="@+id/tabTitle"
+        style="@style/RtText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:maxWidth="150dp"
+        android:maxWidth="130dp"
         android:maxLines="1"
         android:ellipsize="end"
-        android:textAppearance="?attr/textAppearanceLabelLarge"
-        android:textColor="?attr/colorOnSurface" />
+        android:textSize="9.5sp"
+        android:textColor="@color/rt_text_secondary"
+        tools:text="narchat 2" />
 
     <TextView
         android:id="@+id/tabBadge"
+        style="@style/RtText"
         android:layout_width="wrap_content"
-        android:layout_height="18dp"
-        android:layout_marginStart="@dimen/space_s"
-        android:minWidth="18dp"
+        android:layout_height="17dp"
+        android:layout_marginStart="7dp"
+        android:minWidth="17dp"
         android:gravity="center"
         android:paddingStart="5dp"
         android:paddingEnd="5dp"
-        android:background="@drawable/bg_badge"
-        android:textAppearance="?attr/textAppearanceLabelSmall"
-        android:textColor="?attr/colorOnPrimary"
-        android:textSize="11sp"
-        android:visibility="gone" />
+        android:background="@drawable/rt_badge_count"
+        android:textSize="8.5sp"
+        android:textStyle="bold"
+        android:textColor="@color/rt_on_primary"
+        android:visibility="gone"
+        tools:text="10"
+        tools:visibility="visible" />
 
     <ImageButton
         android:id="@+id/tabClose"
         android:layout_width="26dp"
         android:layout_height="26dp"
-        android:layout_marginStart="6dp"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:src="@drawable/ic_close"
-        android:scaleType="centerInside"
-        android:padding="6dp"
+        android:layout_marginStart="5dp"
+        android:padding="7dp"
+        android:scaleType="fitCenter"
+        android:background="@drawable/rt_tab_close"
+        android:src="@drawable/ic_rt_close"
         android:contentDescription="@string/tab_close"
-        app:tint="?attr/colorOnSurfaceVariant" />
+        app:tint="@color/rt_text_muted" />
 </LinearLayout>

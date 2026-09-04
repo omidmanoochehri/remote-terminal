@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Top-level screen header: the app mark, a title with a supporting line, and up
+  to three trailing actions. Screens hide the actions they do not offer rather
+  than defining their own header, so the mark and baseline never move.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/header"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:minHeight="@dimen/rt_header_height"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingTop="8dp"
+    android:paddingBottom="10dp"
+    android:paddingStart="@dimen/rt_gutter"
+    android:paddingEnd="0dp">
+
+    <FrameLayout
+        android:id="@+id/headerMark"
+        android:layout_width="@dimen/rt_header_icon"
+        android:layout_height="@dimen/rt_header_icon"
+        android:background="@drawable/rt_icon_tile">
+
+        <ImageView
+            android:id="@+id/headerMarkIcon"
+            android:layout_width="@dimen/rt_icon_xl"
+            android:layout_height="@dimen/rt_icon_xl"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_rt_terminal_square"
+            android:importantForAccessibility="no"
+            app:tint="@color/rt_text" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="4dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/headerTitle"
+            style="@style/RtText.ScreenTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="Remote Terminal" />
+
+        <TextView
+            android:id="@+id/headerSubtitle"
+            style="@style/RtText.ScreenSubtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="Secure. Fast. Everywhere." />
+    </LinearLayout>
+
+    <ImageButton
+        android:id="@+id/headerSearch"
+        style="@style/Widget.RemoteTerminal.IconButton"
+        android:src="@drawable/ic_rt_search"
+        android:contentDescription="@string/search" />
+
+    <ImageButton
+        android:id="@+id/headerRefresh"
+        style="@style/Widget.RemoteTerminal.IconButton"
+        android:src="@drawable/ic_rt_refresh"
+        android:padding="11dp"
+        android:contentDescription="@string/refresh" />
+
+    <ImageButton
+        android:id="@+id/headerOverflow"
+        style="@style/Widget.RemoteTerminal.IconButton"
+        android:src="@drawable/ic_rt_more"
+        android:padding="12dp"
+        android:contentDescription="@string/more" />
+</LinearLayout>

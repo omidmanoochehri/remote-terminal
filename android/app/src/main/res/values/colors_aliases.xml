@@ -1,0 +1,8 @@
+<resources>
+
+    <!-- Presence -->
+    <color name="status_online">@color/rt_status_online</color>
+    <color name="status_reconnecting">@color/rt_status_warn</color>
+    <color name="status_offline">@color/rt_status_offline</color>
+    <color name="status_error">@color/rt_status_error</color>
+</resources>

@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Machine settings. Everything here is either stored on this phone (the
+  connection behaviour and alerts) or sent to the relay (the display name);
+  nothing on the screen is decorative.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <include
+        android:id="@+id/headerBar"
+        layout="@layout/view_back_header" />
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/scroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingBottom="@dimen/space_xl"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="@dimen/rt_gutter"
+            android:paddingEnd="@dimen/rt_gutter">
+
+            <TextView
+                style="@style/RtText.Section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/group_general" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical"
+                android:padding="14dp"
+                android:background="@drawable/rt_card">
+
+                <include
+                    android:id="@+id/nameField"
+                    layout="@layout/view_form_field" />
+
+                <include
+                    android:id="@+id/relayField"
+                    layout="@layout/view_form_field"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp" />
+
+                <TextView
+                    style="@style/RtText.RowMeta"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:lineSpacingExtra="2dp"
+                    android:text="@string/relay_is_account_wide" />
+            </LinearLayout>
+
+            <TextView
+                style="@style/RtText.Section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="22dp"
+                android:text="@string/group_connection" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:background="@drawable/rt_card">
+
+                <include
+                    android:id="@+id/toggleAutoReconnect"
+                    layout="@layout/view_toggle_row" />
+
+                <View
+                    style="@style/RtRowDivider"
+                    android:layout_marginStart="14dp"
+                    android:layout_marginEnd="14dp" />
+
+                <include
+                    android:id="@+id/toggleKeepAlive"
+                    layout="@layout/view_toggle_row" />
+
+                <View
+                    style="@style/RtRowDivider"
+                    android:layout_marginStart="14dp"
+                    android:layout_marginEnd="14dp" />
+
+                <include
+                    android:id="@+id/toggleAlerts"
+                    layout="@layout/view_toggle_row" />
+            </LinearLayout>
+
+            <TextView
+                style="@style/RtText.Section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="22dp"
+                android:text="@string/group_security" />
+
+            <LinearLayout
+                android:id="@+id/securityCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:background="@drawable/rt_card" />
+
+            <LinearLayout
+                android:id="@+id/saveButton"
+                style="@style/RtCta"
+                android:layout_marginTop="26dp">
+
+                <ImageView
+                    android:layout_width="@dimen/rt_icon_lg"
+                    android:layout_height="@dimen/rt_icon_lg"
+                    android:layout_marginEnd="14dp"
+                    android:src="@drawable/ic_rt_save"
+                    android:importantForAccessibility="no"
+                    app:tint="@color/rt_on_primary" />
+
+                <TextView
+                    style="@style/RtText.Cta"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="14sp"
+                    android:text="@string/save_changes" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/removeButton"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/rt_cta_height"
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:background="@drawable/rt_button_danger"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:layout_width="@dimen/rt_icon_lg"
+                    android:layout_height="@dimen/rt_icon_lg"
+                    android:layout_marginEnd="14dp"
+                    android:src="@drawable/ic_rt_trash"
+                    android:importantForAccessibility="no"
+                    app:tint="@color/rt_danger" />
+
+                <TextView
+                    style="@style/RtText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/rt_danger"
+                    android:text="@string/remove_machine" />
+            </LinearLayout>
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+</LinearLayout>

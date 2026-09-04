@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  One block that carries every "nothing to show" case: empty list, no search
+  results, offline, and error. Screens set the icon, the two lines and the
+  optional action rather than shipping a variant each.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/stateBlock"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:gravity="center_horizontal"
+    android:paddingStart="@dimen/rt_gutter"
+    android:paddingEnd="@dimen/rt_gutter"
+    android:paddingTop="40dp"
+    android:paddingBottom="40dp"
+    android:visibility="gone">
+
+    <FrameLayout
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:background="@drawable/rt_icon_tile">
+
+        <ImageView
+            android:id="@+id/stateIcon"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no"
+            app:tint="@color/rt_text_muted"
+            tools:src="@drawable/ic_rt_monitor" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/stateTitle"
+        style="@style/RtText.Section"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="18dp"
+        android:gravity="center"
+        tools:text="No machines yet" />
+
+    <TextView
+        android:id="@+id/stateBody"
+        style="@style/RtText.Body"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center"
+        android:textColor="@color/rt_text_muted"
+        tools:text="Install the agent on a computer and pair it." />
+
+    <LinearLayout
+        android:id="@+id/stateAction"
+        style="@style/RtOutlineButton"
+        android:layout_marginTop="20dp"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/stateActionIcon"
+            android:layout_width="@dimen/rt_icon_sm"
+            android:layout_height="@dimen/rt_icon_sm"
+            android:layout_marginEnd="8dp"
+            android:src="@drawable/ic_rt_plus"
+            android:importantForAccessibility="no"
+            app:tint="@color/rt_primary" />
+
+        <TextView
+            android:id="@+id/stateActionLabel"
+            style="@style/RtText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="@color/rt_primary"
+            tools:text="Add a new machine" />
+    </LinearLayout>
+</LinearLayout>

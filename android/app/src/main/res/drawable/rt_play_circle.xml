@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Round "resume terminal" affordance on a terminal row. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="@color/rt_primary_soft">
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="@color/rt_primary_soft" />
+            <stroke android:width="@dimen/rt_stroke" android:color="@color/rt_primary_softer" />
+        </shape>
+    </item>
+</ripple>

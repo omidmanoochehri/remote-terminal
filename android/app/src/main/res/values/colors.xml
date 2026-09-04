@@ -1,33 +1,60 @@
 <resources>
-    <!-- App chrome (light). Night overrides live in values-night. -->
-    <color name="app_bg">#FFF5F7FA</color>
-    <color name="app_surface">#FFFFFFFF</color>
-    <color name="app_surface_variant">#FFEBEEF3</color>
-    <color name="app_on_surface">#FF10151C</color>
-    <color name="app_on_surface_muted">#FF5A6573</color>
-    <color name="app_outline">#FFD5DAE2</color>
-    <color name="app_primary">#FF0E7A5F</color>
-    <color name="app_on_primary">#FFFFFFFF</color>
-    <color name="app_primary_container">#FFC6EFDF</color>
-    <color name="app_on_primary_container">#FF00251A</color>
-    <color name="app_bar">#FFFFFFFF</color>
 
-    <!-- Extra-keys bar -->
-    <color name="key_bg">#FFE7EBF1</color>
-    <color name="key_fg">#FF19202A</color>
-    <color name="key_active_bg">#FF0E7A5F</color>
-    <color name="key_active_fg">#FFFFFFFF</color>
-    <color name="key_locked_bg">#FF08553F</color>
+    <!-- Backdrop -->
+    <color name="rt_bg_top">#FFF7F9FC</color>
+    <color name="rt_bg_bottom">#FFEEF2F7</color>
+    <color name="rt_glow">#1412A45C</color>
 
-    <!-- Presence (also carried by text/glyph, never colour alone) -->
-    <color name="status_online">#FF12A277</color>
-    <color name="status_reconnecting">#FFD98A15</color>
-    <color name="status_offline">#FF97A1AF</color>
-    <color name="status_error">#FFD2382F</color>
+    <!-- Surfaces -->
+    <color name="rt_surface_top">#FFFFFFFF</color>
+    <color name="rt_surface_bottom">#FFF8FAFD</color>
+    <color name="rt_surface_bright_top">#FFF1F5FA</color>
+    <color name="rt_surface_bright_bottom">#FFE7EDF5</color>
+    <color name="rt_surface_sunken">#0F0A131E</color>
+    <color name="rt_surface_tile">#FFF2F5F9</color>
+    <color name="rt_surface_field">#FFFFFFFF</color>
+    <color name="rt_surface_nav">#FAFFFFFF</color>
+    <color name="rt_surface_flat">#FFF1F4F9</color>
+
+    <!-- Brand -->
+    <color name="rt_primary">#FF14A85A</color>
+    <color name="rt_primary_light">#FF1FBE69</color>
+    <color name="rt_primary_dark">#FF0E8F4B</color>
+    <color name="rt_on_primary">#FFFFFFFF</color>
+    <color name="rt_primary_soft">#1F14A85A</color>
+    <color name="rt_primary_softer">#1214A85A</color>
+    <color name="rt_primary_edge">#5714A85A</color>
+
+    <!-- Accents (semantic, used for category icons and meters) -->
+    <color name="rt_accent">#FF0B7FD6</color>
+    <color name="rt_accent_soft">#1F0B7FD6</color>
+    <color name="rt_amber">#FFB77400</color>
+    <color name="rt_amber_soft">#1FB77400</color>
+    <color name="rt_purple">#FF7B33C7</color>
+    <color name="rt_purple_soft">#1F7B33C7</color>
+    <color name="rt_danger">#FFD32B3D</color>
+    <color name="rt_danger_soft">#14D32B3D</color>
+    <color name="rt_danger_edge">#4DD32B3D</color>
+
+    <!-- Text -->
+    <color name="rt_text">#FF0C121A</color>
+    <color name="rt_text_secondary">#FF3B4652</color>
+    <color name="rt_text_muted">#FF5D6B7D</color>
+    <color name="rt_text_dim">#FF74818F</color>
+
+    <!-- Lines -->
+    <color name="rt_outline">#FFD6DDE6</color>
+    <color name="rt_outline_strong">#FFC3CCD8</color>
+    <color name="rt_divider">#FFE4EAF1</color>
+
+    <!-- Presence (colour is always paired with a label, never used alone) -->
+    <color name="rt_status_online">#FF14A85A</color>
+    <color name="rt_status_offline">#FF7B8797</color>
+    <color name="rt_status_warn">#FFB77400</color>
+    <color name="rt_status_error">#FFD32B3D</color>
 
     <!-- Terminal defaults (the scheme is applied at runtime; these are fallbacks) -->
     <color name="term_bg">#FF0C0C0C</color>
     <color name="term_fg">#FFE6E6E6</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="black">#FF000000</color>
 </resources>

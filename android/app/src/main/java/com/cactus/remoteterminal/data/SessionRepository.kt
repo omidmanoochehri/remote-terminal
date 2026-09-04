@@ -29,6 +29,16 @@ class TerminalSession(val agentId: String, val sessionId: String, scrollback: In
     /** Rows of output that arrived while this tab was not the visible one (for the "N new lines" badge). */
     var unreadRows: Int = 0
 
+    /**
+     * Input queued before the shell was attached (the working directory and
+     * the optional start-up command chosen on the New terminal screen). Sent
+     * once, on the first successful attach.
+     */
+    var startupInput: String? = null
+
+    /** When this tab was opened on this phone; used until the relay reports createdAt. */
+    val openedAt: Long = System.currentTimeMillis()
+
     /** Bumped on every metadata/stream change so views can re-render cheaply. */
     private val _version = MutableStateFlow(0)
     val version: StateFlow<Int> = _version
@@ -147,6 +157,15 @@ class SessionRepository(
         s.title = title; s.bump()
     }
 
+    /**
+     * Hold [data] until the freshly created session is attached, then send it
+     * as ordinary input so the user sees it echoed in the scrollback.
+     */
+    fun queueStartupInput(s: TerminalSession, data: String) {
+        if (data.isEmpty()) return
+        if (s.stream.state == SessionStream.State.ATTACHED) input(s, data) else s.startupInput = data
+    }
+
     fun input(s: TerminalSession, data: String): Boolean {
         if (s.stream.state != SessionStream.State.ATTACHED) return false
         return client.send(Outgoing.input(s.agentId, s.sessionId, data))
@@ -196,9 +215,21 @@ class SessionRepository(
             if (agentId != null && s.agentId != agentId) continue
             if (s.state != "running") continue
             if (agents.agent(s.agentId)?.online != true) continue
+            // Machine settings can opt a machine out of automatic re-attachment,
+            // and a single terminal can opt out of being restored.
+            if (!settings.autoReconnect(s.agentId)) continue
+            if (!settings.restoreOnReconnect(s.key)) continue
             attach(s, s.emulator.cols, s.emulator.rows)
         }
     }
+
+    /**
+     * True when at least one machine with open terminals asked to be kept
+     * alive in the background; the relay client uses this to decide whether to
+     * hold the socket during the background grace period.
+     */
+    fun wantsBackgroundKeepAlive(): Boolean =
+        sessions.values.any { it.state == "running" && settings.keepAlive(it.agentId) }
 
     /* ------------------------------- events ------------------------------- */
 
@@ -211,11 +242,16 @@ class SessionRepository(
         when (event) {
             is RelayEvent.Welcome -> {
                 for (a in event.agents) noteInstance(a.agentId, a.instanceId)
+                refreshMetadata()
                 pruneClosed(event.agents.associate { it.agentId to it.sessions.map { s -> s.sessionId }.toSet() })
                 reattachAll()
             }
+            // Tabs restored from the last run have no title until the relay
+            // describes their sessions; take it as soon as a list arrives.
+            is RelayEvent.AgentList -> refreshMetadata()
             is RelayEvent.AgentOnline -> {
                 noteInstance(event.agent.agentId, event.agent.instanceId)
+                refreshMetadata(event.agent.agentId)
                 pruneClosed(mapOf(event.agent.agentId to event.agent.sessions.map { it.sessionId }.toSet()))
                 reattachAll(event.agent.agentId)
             }
@@ -236,6 +272,7 @@ class SessionRepository(
                 }
                 s.emulator.muteResponses = false
                 s.bump(); s.onOutput?.invoke()
+                s.startupInput?.let { queued -> s.startupInput = null; input(s, queued) }
             }
             is RelayEvent.Output -> find(event.agentId, event.sessionId)?.let { s ->
                 when (s.stream.onOutput(event.seq, event.data.length)) {
@@ -280,6 +317,14 @@ class SessionRepository(
                 s.bump()
             }
             else -> {}
+        }
+    }
+
+    /** Copy the relay's view of each open tab onto it (title, shell, state). */
+    private fun refreshMetadata(agentId: String? = null) {
+        for (s in sessions.values) {
+            if (agentId != null && s.agentId != agentId) continue
+            agents.session(s.agentId, s.sessionId)?.let { s.applyInfo(it) }
         }
     }
 

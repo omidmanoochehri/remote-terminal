@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A terminal as its own card, used on the machine screen where terminals are
+  the primary content rather than a grouped list.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/card"
+    android:layout_width="match_parent"
+    android:layout_height="76dp"
+    android:layout_marginStart="@dimen/rt_gutter"
+    android:layout_marginEnd="@dimen/rt_gutter"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingStart="13dp"
+    android:paddingEnd="4dp"
+    android:background="@drawable/rt_card_clickable"
+    android:clickable="true"
+    android:focusable="true">
+
+    <FrameLayout
+        android:layout_width="46dp"
+        android:layout_height="46dp"
+        android:background="@drawable/rt_icon_tile_quiet">
+
+        <ImageView
+            android:layout_width="@dimen/rt_icon_md"
+            android:layout_height="@dimen/rt_icon_md"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_rt_terminal_square"
+            android:contentDescription="@string/a11y_terminal_icon"
+            app:tint="@color/rt_text_secondary" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="12dp"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/terminalName"
+                style="@style/RtText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:maxWidth="150dp"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end"
+                tools:text="narchat 2" />
+
+            <TextView
+                android:id="@+id/terminalBadge"
+                style="@style/RtBadge"
+                android:layout_marginStart="9dp"
+                android:visibility="gone"
+                tools:text="New"
+                tools:visibility="visible" />
+
+            <ImageView
+                android:id="@+id/pinnedMark"
+                android:layout_width="@dimen/rt_icon_xs"
+                android:layout_height="@dimen/rt_icon_xs"
+                android:layout_marginStart="6dp"
+                android:src="@drawable/ic_rt_star"
+                android:visibility="gone"
+                android:contentDescription="@string/badge_pinned"
+                app:tint="@color/rt_amber" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <ImageView
+                android:layout_width="13dp"
+                android:layout_height="13dp"
+                android:src="@drawable/ic_rt_terminal"
+                android:importantForAccessibility="no"
+                app:tint="@color/rt_text_muted" />
+
+            <TextView
+                android:id="@+id/terminalMeta"
+                style="@style/RtText.Meta"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                tools:text="bash  •  detached  •  just now" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <ImageButton
+        android:id="@+id/terminalMenu"
+        style="@style/Widget.RemoteTerminal.IconButton"
+        android:src="@drawable/ic_rt_more"
+        android:padding="13dp"
+        android:contentDescription="@string/a11y_terminal_menu" />
+</LinearLayout>

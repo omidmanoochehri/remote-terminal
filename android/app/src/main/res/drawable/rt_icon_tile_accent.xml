@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Machine hero mark: dark well with a green edge and glow. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <gradient
+        android:angle="315"
+        android:startColor="#FF0B2517"
+        android:endColor="#FF061A10"
+        android:type="linear" />
+    <stroke android:width="1.5dp" android:color="@color/rt_primary_edge" />
+    <corners android:radius="22dp" />
+</shape>

@@ -29,6 +29,17 @@ class TerminalTheme(
     companion object {
         private fun rgb(vararg v: Int) = IntArray(v.size) { 0xFF000000.toInt() or v[it] }
 
+        /**
+         * The scheme the product is designed around: the same near-black navy
+         * as the app surfaces, with the design system's green, blue, amber and
+         * violet as the bright ANSI colours so terminal output sits inside the
+         * app rather than on top of it.
+         */
+        val REMOTE = TerminalTheme(
+            "remote", "Remote Terminal", 0xFF040E19.toInt(), 0xFFD9E3EF.toInt(), 0xFF39E56D.toInt(), 0x6635A8FF,
+            rgb(0x0A131E, 0xFF6374, 0x39E56D, 0xFFBD36, 0x35A8FF, 0xBF77FF, 0x4FD6E8, 0xCDD6DF,
+                0x52627A, 0xFF8A96, 0x6FF39A, 0xFFD277, 0x74C4FF, 0xD6A6FF, 0x86E8F5, 0xF3F7FB),
+        )
         val DARK = TerminalTheme(
             "dark", "Default Dark", 0xFF0C0C0C.toInt(), 0xFFE6E6E6.toInt(), 0xFFE6E6E6.toInt(), 0x663B82F6,
             rgb(0x000000, 0xE5484D, 0x46A758, 0xE5C24D, 0x3B82F6, 0xB56CE0, 0x22B8CF, 0xD4D4D4,
@@ -56,8 +67,8 @@ class TerminalTheme(
                 0x928374, 0xFB4934, 0xB8BB26, 0xFABD2F, 0x83A598, 0xD3869B, 0x8EC07C, 0xEBDBB2),
         )
 
-        val ALL: List<TerminalTheme> = listOf(DARK, AMOLED, LIGHT, SOLARIZED_DARK, GRUVBOX)
+        val ALL: List<TerminalTheme> = listOf(REMOTE, DARK, AMOLED, LIGHT, SOLARIZED_DARK, GRUVBOX)
 
-        fun byId(id: String?): TerminalTheme = ALL.firstOrNull { it.id == id } ?: DARK
+        fun byId(id: String?): TerminalTheme = ALL.firstOrNull { it.id == id } ?: REMOTE
     }
 }

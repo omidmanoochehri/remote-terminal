@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Primary call to action: the artboard's #58ED80 -> #30CF61 gradient. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <gradient
+        android:angle="270"
+        android:startColor="@color/rt_primary_light"
+        android:endColor="@color/rt_primary_dark"
+        android:type="linear" />
+    <corners android:radius="@dimen/rt_radius_control" />
+</shape>

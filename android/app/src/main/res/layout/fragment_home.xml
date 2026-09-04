@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Home: the machines you use, the terminals you left running, and the counts
+  that get you to the rest of the app in one tap. The header is fixed; only
+  the content column scrolls, so the app mark never moves.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <include
+        android:id="@+id/headerBar"
+        layout="@layout/view_screen_header" />
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/scroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingBottom="@dimen/space_l"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <include
+                android:id="@+id/banner"
+                layout="@layout/view_connection_banner" />
+
+            <!-- Machines -->
+            <LinearLayout
+                style="@style/RtSectionRow"
+                android:layout_marginTop="@dimen/space_m">
+
+                <TextView
+                    style="@style/RtText.Section"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/nav_machines" />
+
+                <LinearLayout
+                    android:id="@+id/addMachineButton"
+                    style="@style/RtOutlineButton">
+
+                    <ImageView
+                        android:layout_width="@dimen/rt_icon_sm"
+                        android:layout_height="@dimen/rt_icon_sm"
+                        android:layout_marginEnd="7dp"
+                        android:src="@drawable/ic_rt_plus"
+                        android:importantForAccessibility="no"
+                        app:tint="@color/rt_primary" />
+
+                    <TextView
+                        style="@style/RtText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/rt_primary"
+                        android:text="@string/home_add_machine" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/machineList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_xs"
+                android:paddingStart="@dimen/rt_gutter"
+                android:paddingEnd="@dimen/rt_gutter"
+                android:orientation="vertical" />
+
+            <include
+                android:id="@+id/machinesEmpty"
+                layout="@layout/view_state_block" />
+
+            <!-- Recent terminals -->
+            <LinearLayout
+                android:id="@+id/recentSection"
+                style="@style/RtSectionRow"
+                android:layout_marginTop="@dimen/space_xl">
+
+                <TextView
+                    style="@style/RtText.Section"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/home_recent_terminals" />
+
+                <TextView
+                    android:id="@+id/viewAllTerminals"
+                    style="@style/RtText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="34dp"
+                    android:gravity="center"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="2dp"
+                    android:textSize="10.5sp"
+                    android:textColor="@color/rt_primary"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:text="@string/home_view_all" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/recentCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/rt_gutter"
+                android:layout_marginEnd="@dimen/rt_gutter"
+                android:layout_marginTop="@dimen/space_xs"
+                android:orientation="vertical"
+                android:paddingTop="@dimen/space_m"
+                android:paddingBottom="@dimen/space_m"
+                android:background="@drawable/rt_card" />
+
+            <TextView
+                android:id="@+id/recentEmpty"
+                style="@style/RtText.Body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/rt_gutter"
+                android:layout_marginEnd="@dimen/rt_gutter"
+                android:layout_marginTop="@dimen/space_xs"
+                android:padding="18dp"
+                android:background="@drawable/rt_card"
+                android:textColor="@color/rt_text_muted"
+                android:text="@string/empty_terminals_body"
+                android:visibility="gone" />
+
+            <!-- Quick access -->
+            <LinearLayout
+                style="@style/RtSectionRow"
+                android:layout_marginTop="@dimen/space_xl">
+
+                <TextView
+                    style="@style/RtText.Section"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/home_quick_access" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/quickAccessRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/rt_gutter"
+                android:layout_marginEnd="@dimen/rt_gutter"
+                android:layout_marginTop="@dimen/space_s"
+                android:orientation="horizontal"
+                android:baselineAligned="false">
+
+                <include
+                    android:id="@+id/tileMachines"
+                    layout="@layout/item_quick_tile" />
+
+                <Space
+                    android:layout_width="9dp"
+                    android:layout_height="1dp" />
+
+                <include
+                    android:id="@+id/tileTerminals"
+                    layout="@layout/item_quick_tile" />
+
+                <Space
+                    android:layout_width="9dp"
+                    android:layout_height="1dp" />
+
+                <include
+                    android:id="@+id/tileRecent"
+                    layout="@layout/item_quick_tile" />
+
+                <Space
+                    android:layout_width="9dp"
+                    android:layout_height="1dp" />
+
+                <include
+                    android:id="@+id/tileFavourites"
+                    layout="@layout/item_quick_tile" />
+            </LinearLayout>
+
+            <!-- Tips -->
+            <LinearLayout
+                android:id="@+id/tipsCard"
+                android:layout_width="match_parent"
+                android:layout_height="70dp"
+                android:layout_marginStart="@dimen/rt_gutter"
+                android:layout_marginEnd="@dimen/rt_gutter"
+                android:layout_marginTop="22dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="12dp"
+                android:paddingEnd="10dp"
+                android:background="@drawable/rt_card"
+                android:clickable="true"
+                android:focusable="true">
+
+                <FrameLayout
+                    android:id="@+id/tipsIconWell"
+                    android:layout_width="42dp"
+                    android:layout_height="42dp"
+                    android:background="@drawable/rt_circle_ring">
+
+                    <ImageView
+                        android:layout_width="@dimen/rt_icon_md"
+                        android:layout_height="@dimen/rt_icon_md"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_rt_lightbulb"
+                        android:importantForAccessibility="no"
+                        app:tint="@color/rt_amber" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="12dp"
+                    android:orientation="vertical">
+
+                    <TextView
+                        style="@style/RtText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="11.5sp"
+                        android:textStyle="bold"
+                        android:text="@string/tips_title" />
+
+                    <TextView
+                        style="@style/RtText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="3dp"
+                        android:textSize="8.8sp"
+                        android:lineSpacingExtra="3dp"
+                        android:textColor="@color/rt_text_muted"
+                        android:text="@string/tips_body" />
+                </LinearLayout>
+
+                <TextView
+                    style="@style/RtText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="9.5sp"
+                    android:textColor="@color/rt_primary"
+                    android:text="@string/learn_more" />
+
+                <ImageView
+                    android:layout_width="@dimen/rt_icon_sm"
+                    android:layout_height="@dimen/rt_icon_sm"
+                    android:layout_marginStart="4dp"
+                    android:src="@drawable/ic_rt_chevron_right"
+                    android:importantForAccessibility="no"
+                    app:tint="@color/rt_primary" />
+            </LinearLayout>
+
+            <!-- Room for the floating navigation bar. -->
+            <Space
+                android:id="@+id/navSpacer"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/rt_nav_height" />
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+</LinearLayout>

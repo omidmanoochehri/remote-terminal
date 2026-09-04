@@ -8,38 +8,57 @@ import android.os.Bundle
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentManager
 import androidx.fragment.app.commit
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import androidx.lifecycle.Lifecycle
 import com.cactus.remoteterminal.App
 import com.cactus.remoteterminal.R
 import com.cactus.remoteterminal.databinding.ActivityMainBinding
 import com.cactus.remoteterminal.net.RelayClient
+import com.cactus.remoteterminal.ui.design.BottomNavView
+import com.cactus.remoteterminal.ui.design.visible
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.launch
 
 /**
- * Single-activity host. Portrait phones show one screen at a time (Machines →
- * Machine → Terminal); on wide screens (sw600dp) the Machines list stays in a
- * side pane while the machine/terminal screens use the main pane.
+ * Contract every screen implements so the shell knows how to frame it: the
+ * four destinations behind the navigation bar keep it visible, detail screens
+ * (a terminal, a form, a settings page) take the whole window.
+ */
+interface RtScreen {
+    val showsBottomNav: Boolean get() = false
+    /** The navigation destination this screen belongs to, when it has one. */
+    val navDestination: BottomNavView.Destination? get() = null
+}
+
+/**
+ * Single-activity host. The four top-level destinations (Home, Machines,
+ * Terminals, Settings) are swapped in place behind a floating navigation bar;
+ * every other screen is pushed onto the back stack over them.
  */
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private val app get() = application as App
-    val twoPane: Boolean get() = binding.listPane != null
+    private var unlocked = false
 
-    private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* optional */ }
+    private val notificationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* optional */ }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Draw edge to edge (the platform default from Android 15) and let each
-        // screen pad its own chrome out of the system bars — see ui/Insets.kt.
+        // Draw edge to edge (the platform default from Android 15); each screen
+        // pads its own chrome out of the system bars — see ui/Insets.kt.
         WindowCompat.setDecorFitsSystemWindows(window, false)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
         val night = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
             android.content.res.Configuration.UI_MODE_NIGHT_YES
         WindowInsetsControllerCompat(window, binding.root).apply {
@@ -47,25 +66,41 @@ class MainActivity : AppCompatActivity() {
             isAppearanceLightNavigationBars = !night
         }
 
-        if (savedInstanceState == null) {
-            if (!app.credentials.isPaired) openPair(initial = true)
-            else {
-                if (twoPane) {
-                    supportFragmentManager.commit { replace(R.id.listPane, MachinesFragment()) }
-                    supportFragmentManager.commit { replace(R.id.container, PlaceholderFragment()) }
-                } else {
-                    supportFragmentManager.commit { replace(R.id.container, MachinesFragment()) }
-                }
-                handleIntent(intent)
+        // The bar floats 8dp above the gesture/navigation inset, never on top of it.
+        val baseMargin = resources.getDimensionPixelSize(R.dimen.rt_nav_margin)
+        ViewCompat.setOnApplyWindowInsetsListener(binding.bottomNav) { v, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            (v.layoutParams as android.widget.FrameLayout.LayoutParams).also {
+                it.bottomMargin = baseMargin + bars.bottom
+                v.layoutParams = it
             }
-            maybeAskNotifications()
+            insets
         }
 
-        // A revoked/unpaired phone always lands on the pairing screen.
+        binding.bottomNav.onSelected = { destination -> openTab(destination, fromUser = true) }
+        supportFragmentManager.addOnBackStackChangedListener { syncChrome() }
+
+        if (savedInstanceState == null) {
+            if (!app.credentials.isPaired) openAddMachine(initial = true)
+            else {
+                openTab(BottomNavView.Destination.HOME, fromUser = false)
+                handleIntent(intent)
+            }
+        }
+
+        // After a rotation or a process restart the fragment manager restores
+        // the screen itself, so the chrome has to be re-derived from whatever
+        // came back rather than from the transaction we did not run.
+        supportFragmentManager.executePendingTransactions()
+        syncChrome()
+
+        // A revoked or unpaired phone always lands back on pairing.
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 app.client.state.collect { s ->
-                    if (s is RelayClient.ConnectionState.Unpaired && supportFragmentManager.findFragmentById(R.id.container) !is PairFragment) openPair(initial = true)
+                    if (s is RelayClient.ConnectionState.Unpaired &&
+                        supportFragmentManager.findFragmentById(R.id.container) !is AddMachineFragment
+                    ) openAddMachine(initial = true)
                 }
             }
         }
@@ -86,59 +121,141 @@ class MainActivity : AppCompatActivity() {
         super.onStart()
         app.notifier.foreground = true
         app.client.setForeground(true)
+        guardWithAppLock()
     }
 
     override fun onStop() {
         super.onStop()
         app.notifier.foreground = false
         app.client.setForeground(false)
+        // Leaving the app re-arms the lock; a rotation does not.
+        if (!isChangingConfigurations) unlocked = false
+    }
+
+    /* ------------------------------ app lock ------------------------------ */
+
+    private val lockPrompt = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK) {
+            unlocked = true
+            binding.lockCover.visible = false
+        } else {
+            // Refusing the prompt must not leave the terminal readable.
+            finish()
+        }
+    }
+
+    /**
+     * Optional app lock. Uses the device credential prompt (fingerprint, face,
+     * PIN — whatever the phone is set up for) instead of pulling in a
+     * biometric library; the content stays covered until it succeeds.
+     */
+    private fun guardWithAppLock() {
+        if (!app.settings.biometricLock || unlocked) {
+            binding.lockCover.visible = false
+            return
+        }
+        val keyguard = getSystemService(android.app.KeyguardManager::class.java)
+        val intent = keyguard?.createConfirmDeviceCredentialIntent(
+            getString(R.string.app_name), getString(R.string.setting_biometric_desc)
+        )
+        if (intent == null) {
+            // No screen lock configured any more: the setting cannot be honoured.
+            app.settings.biometricLock = false
+            binding.lockCover.visible = false
+            return
+        }
+        binding.lockCover.visible = true
+        lockPrompt.launch(intent)
     }
 
     /* ----------------------------- navigation ----------------------------- */
 
-    private fun show(fragment: Fragment, tag: String, addToBackStack: Boolean = true) {
+    /** Show one of the four destinations, resetting anything pushed over it. */
+    fun openTab(destination: BottomNavView.Destination, fromUser: Boolean) {
+        supportFragmentManager.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE)
+        val fragment: Fragment = when (destination) {
+            BottomNavView.Destination.HOME -> HomeFragment()
+            BottomNavView.Destination.MACHINES -> MachinesFragment()
+            BottomNavView.Destination.TERMINALS -> AllTerminalsFragment()
+            BottomNavView.Destination.SETTINGS -> AppSettingsFragment()
+        }
+        supportFragmentManager.commit {
+            setReorderingAllowed(true)
+            replace(R.id.container, fragment, destination.name)
+        }
+        binding.bottomNav.selected = destination
+        if (!fromUser) syncChrome()
+        supportFragmentManager.executePendingTransactions()
+        syncChrome()
+    }
+
+    private fun push(fragment: Fragment, tag: String, addToBackStack: Boolean = true) {
         supportFragmentManager.commit {
             setReorderingAllowed(true)
             replace(R.id.container, fragment, tag)
             if (addToBackStack) addToBackStack(tag)
         }
+        supportFragmentManager.executePendingTransactions()
+        syncChrome()
     }
 
-    fun openMachines() {
-        if (twoPane) { supportFragmentManager.popBackStack(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE); return }
-        supportFragmentManager.popBackStack(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE)
-        if (supportFragmentManager.findFragmentById(R.id.container) !is MachinesFragment) show(MachinesFragment(), "machines", addToBackStack = false)
+    /** Keep the navigation bar in step with whatever is on screen. */
+    private fun syncChrome() {
+        val current = supportFragmentManager.findFragmentById(R.id.container)
+        val screen = current as? RtScreen
+        binding.bottomNav.visible = screen?.showsBottomNav == true
+        screen?.navDestination?.let { binding.bottomNav.selected = it }
     }
 
-    fun openAgent(agentId: String) {
+    fun openMachines() = openTab(BottomNavView.Destination.MACHINES, fromUser = false)
+    fun openTerminalsTab() = openTab(BottomNavView.Destination.TERMINALS, fromUser = false)
+    fun openHome() = openTab(BottomNavView.Destination.HOME, fromUser = false)
+    fun openSettings() = openTab(BottomNavView.Destination.SETTINGS, fromUser = false)
+
+    fun openMachine(agentId: String, tab: MachineFragment.Tab = MachineFragment.Tab.TERMINALS) {
         app.notifier.noteAgentUsed(agentId)
-        show(AgentFragment.newInstance(agentId), "agent:$agentId")
+        push(MachineFragment.newInstance(agentId, tab), "machine:$agentId")
     }
+
+    fun openMachineSettings(agentId: String) = push(MachineSettingsFragment.newInstance(agentId), "machineSettings:$agentId")
 
     fun openTerminal(agentId: String, sessionId: String?) {
         app.notifier.noteAgentUsed(agentId)
-        show(TerminalFragment.newInstance(agentId, sessionId), "terminal:$agentId")
+        push(TerminalFragment.newInstance(agentId, sessionId), "terminal:$agentId")
     }
 
-    fun openPair(initial: Boolean = false) {
-        supportFragmentManager.popBackStack(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE)
-        if (twoPane) supportFragmentManager.findFragmentById(R.id.listPane)?.let { supportFragmentManager.commit { remove(it) } }
-        show(PairFragment(), "pair", addToBackStack = !initial)
+    fun openNewTerminal(agentId: String?) = push(NewTerminalFragment.newInstance(agentId), "newTerminal")
+
+    fun openAddMachine(initial: Boolean = false) {
+        supportFragmentManager.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE)
+        push(AddMachineFragment(), "addMachine", addToBackStack = !initial)
+    }
+
+    fun openDevices() = push(DevicesFragment(), "devices")
+
+    fun openCommandHistory() = push(CommandHistoryFragment(), "commandHistory")
+
+    fun openTerminalFontSettings() = push(TerminalFontFragment(), "terminalFont")
+
+    fun openQrScanner(onResult: (relay: String?, code: String) -> Unit) {
+        QrScanFragment.pendingResult = onResult
+        push(QrScanFragment(), "qrScan")
     }
 
     /** After a successful pairing: rebuild the normal screens. */
     fun onPaired() {
-        supportFragmentManager.popBackStack(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE)
-        if (twoPane) {
-            supportFragmentManager.commit { replace(R.id.listPane, MachinesFragment()) }
-            show(PlaceholderFragment(), "placeholder", addToBackStack = false)
-        } else show(MachinesFragment(), "machines", addToBackStack = false)
+        supportFragmentManager.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE)
+        openTab(BottomNavView.Destination.HOME, fromUser = false)
+        maybeAskNotifications()
     }
 
-    fun openDevices() = show(DevicesFragment(), "devices")
-    fun openSettings() = show(SettingsFragment(), "settings")
+    /* --------------------------- permissions ------------------------------ */
 
-    private fun maybeAskNotifications() {
+    /**
+     * Explain before the system dialog appears: the platform prompt gives no
+     * room for a reason, and a refused prompt cannot be shown again.
+     */
+    fun maybeAskNotifications() {
         if (Build.VERSION.SDK_INT < 33) return
         val s = app.settings
         if (!(s.notifyAgentOffline || s.notifyExit || s.notifyBell)) return
@@ -146,7 +263,14 @@ class MainActivity : AppCompatActivity() {
         val prefs = getSharedPreferences("rt_ui", MODE_PRIVATE)
         if (prefs.getBoolean("asked_notifications", false)) return
         prefs.edit().putBoolean("asked_notifications", true).apply()
-        notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.permission_notifications_title)
+            .setMessage(R.string.permission_notifications_body)
+            .setPositiveButton(R.string.permission_allow) { _, _ ->
+                notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            .setNegativeButton(R.string.permission_not_now, null)
+            .show()
     }
 
     companion object {
@@ -154,6 +278,3 @@ class MainActivity : AppCompatActivity() {
         const val EXTRA_SESSION = "session"
     }
 }
-
-/** Empty right pane on tablets before a machine is chosen. */
-class PlaceholderFragment : Fragment(R.layout.fragment_placeholder)

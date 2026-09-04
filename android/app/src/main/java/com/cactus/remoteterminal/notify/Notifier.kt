@@ -65,10 +65,19 @@ class Notifier(
     fun noteAgentUsed(agentId: String) { usedAgents.add(agentId) }
 
     override fun onRelayEvent(event: RelayEvent) {
-        if (event is RelayEvent.AgentOffline && !foreground && settings.notifyAgentOffline && event.agentId in usedAgents) {
-            val name = agents.agent(event.agentId)?.name ?: "A machine"
-            post(CHANNEL_STATUS, event.agentId.hashCode(), context.getString(R.string.notif_offline_title, name), context.getString(R.string.notif_offline_text))
-        }
+        if (event !is RelayEvent.AgentOffline) return
+        // Two ways to opt in: the global "machine goes offline" setting for
+        // machines you have opened, or per-machine connection alerts.
+        val perMachine = settings.connectionAlerts(event.agentId)
+        val global = settings.notifyAgentOffline && event.agentId in usedAgents
+        if (!perMachine && !(global && !foreground)) return
+        if (foreground && !perMachine) return
+        val name = agents.agent(event.agentId)?.name ?: "A machine"
+        post(
+            CHANNEL_STATUS, event.agentId.hashCode(),
+            context.getString(R.string.notif_offline_title, name),
+            context.getString(R.string.notif_offline_text),
+        )
     }
 
     private fun notifyExit(s: TerminalSession) {

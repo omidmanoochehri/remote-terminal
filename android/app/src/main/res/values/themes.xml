@@ -1,58 +1,69 @@
 <resources>
-    <!-- Material 3 day/night theme. The terminal surface has its own colour scheme (TerminalTheme). -->
+    <!--
+      Material 3 day/night theme mapped onto the Remote Terminal design tokens.
+      Screens use the tokens directly; the Material mapping is what keeps
+      dialogs, menus, snackbars and the preference screens on-palette.
+    -->
     <style name="Theme.RemoteTerminal" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/app_primary</item>
-        <item name="colorOnPrimary">@color/app_on_primary</item>
-        <item name="colorPrimaryContainer">@color/app_primary_container</item>
-        <item name="colorOnPrimaryContainer">@color/app_on_primary_container</item>
-        <item name="colorSecondary">@color/app_primary</item>
-        <item name="colorOnSecondary">@color/app_on_primary</item>
-        <item name="colorSecondaryContainer">@color/app_primary_container</item>
-        <item name="colorOnSecondaryContainer">@color/app_on_primary_container</item>
-        <item name="colorTertiary">@color/app_primary</item>
-        <item name="android:colorBackground">@color/app_bg</item>
-        <item name="colorSurface">@color/app_surface</item>
-        <item name="colorSurfaceVariant">@color/app_surface_variant</item>
-        <item name="colorSurfaceContainer">@color/app_surface_variant</item>
-        <item name="colorSurfaceContainerHigh">@color/app_surface_variant</item>
-        <item name="colorSurfaceContainerLow">@color/app_surface</item>
-        <item name="colorOnSurface">@color/app_on_surface</item>
-        <item name="colorOnSurfaceVariant">@color/app_on_surface_muted</item>
-        <item name="colorOutline">@color/app_outline</item>
-        <item name="colorOutlineVariant">@color/app_outline</item>
-        <item name="android:windowBackground">@color/app_bg</item>
+        <item name="colorPrimary">@color/rt_primary</item>
+        <item name="colorOnPrimary">@color/rt_on_primary</item>
+        <item name="colorPrimaryContainer">@color/rt_primary_soft</item>
+        <item name="colorOnPrimaryContainer">@color/rt_primary</item>
+        <item name="colorSecondary">@color/rt_accent</item>
+        <item name="colorOnSecondary">@color/rt_on_primary</item>
+        <item name="colorSecondaryContainer">@color/rt_accent_soft</item>
+        <item name="colorOnSecondaryContainer">@color/rt_accent</item>
+        <item name="colorTertiary">@color/rt_primary</item>
+        <item name="colorError">@color/rt_status_error</item>
+        <item name="android:colorBackground">@color/rt_bg_bottom</item>
+        <item name="colorSurface">@color/rt_surface_top</item>
+        <item name="colorSurfaceVariant">@color/rt_surface_bright_top</item>
+        <item name="colorSurfaceContainer">@color/rt_surface_top</item>
+        <item name="colorSurfaceContainerHigh">@color/rt_surface_bright_top</item>
+        <item name="colorSurfaceContainerLow">@color/rt_surface_bottom</item>
+        <item name="colorSurfaceContainerHighest">@color/rt_surface_bright_top</item>
+        <item name="colorOnSurface">@color/rt_text</item>
+        <item name="colorOnSurfaceVariant">@color/rt_text_muted</item>
+        <item name="colorOutline">@color/rt_outline</item>
+        <item name="colorOutlineVariant">@color/rt_divider</item>
+        <item name="android:windowBackground">@drawable/rt_bg_screen</item>
+
         <!-- Edge to edge: the bars are transparent and each screen pads its own chrome. -->
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">?attr/isLightTheme</item>
         <item name="preferenceTheme">@style/PreferenceThemeOverlay</item>
 
-        <!-- Rounder, more modern component shapes -->
+        <!-- Component shapes from the design system (cards 18-20, controls 10-14). -->
         <item name="shapeAppearanceCornerExtraSmall">@style/Shape.RemoteTerminal.ExtraSmall</item>
         <item name="shapeAppearanceCornerSmall">@style/Shape.RemoteTerminal.Small</item>
         <item name="shapeAppearanceCornerMedium">@style/Shape.RemoteTerminal.Medium</item>
         <item name="shapeAppearanceCornerLarge">@style/Shape.RemoteTerminal.Large</item>
         <item name="materialCardViewStyle">@style/Widget.RemoteTerminal.Card</item>
         <item name="materialButtonStyle">@style/Widget.RemoteTerminal.Button</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.RemoteTerminal.Dialog</item>
+        <item name="bottomSheetDialogTheme">@style/ThemeOverlay.RemoteTerminal.BottomSheet</item>
+        <item name="android:textColorPrimary">@color/rt_text</item>
+        <item name="android:textColorSecondary">@color/rt_text_muted</item>
+        <item name="android:textColorHint">@color/rt_text_muted</item>
     </style>
 
     <style name="Shape.RemoteTerminal.ExtraSmall" parent="ShapeAppearance.Material3.Corner.ExtraSmall">
         <item name="cornerSize">8dp</item>
     </style>
     <style name="Shape.RemoteTerminal.Small" parent="ShapeAppearance.Material3.Corner.Small">
-        <item name="cornerSize">14dp</item>
+        <item name="cornerSize">12dp</item>
     </style>
     <style name="Shape.RemoteTerminal.Medium" parent="ShapeAppearance.Material3.Corner.Medium">
-        <item name="cornerSize">18dp</item>
+        <item name="cornerSize">14dp</item>
     </style>
     <style name="Shape.RemoteTerminal.Large" parent="ShapeAppearance.Material3.Corner.Large">
-        <item name="cornerSize">24dp</item>
+        <item name="cornerSize">18dp</item>
     </style>
 
-    <!-- Flat, tonal cards: the list is the surface, cards only group content. -->
     <style name="Widget.RemoteTerminal.Card" parent="Widget.Material3.CardView.Filled">
         <item name="cardBackgroundColor">?attr/colorSurface</item>
-        <item name="cardCornerRadius">@dimen/corner_card</item>
+        <item name="cardCornerRadius">@dimen/rt_radius_card</item>
         <item name="cardElevation">0dp</item>
         <item name="strokeColor">?attr/colorOutline</item>
         <item name="strokeWidth">1dp</item>
@@ -60,39 +71,51 @@
     </style>
 
     <style name="Widget.RemoteTerminal.Button" parent="Widget.Material3.Button">
-        <item name="android:minHeight">52dp</item>
-        <item name="cornerRadius">18dp</item>
-        <item name="android:textSize">15sp</item>
-        <item name="android:letterSpacing">0.01</item>
-    </style>
-
-    <!-- Compact key on the extra-keys bar. -->
-    <style name="KeyButton" parent="Widget.Material3.Button.TextButton">
-        <item name="android:layout_width">wrap_content</item>
-        <item name="android:layout_height">40dp</item>
-        <item name="android:minWidth">44dp</item>
-        <item name="android:minHeight">40dp</item>
-        <item name="android:insetTop">0dp</item>
-        <item name="android:insetBottom">0dp</item>
-        <item name="android:paddingStart">10dp</item>
-        <item name="android:paddingEnd">10dp</item>
-        <item name="android:textAllCaps">false</item>
+        <item name="android:minHeight">@dimen/rt_cta_height</item>
+        <item name="cornerRadius">@dimen/rt_radius_control</item>
         <item name="android:textSize">13sp</item>
-        <item name="android:fontFamily">monospace</item>
-        <item name="cornerRadius">10dp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.005</item>
+        <item name="android:textAllCaps">false</item>
     </style>
 
-    <style name="TextAppearance.RemoteTerminal.Mono" parent="TextAppearance.Material3.BodyMedium">
-        <item name="android:fontFamily">monospace</item>
+    <!-- Dialogs, sheets and menus inherit the dark card surface. -->
+    <style name="ThemeOverlay.RemoteTerminal.Dialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="colorSurface">@color/rt_surface_top</item>
+        <item name="colorSurfaceContainerHigh">@color/rt_surface_top</item>
+        <item name="android:colorBackground">@color/rt_surface_top</item>
+        <item name="shapeAppearanceCornerLarge">@style/Shape.RemoteTerminal.Large</item>
+        <item name="materialAlertDialogTitleTextStyle">@style/RtDialogTitle</item>
+        <item name="buttonBarPositiveButtonStyle">@style/RtDialogButton</item>
+        <item name="buttonBarNegativeButtonStyle">@style/RtDialogButton</item>
+        <item name="buttonBarNeutralButtonStyle">@style/RtDialogButton</item>
     </style>
 
-    <!-- Round icon button in the app bars -->
+    <style name="RtDialogTitle" parent="MaterialAlertDialog.Material3.Title.Text">
+        <item name="android:textColor">@color/rt_text</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="RtDialogButton" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/rt_primary</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:minHeight">44dp</item>
+    </style>
+
+    <style name="ThemeOverlay.RemoteTerminal.BottomSheet" parent="ThemeOverlay.Material3.BottomSheetDialog">
+        <item name="colorSurface">@color/rt_surface_top</item>
+        <item name="colorSurfaceContainerLow">@color/rt_surface_top</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+
+    <!-- Round icon button used by the app bars. -->
     <style name="Widget.RemoteTerminal.IconButton" parent="android:Widget.ImageButton">
-        <item name="android:layout_width">44dp</item>
-        <item name="android:layout_height">44dp</item>
+        <item name="android:layout_width">@dimen/rt_header_action</item>
+        <item name="android:layout_height">@dimen/rt_header_action</item>
         <item name="android:padding">10dp</item>
-        <item name="android:scaleType">centerInside</item>
-        <item name="android:background">?attr/selectableItemBackgroundBorderless</item>
-        <item name="tint">?attr/colorOnSurface</item>
+        <item name="android:scaleType">fitCenter</item>
+        <item name="android:background">@drawable/rt_icon_button</item>
+        <item name="tint">@color/rt_text_secondary</item>
     </style>
 </resources>

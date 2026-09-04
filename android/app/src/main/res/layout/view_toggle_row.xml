@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Settings row with a switch. The whole row toggles, so the target is the full
+  width rather than the 46dp track.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/toggleRow"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:minHeight="60dp"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingStart="14dp"
+    android:paddingEnd="14dp"
+    android:paddingTop="10dp"
+    android:paddingBottom="10dp"
+    android:background="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true">
+
+    <FrameLayout
+        android:id="@+id/toggleIconWell"
+        android:layout_width="34dp"
+        android:layout_height="34dp">
+
+        <ImageView
+            android:id="@+id/toggleIcon"
+            android:layout_width="@dimen/rt_icon_lg"
+            android:layout_height="@dimen/rt_icon_lg"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no"
+            tools:src="@drawable/ic_rt_refresh" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="10dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/toggleTitle"
+            style="@style/RtText.ListTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            tools:text="Auto reconnect" />
+
+        <TextView
+            android:id="@+id/toggleDesc"
+            style="@style/RtText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textSize="8.5sp"
+            android:lineSpacingExtra="2dp"
+            android:textColor="@color/rt_text_muted"
+            tools:text="Reconnect automatically after network changes" />
+    </LinearLayout>
+
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/toggleSwitch"
+        style="@style/RtSwitch"
+        android:clickable="false"
+        android:focusable="false"
+        android:duplicateParentState="true" />
+</LinearLayout>

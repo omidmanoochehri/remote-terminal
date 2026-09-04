@@ -1,25 +1,60 @@
 <resources>
-    <!-- App chrome (dark): near-black surfaces with a bright, calm green accent. -->
-    <color name="app_bg">#FF0C1015</color>
-    <color name="app_surface">#FF141A21</color>
-    <color name="app_surface_variant">#FF1E2630</color>
-    <color name="app_on_surface">#FFE7ECF3</color>
-    <color name="app_on_surface_muted">#FF97A3B3</color>
-    <color name="app_outline">#FF2A3341</color>
-    <color name="app_primary">#FF3FD69A</color>
-    <color name="app_on_primary">#FF00281B</color>
-    <color name="app_primary_container">#FF15402F</color>
-    <color name="app_on_primary_container">#FFB6F5D9</color>
-    <color name="app_bar">#FF10161D</color>
+    <!--
+      Exact values from the reference design set (390 x 844 artboards).
+      Background #030811, surface #0A131E, primary #39E56D, accent #35A8FF,
+      text #F3F7FB, muted #8290A4.
+    -->
 
-    <color name="key_bg">#FF222B36</color>
-    <color name="key_fg">#FFE7ECF3</color>
-    <color name="key_active_bg">#FF3FD69A</color>
-    <color name="key_active_fg">#FF00281B</color>
-    <color name="key_locked_bg">#FF1C8A63</color>
+    <!-- Backdrop: vertical #06101A -> #030811 with a soft green glow top-right -->
+    <color name="rt_bg_top">#FF06101A</color>
+    <color name="rt_bg_bottom">#FF030811</color>
+    <color name="rt_glow">#5C123B27</color>
 
-    <color name="status_online">#FF3FD69A</color>
-    <color name="status_reconnecting">#FFF0B429</color>
-    <color name="status_offline">#FF77828F</color>
-    <color name="status_error">#FFFF6B61</color>
+    <!-- Surfaces -->
+    <color name="rt_surface_top">#FF0D1926</color>
+    <color name="rt_surface_bottom">#FF07101A</color>
+    <color name="rt_surface_bright_top">#FF122235</color>
+    <color name="rt_surface_bright_bottom">#FF0A1421</color>
+    <color name="rt_surface_sunken">#6B02080E</color>
+    <color name="rt_surface_tile">#BF0A131E</color>
+    <color name="rt_surface_field">#6B02080E</color>
+    <color name="rt_surface_nav">#F7081019</color>
+    <color name="rt_surface_flat">#FF0D1926</color>
+
+    <!-- Brand -->
+    <color name="rt_primary">#FF39E56D</color>
+    <color name="rt_primary_light">#FF58ED80</color>
+    <color name="rt_primary_dark">#FF30CF61</color>
+    <color name="rt_on_primary">#FF03130A</color>
+    <color name="rt_primary_soft">#1C39E56D</color>
+    <color name="rt_primary_softer">#0F39E56D</color>
+    <color name="rt_primary_edge">#5739E56D</color>
+
+    <!-- Accents -->
+    <color name="rt_accent">#FF35A8FF</color>
+    <color name="rt_accent_soft">#2135A8FF</color>
+    <color name="rt_amber">#FFFFBD36</color>
+    <color name="rt_amber_soft">#17FFBD36</color>
+    <color name="rt_purple">#FFBF77FF</color>
+    <color name="rt_purple_soft">#1FBF77FF</color>
+    <color name="rt_danger">#FFFF6374</color>
+    <color name="rt_danger_soft">#17FF6374</color>
+    <color name="rt_danger_edge">#4DFF6374</color>
+
+    <!-- Text -->
+    <color name="rt_text">#FFF3F7FB</color>
+    <color name="rt_text_secondary">#FFCDD6DF</color>
+    <color name="rt_text_muted">#FF8290A4</color>
+    <color name="rt_text_dim">#FF778596</color>
+
+    <!-- Lines -->
+    <color name="rt_outline">#FF1D3043</color>
+    <color name="rt_outline_strong">#FF2A3A48</color>
+    <color name="rt_divider">#FF142536</color>
+
+    <!-- Presence -->
+    <color name="rt_status_online">#FF39E56D</color>
+    <color name="rt_status_offline">#FF8290A4</color>
+    <color name="rt_status_warn">#FFFFBD36</color>
+    <color name="rt_status_error">#FFFF6374</color>
 </resources>

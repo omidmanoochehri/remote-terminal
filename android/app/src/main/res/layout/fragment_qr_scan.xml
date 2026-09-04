@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Pairing-code scanner. The camera preview fills the screen behind a cut-out
+  frame; if permission is refused the same screen explains why it was asked
+  and offers the manual route instead of a dead end.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/rt_bg_bottom">
+
+    <androidx.camera.view.PreviewView
+        android:id="@+id/preview"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
+    <View
+        android:id="@+id/scrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#66030811"
+        android:importantForAccessibility="no" />
+
+    <LinearLayout
+        android:id="@+id/frameHolder"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center">
+
+        <View
+            android:id="@+id/scanFrame"
+            android:layout_width="240dp"
+            android:layout_height="240dp"
+            android:background="@drawable/rt_scan_frame"
+            android:importantForAccessibility="no" />
+
+        <TextView
+            android:id="@+id/scanHint"
+            style="@style/RtText.Body"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="32dp"
+            android:layout_marginEnd="32dp"
+            android:layout_marginTop="24dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="12dp"
+            android:paddingBottom="12dp"
+            android:background="@drawable/rt_badge_neutral"
+            android:gravity="center"
+            android:textColor="@color/rt_text_secondary"
+            android:text="@string/qr_hint" />
+    </LinearLayout>
+
+    <include
+        android:id="@+id/permissionBlock"
+        layout="@layout/view_state_block"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <include
+            android:id="@+id/headerBar"
+            layout="@layout/view_back_header" />
+
+        <Space
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <LinearLayout
+            android:id="@+id/manualButton"
+            android:layout_width="match_parent"
+            android:layout_height="43dp"
+            android:layout_marginStart="@dimen/rt_gutter"
+            android:layout_marginEnd="@dimen/rt_gutter"
+            android:layout_marginBottom="@dimen/rt_gutter"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:background="@drawable/rt_button_quiet"
+            android:clickable="true"
+            android:focusable="true">
+
+            <ImageView
+                android:layout_width="@dimen/rt_icon_md"
+                android:layout_height="@dimen/rt_icon_md"
+                android:layout_marginEnd="12dp"
+                android:src="@drawable/ic_rt_key"
+                android:importantForAccessibility="no"
+                app:tint="@color/rt_text" />
+
+            <TextView
+                style="@style/RtText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:text="@string/qr_enter_manually" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

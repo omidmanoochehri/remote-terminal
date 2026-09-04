@@ -1,0 +1,293 @@
+<resources>
+
+    <!-- Bottom navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_machines">Machines</string>
+    <string name="nav_terminals">Terminals</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Accessibility -->
+    <string name="a11y_selected">selected</string>
+    <string name="a11y_not_selected">not selected</string>
+    <string name="a11y_machine_icon">Machine</string>
+    <string name="a11y_terminal_icon">Terminal</string>
+    <string name="a11y_open_terminal">Open terminal</string>
+    <string name="a11y_resume_terminal">Resume terminal</string>
+    <string name="a11y_machine_menu">Machine actions</string>
+    <string name="a11y_terminal_menu">Terminal actions</string>
+    <string name="a11y_step_done">completed</string>
+    <string name="a11y_step_current">current step</string>
+    <string name="a11y_step_todo">not started</string>
+
+    <!-- Home -->
+    <string name="app_tagline">Secure. Fast. Everywhere.</string>
+    <string name="home_recent_terminals">Recent terminals</string>
+    <string name="home_view_all">View all</string>
+    <string name="home_quick_access">Quick access</string>
+    <string name="quick_recent">Recent</string>
+    <string name="quick_favourites">Favourites</string>
+    <string name="home_add_machine">Add machine</string>
+    <string name="tips_title">Tips</string>
+    <string name="tips_body">Pin favourite machines and terminals for quick access.</string>
+    <string name="learn_more">Learn more</string>
+    <string name="tips_help_title">Favourites</string>
+    <string name="tips_help_body">Tap the star on a machine, or “Pin” in a terminal’s menu, to keep it at the top of Home and in the Pinned filter.</string>
+
+    <!-- Machine quick actions -->
+    <string name="action_connect">Connect</string>
+    <string name="action_terminals">Terminals</string>
+    <string name="action_details">Details</string>
+    <string name="action_settings">Settings</string>
+    <string name="action_unavailable">Unavailable</string>
+    <string name="action_favourite">Favourite</string>
+    <string name="action_unfavourite">Remove from favourites</string>
+    <string name="action_pin">Pin</string>
+    <string name="action_unpin">Unpin</string>
+    <string name="action_continue">Continue</string>
+    <string name="action_retry">Try again</string>
+
+    <!-- Machines list -->
+    <string name="machines_subtitle">Manage connected computers</string>
+    <string name="machines_search_hint">Search by name, host or operating system</string>
+    <string name="machines_add_new">Add a new machine</string>
+    <string name="filter_all">All</string>
+    <string name="filter_online">Online</string>
+    <string name="filter_offline">Offline</string>
+    <string name="filter_filters">Filters</string>
+    <string name="filter_active">Active</string>
+    <string name="filter_detached">Detached</string>
+    <string name="filter_pinned">Pinned</string>
+    <string name="filter_count">%1$s  %2$d</string>
+    <string name="stat_terminals">Terminals</string>
+    <string name="stat_agent">Agent</string>
+    <string name="stat_latency">Latency</string>
+    <string name="stat_uptime">Uptime</string>
+    <plurals name="stat_active_count">
+        <item quantity="one">%d active</item>
+        <item quantity="other">%d active</item>
+    </plurals>
+    <string name="stat_version">v%1$s</string>
+    <string name="stat_latency_ms">%1$d ms</string>
+    <string name="value_unknown">—</string>
+    <string name="presence_online_last_seen">Online · Last seen now</string>
+    <string name="presence_offline_since">Offline · %1$s</string>
+    <string name="sort_name">Name</string>
+    <string name="sort_recent">Recently used</string>
+    <string name="sort_status">Status</string>
+
+    <!-- All terminals -->
+    <string name="terminals_subtitle">Resume and manage sessions</string>
+    <string name="terminals_search_hint">Search terminal sessions</string>
+    <string name="terminals_encrypted_title">Sessions are encrypted</string>
+    <string name="terminals_encrypted_body">Commands and output are protected in transit.</string>
+    <string name="terminals_insecure_title">This relay is not encrypted</string>
+    <string name="terminals_insecure_body">You paired over ws://. Commands and output travel in clear text.</string>
+    <string name="badge_active">Active</string>
+    <string name="badge_new">New</string>
+    <string name="badge_latest">Latest</string>
+    <string name="badge_pinned">Pinned</string>
+
+    <!-- Machine screen -->
+    <string name="tab_terminals">Terminals</string>
+    <string name="tab_details">Details</string>
+    <string name="tab_settings">Settings</string>
+    <string name="machine_sessions_note_body">Sessions remain available when you leave this screen.</string>
+    <plurals name="machine_sessions_note_title">
+        <item quantity="one">%d terminal session</item>
+        <item quantity="other">%d terminal sessions</item>
+    </plurals>
+    <string name="agent_version_short">Agent %1$s</string>
+
+    <!-- Machine details -->
+    <string name="machine_details_title">Machine details</string>
+    <string name="metric_cpu">CPU</string>
+    <string name="metric_memory">Memory</string>
+    <string name="metric_storage">Storage</string>
+    <string name="metric_uptime">Uptime</string>
+    <string name="system_information">System information</string>
+    <string name="info_operating_system">Operating system</string>
+    <string name="info_agent_version">Agent version</string>
+    <string name="info_connection">Connection</string>
+    <string name="info_machine_id">Machine ID</string>
+    <string name="info_shells">Shells</string>
+    <string name="metrics_unavailable">This agent does not report system metrics.</string>
+    <string name="agent_up_to_date">%1$s · Up to date</string>
+    <string name="connection_with_latency">%1$s · %2$d ms</string>
+
+    <!-- Machine settings -->
+    <string name="machine_settings_title">Machine settings</string>
+    <string name="group_general">General</string>
+    <string name="group_connection">Connection</string>
+    <string name="group_security">Security</string>
+    <string name="field_display_name">Display name</string>
+    <string name="field_relay_server">Relay server</string>
+    <string name="hint_secure">Secure</string>
+    <string name="hint_insecure">Not encrypted</string>
+    <string name="setting_auto_reconnect">Auto reconnect</string>
+    <string name="setting_auto_reconnect_desc">Reconnect automatically after network changes</string>
+    <string name="setting_keep_alive">Keep alive</string>
+    <string name="setting_keep_alive_desc">Maintain sessions while app is in background</string>
+    <string name="setting_connection_alerts">Connection alerts</string>
+    <string name="setting_connection_alerts_desc">Notify when this machine goes offline</string>
+    <string name="security_agent_token">Agent token</string>
+    <string name="security_agent_token_value">••••••••••••••</string>
+    <string name="security_agent_token_note">Held by the relay. Re-enrol the agent to replace it.</string>
+    <string name="security_encryption">Encryption</string>
+    <string name="security_encryption_tls">TLS 1.3 · End-to-end protected</string>
+    <string name="security_encryption_plain">ws:// · Not encrypted</string>
+    <string name="save_changes">Save changes</string>
+    <string name="saved">Saved</string>
+    <string name="relay_is_account_wide">The relay is shared by every machine on this phone. Change it by pairing again.</string>
+
+    <!-- Add machine -->
+    <string name="add_machine_title">Add machine</string>
+    <string name="add_machine_subtitle">Pair a computer with this device</string>
+    <string name="step_connection">1 Connection</string>
+    <string name="step_verify">2 Verify</string>
+    <string name="step_finish">3 Finish</string>
+    <string name="field_pairing_code">Pairing code</string>
+    <string name="hint_scan">Scan</string>
+    <string name="pairing_code_help">Find this one-time code in the Remote Terminal agent on your computer.</string>
+    <string name="or">OR</string>
+    <string name="scan_qr">Scan pairing QR code</string>
+    <string name="pairing_security_note">No inbound port is opened. Both devices connect outward to your relay over encrypted WebSockets.</string>
+    <string name="need_agent">Need the computer agent?</string>
+    <string name="view_setup_guide">View setup guide</string>
+    <string name="verify_title">Verifying pairing code</string>
+    <string name="verify_body">Redeeming the code with %1$s. This takes a moment.</string>
+    <string name="verify_failed_title">Pairing did not complete</string>
+    <string name="finish_title">This phone is paired</string>
+    <string name="finish_body">Machines that connect to %1$s now appear in your list. Nothing was opened on your network.</string>
+    <string name="finish_action">Go to machines</string>
+    <string name="pair_name_hint">Name of this phone</string>
+
+    <!-- QR scanning -->
+    <string name="qr_title">Scan pairing code</string>
+    <string name="qr_subtitle">Point the camera at the code</string>
+    <string name="qr_permission_title">Camera access needed</string>
+    <string name="qr_permission_body">Remote Terminal uses the camera only to read a pairing code. Nothing is recorded or uploaded.</string>
+    <string name="qr_permission_action">Allow camera</string>
+    <string name="qr_permission_settings">Open settings</string>
+    <string name="qr_enter_manually">Enter the code by hand</string>
+    <string name="qr_unsupported">This code is not a Remote Terminal pairing code.</string>
+    <string name="qr_hint">The agent prints this code with --pair, and a paired phone can show one under Paired phones.</string>
+    <string name="qr_show_title">Pairing code</string>
+    <plurals name="qr_show_body">
+        <item quantity="one">Scan this on the other phone, or type the code. It expires in %d minute.</item>
+        <item quantity="other">Scan this on the other phone, or type the code. It expires in %d minutes.</item>
+    </plurals>
+
+    <!-- New terminal -->
+    <string name="new_terminal_title">New terminal</string>
+    <string name="new_terminal_subtitle">Start a persistent shell session</string>
+    <string name="label_machine">MACHINE</string>
+    <string name="field_terminal_name">Terminal name</string>
+    <string name="field_terminal_name_hint">Optional</string>
+    <string name="field_shell">Shell</string>
+    <string name="field_working_directory">Working directory</string>
+    <string name="working_directory_help">Leave empty to use the account’s home directory.</string>
+    <string name="working_directory_hint">/home/you</string>
+    <string name="recent_directories">Recent</string>
+    <string name="toggle_restore">Restore on reconnect</string>
+    <string name="toggle_restore_desc">Keep the terminal running when disconnected</string>
+    <string name="toggle_notify">Notify when command finishes</string>
+    <string name="toggle_notify_desc">For commands that run longer than 30 seconds</string>
+    <string name="create_terminal">Create terminal</string>
+    <string name="advanced_options">Advanced options</string>
+    <string name="field_initial_command">Command to run on start</string>
+    <string name="field_initial_command_hint">e.g. npm run dev</string>
+    <string name="field_scrollback">Scrollback lines</string>
+    <string name="choose_machine">Choose a machine</string>
+    <string name="no_online_machines">No machine is online right now.</string>
+
+    <!-- App settings -->
+    <string name="settings_subtitle">Personalize Remote Terminal</string>
+    <string name="settings_search_hint">Search settings</string>
+    <string name="group_appearance">Appearance</string>
+    <string name="group_terminal">Terminal</string>
+    <string name="group_keyboard">Keyboard</string>
+    <string name="group_notifications">Notifications</string>
+    <string name="group_security_connection">Security &amp; connection</string>
+    <string name="setting_theme">Theme</string>
+    <string name="setting_theme_desc">App appearance</string>
+    <string name="setting_terminal_font">Terminal font</string>
+    <string name="setting_terminal_font_value">%1$s · %2$s px</string>
+    <string name="setting_terminal_colours">Colour scheme</string>
+    <string name="setting_cursor">Cursor</string>
+    <string name="setting_extra_keys">Extra keys row</string>
+    <string name="setting_extra_keys_desc">Ctrl, Alt, arrows and common symbols</string>
+    <string name="setting_command_notifications">Command notifications</string>
+    <string name="setting_command_notifications_desc">Notify when long commands finish</string>
+    <string name="setting_command_history">Command history</string>
+    <plurals name="setting_command_history_desc">
+        <item quantity="one">Store the last %d command locally</item>
+        <item quantity="other">Store the last %d commands locally</item>
+    </plurals>
+    <string name="setting_biometric">Biometric lock</string>
+    <string name="setting_biometric_desc">Require fingerprint to open the app</string>
+    <string name="setting_biometric_unavailable">No screen lock is set up on this phone</string>
+    <string name="setting_default_relay">Default relay</string>
+    <string name="setting_paired_phones">Paired phones</string>
+    <string name="setting_scrollback">Scrollback</string>
+    <string name="setting_keep_awake">Keep screen on</string>
+    <string name="setting_haptics">Haptic feedback</string>
+    <string name="setting_bell">Terminal bell</string>
+    <string name="setting_osc52">Programs may set the clipboard</string>
+    <string name="setting_osc52_desc">OSC 52 clipboard writes</string>
+    <string name="setting_paste_confirm">Confirm multi-line paste</string>
+    <string name="setting_command_bar">Command bar</string>
+    <string name="setting_command_bar_desc">Show the command input under the terminal</string>
+    <string name="setting_key_rows">Key rows</string>
+    <string name="setting_key_rows_desc">Edit the three extra-key rows</string>
+    <string name="setting_command_shortcuts">Command shortcuts</string>
+    <string name="setting_command_shortcuts_desc">Chips in the shortcuts sheet</string>
+    <string name="setting_notify_offline">Machine goes offline</string>
+    <string name="setting_notify_exit">Terminal process exits</string>
+    <string name="setting_notify_bell">Terminal bell</string>
+    <string name="setting_unpair">Unpair this phone</string>
+    <string name="setting_device_id">Device ID</string>
+    <string name="about_line">Remote Terminal %1$s • Wire protocol v%2$d</string>
+    <string name="command_history_title">Command history</string>
+    <string name="command_history_empty">Nothing yet. Commands you send from the command bar are listed here.</string>
+    <string name="command_history_clear">Clear history</string>
+    <string name="command_history_cleared">History cleared</string>
+    <string name="terminal_font_title">Terminal font</string>
+    <string name="font_size_label">Size</string>
+    <string name="line_spacing_label">Line spacing</string>
+    <string name="font_preview_text">$ ls -la ~/projects</string>
+    <string name="font_bundled">Bundled mono</string>
+    <string name="font_system">System monospace</string>
+    <string name="font_family_label">Typeface</string>
+    <string name="cursor_blink_label">Blinking cursor</string>
+    <string name="preview_label">Preview</string>
+
+    <!-- Terminal session -->
+    <string name="command_placeholder">Type a command…</string>
+    <string name="command_prompt_glyph" translatable="false">›</string>
+    <string name="terminal_settings">Terminal settings</string>
+    <string name="terminal_new_tab">New tab</string>
+    <string name="keyboard_toggle">Show or hide the keyboard</string>
+
+    <!-- Shared states -->
+    <string name="empty_machines_title">No machines yet</string>
+    <string name="empty_machines_body">Install the agent on a computer and pair it. It appears here as soon as it reaches the relay.</string>
+    <string name="empty_terminals_title">No terminals yet</string>
+    <string name="empty_terminals_body">Start one on a machine and it stays running even when you close the app.</string>
+    <string name="empty_search_title">No matches</string>
+    <string name="empty_search_body">Nothing matches “%1$s”. Try a shorter search.</string>
+    <string name="empty_filter_title">Nothing in this filter</string>
+    <string name="empty_filter_body">Switch to another filter to see the rest.</string>
+    <string name="offline_title">Not connected to the relay</string>
+    <string name="offline_body">Your machines and terminals are shown from the last sync. They resume as soon as the connection returns.</string>
+    <string name="error_title">Something went wrong</string>
+    <string name="clear_search">Clear search</string>
+
+    <!-- Confirmations -->
+    <string name="confirm_disconnect_title">Disconnect “%1$s”?</string>
+    <string name="confirm_disconnect_body">The shell keeps running on the machine. Reopen it any time from the machine screen.</string>
+    <string name="confirm_disconnect_action">Disconnect</string>
+    <string name="permission_notifications_title">Allow notifications?</string>
+    <string name="permission_notifications_body">Remote Terminal tells you when a machine drops off or a long command finishes. Nothing else is sent.</string>
+    <string name="permission_allow">Allow</string>
+    <string name="permission_not_now">Not now</string>
+</resources>

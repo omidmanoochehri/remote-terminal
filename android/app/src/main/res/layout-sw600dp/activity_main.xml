@@ -1,23 +1,53 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+  Tablet / large-screen shell. Same structure as the phone layout; the content
+  column and the navigation bar are capped and centred so a 1000dp-wide screen
+  keeps the reference proportions instead of stretching every card.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="horizontal"
-    android:baselineAligned="false">
-
-    <androidx.fragment.app.FragmentContainerView
-        android:id="@+id/listPane"
-        android:layout_width="320dp"
-        android:layout_height="match_parent" />
+    android:background="@drawable/rt_bg_screen">
 
     <View
-        android:layout_width="1dp"
+        android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="?attr/colorOutline" />
+        android:background="@drawable/rt_bg_glow"
+        android:importantForAccessibility="no" />
 
     <androidx.fragment.app.FragmentContainerView
         android:id="@+id/container"
-        android:layout_width="0dp"
+        android:layout_width="600dp"
         android:layout_height="match_parent"
-        android:layout_weight="1" />
-</LinearLayout>
+        android:layout_gravity="center_horizontal" />
+
+    <com.cactus.remoteterminal.ui.design.BottomNavView
+        android:id="@+id/bottomNav"
+        android:layout_width="520dp"
+        android:layout_height="@dimen/rt_nav_height"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="@dimen/rt_nav_margin"
+        android:elevation="8dp" />
+
+    <!-- Opaque cover while the app lock prompt is up, so nothing leaks behind it. -->
+    <FrameLayout
+        android:id="@+id/lockCover"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/rt_bg_bottom"
+        android:elevation="24dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
+
+        <ImageView
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_rt_fingerprint"
+            android:importantForAccessibility="no"
+            app:tint="@color/rt_primary" />
+    </FrameLayout>
+</FrameLayout>

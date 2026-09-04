@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Detail-screen header: a boxed back button, a title with a supporting line,
+  and up to two trailing actions. Same 80dp band and baselines as the
+  top-level header so pushing a screen does not shift the title.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/header"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:minHeight="@dimen/rt_header_back_height"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingBottom="10dp"
+    android:paddingStart="@dimen/rt_gutter"
+    android:paddingEnd="0dp">
+
+    <ImageButton
+        android:id="@+id/backButton"
+        android:layout_width="38dp"
+        android:layout_height="38dp"
+        android:padding="9dp"
+        android:scaleType="fitCenter"
+        android:background="@drawable/rt_icon_tile"
+        android:src="@drawable/ic_rt_arrow_left"
+        android:contentDescription="@string/back"
+        app:tint="@color/rt_text" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="4dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/headerTitle"
+            style="@style/RtText.ScreenTitle"
+            android:textSize="18sp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="Machine details" />
+
+        <TextView
+            android:id="@+id/headerSubtitle"
+            style="@style/RtText.ScreenSubtitle"
+            android:textSize="9.5sp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="Cactus Server" />
+    </LinearLayout>
+
+    <ImageButton
+        android:id="@+id/headerAction"
+        style="@style/Widget.RemoteTerminal.IconButton"
+        android:src="@drawable/ic_rt_star"
+        android:visibility="gone"
+        android:contentDescription="@string/action_favourite" />
+
+    <ImageButton
+        android:id="@+id/headerOverflow"
+        style="@style/Widget.RemoteTerminal.IconButton"
+        android:src="@drawable/ic_rt_more"
+        android:padding="12dp"
+        android:contentDescription="@string/more" />
+</LinearLayout>

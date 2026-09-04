@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Home machine card: identity, presence, and the four things you can do with a
+  machine in one inset strip. The strip is the primary way into the machine
+  from Home, so every column is a real 48dp target.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/rt_card_lg"
+    android:paddingStart="@dimen/rt_card_padding_wide"
+    android:paddingEnd="@dimen/rt_card_padding_wide"
+    android:paddingTop="@dimen/rt_gutter"
+    android:paddingBottom="@dimen/rt_card_padding_wide">
+
+    <LinearLayout
+        android:id="@+id/identity"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true">
+
+        <FrameLayout
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:background="@drawable/rt_icon_tile">
+
+            <ImageView
+                android:id="@+id/machineIcon"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_rt_terminal_square"
+                android:contentDescription="@string/a11y_machine_icon"
+                app:tint="@color/rt_primary" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/machineName"
+                    style="@style/RtText.CardTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    tools:text="Cactus Server" />
+
+                <ImageView
+                    android:id="@+id/favouriteMark"
+                    android:layout_width="@dimen/rt_icon_sm"
+                    android:layout_height="@dimen/rt_icon_sm"
+                    android:layout_marginStart="6dp"
+                    android:src="@drawable/ic_rt_star"
+                    android:visibility="gone"
+                    android:contentDescription="@string/action_favourite"
+                    app:tint="@color/rt_amber" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/machineSubtitle"
+                style="@style/RtText.Meta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                tools:text="cactus-server · Ubuntu 24.04.4 LTS · x64" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <View
+                    android:id="@+id/statusDot"
+                    android:layout_width="@dimen/status_dot"
+                    android:layout_height="@dimen/status_dot"
+                    android:background="@drawable/rt_dot"
+                    android:importantForAccessibility="no" />
+
+                <TextView
+                    android:id="@+id/statusText"
+                    style="@style/RtText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:textSize="10sp"
+                    android:textColor="@color/rt_status_online"
+                    tools:text="Online" />
+
+                <View
+                    android:id="@+id/metaDivider"
+                    android:layout_width="1dp"
+                    android:layout_height="15dp"
+                    android:layout_marginStart="14dp"
+                    android:layout_marginEnd="12dp"
+                    android:background="@color/rt_outline"
+                    android:importantForAccessibility="no" />
+
+                <TextView
+                    android:id="@+id/terminalCount"
+                    style="@style/RtText.Meta"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    tools:text="3 terminals" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/machineMenu"
+            style="@style/Widget.RemoteTerminal.IconButton"
+            android:layout_marginTop="-4dp"
+            android:src="@drawable/ic_rt_more"
+            android:padding="13dp"
+            android:contentDescription="@string/a11y_machine_menu" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/quickActions"
+        android:layout_width="match_parent"
+        android:layout_height="68dp"
+        android:layout_marginTop="14dp"
+        android:orientation="horizontal"
+        android:background="@drawable/rt_sunken">
+
+        <include
+            android:id="@+id/actionConnect"
+            layout="@layout/view_quick_action" />
+
+        <View style="@style/RtQuickActionDivider" />
+
+        <include
+            android:id="@+id/actionTerminals"
+            layout="@layout/view_quick_action" />
+
+        <View style="@style/RtQuickActionDivider" />
+
+        <include
+            android:id="@+id/actionDetails"
+            layout="@layout/view_quick_action" />
+
+        <View style="@style/RtQuickActionDivider" />
+
+        <include
+            android:id="@+id/actionSettings"
+            layout="@layout/view_quick_action" />
+    </LinearLayout>
+</LinearLayout>

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  All terminals: every session on the account, grouped by machine so the
+  machine that owns a shell is never in doubt.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <include
+        android:id="@+id/headerBar"
+        layout="@layout/view_screen_header" />
+
+    <include
+        android:id="@+id/searchBar"
+        layout="@layout/view_search_field" />
+
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:paddingStart="@dimen/rt_gutter"
+        android:paddingEnd="@dimen/rt_gutter"
+        android:clipToPadding="false"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/filterRow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" />
+    </HorizontalScrollView>
+
+    <include
+        android:id="@+id/banner"
+        layout="@layout/view_connection_banner" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="10dp"
+        android:clipToPadding="false"
+        android:paddingBottom="@dimen/rt_nav_height"
+        android:scrollbars="none" />
+
+    <include
+        android:id="@+id/stateBlock"
+        layout="@layout/view_state_block" />
+</LinearLayout>

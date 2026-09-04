@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "Unavailable" state of a machine's primary action. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/rt_surface_flat" />
+    <corners android:radius="@dimen/rt_radius_control" />
+</shape>

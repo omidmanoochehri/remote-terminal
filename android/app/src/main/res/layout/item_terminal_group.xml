@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Card holding one machine's terminal rows; rows are added at bind time. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/groupCard"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="@dimen/rt_gutter"
+    android:layout_marginEnd="@dimen/rt_gutter"
+    android:layout_marginTop="8dp"
+    android:orientation="vertical"
+    android:paddingTop="@dimen/space_m"
+    android:paddingBottom="@dimen/space_m"
+    android:background="@drawable/rt_card" />

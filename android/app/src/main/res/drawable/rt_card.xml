@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Standard content card: diagonal surface gradient + hairline outline. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <gradient
+        android:angle="315"
+        android:startColor="@color/rt_surface_top"
+        android:endColor="@color/rt_surface_bottom"
+        android:type="linear" />
+    <stroke android:width="@dimen/rt_stroke" android:color="@color/rt_outline" />
+    <corners android:radius="@dimen/rt_radius_card" />
+</shape>

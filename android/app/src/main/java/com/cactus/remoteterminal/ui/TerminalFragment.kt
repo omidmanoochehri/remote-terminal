@@ -7,19 +7,17 @@ import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
-import android.webkit.MimeTypeMap
 import android.text.InputType
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
+import android.webkit.MimeTypeMap
 import android.widget.EditText
 import android.widget.PopupMenu
 import android.widget.Toast
 import androidx.activity.addCallback
-import androidx.core.content.ContextCompat
-import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -28,16 +26,17 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.cactus.remoteterminal.App
 import com.cactus.remoteterminal.R
+import com.cactus.remoteterminal.data.Settings
 import com.cactus.remoteterminal.data.TerminalSession
 import com.cactus.remoteterminal.databinding.FragmentTerminalBinding
 import com.cactus.remoteterminal.databinding.ItemTabBinding
 import com.cactus.remoteterminal.net.RelayClient
 import com.cactus.remoteterminal.protocol.SessionStream
 import com.cactus.remoteterminal.terminal.ExtraKeysView
-import com.cactus.remoteterminal.terminal.KeyEncoder
-import com.cactus.remoteterminal.terminal.ModifierState
 import com.cactus.remoteterminal.terminal.TerminalEmulator
 import com.cactus.remoteterminal.terminal.TerminalTheme
+import com.cactus.remoteterminal.ui.design.Design
+import com.cactus.remoteterminal.ui.design.visible
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.combine
@@ -45,16 +44,17 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * The terminal screen for one machine: scrollable tabs (one per open
- * terminal), the terminal view, status banner, "new lines" chip, search bar,
- * extra-keys bar and the optional command bar.
+ * The terminal screen for one machine: the tab strip, the grid in its well,
+ * the command bar, the extra-keys grid, and a status footer that says in words
+ * what the connection is doing.
  */
-class TerminalFragment : Fragment() {
+class TerminalFragment : Fragment(), RtScreen {
     private var _binding: FragmentTerminalBinding? = null
     private val binding get() = _binding!!
     private val app get() = requireActivity().application as App
+    private val host get() = requireActivity() as MainActivity
     private val agentId: String get() = requireArguments().getString(ARG_AGENT)!!
-    private val modifiers = ModifierState()
+    private val modifiers = com.cactus.remoteterminal.terminal.ModifierState()
     private lateinit var tabAdapter: TabAdapter
     private var current: TerminalSession? = null
     private var tabs: List<TerminalSession> = emptyList()
@@ -67,7 +67,6 @@ class TerminalFragment : Fragment() {
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        val host = requireActivity() as MainActivity
         val b = binding
         val term = b.terminal
 
@@ -76,12 +75,16 @@ class TerminalFragment : Fragment() {
         b.topBar.padForStatusBar()
         b.bottomBar.padForNavigationBar(ime = true)
         b.terminalFrame.padForSideCutouts()
+        // Round the grid to the well; the XML attribute needs API 31, the call does not.
+        b.terminalFrame.clipToOutline = true
+        Design.excludeFromAutofill(view)
 
         b.backButton.setOnClickListener { host.onBackPressedDispatcher.onBackPressed() }
-        b.searchButton.setOnClickListener { toggleSearch(!b.searchBar.isVisible) }
-        b.keyboardButton.setOnClickListener { showKeyboard() }
+        b.searchButton.setOnClickListener { toggleSearch(!b.searchBar.visible) }
+        b.keyboardButton.setOnClickListener { toggleKeyboard() }
         b.moreButton.setOnClickListener { moreMenu(it) }
         b.newLinesChip.setOnClickListener { term.scrollToBottom() }
+        b.footerSettings.setOnClickListener { host.openTerminalFontSettings() }
 
         // Terminal view wiring
         term.modifiers = modifiers
@@ -89,8 +92,9 @@ class TerminalFragment : Fragment() {
         term.onGeometryChanged = { cols, rows -> current?.let { app.sessions.resize(it, cols, rows); ensureAttached(it) } }
         term.onTap = { showKeyboard() }
         term.onFollowChanged = { following, newRows ->
-            b.newLinesChip.isVisible = !following && newRows > 0
-            b.newLinesChip.text = if (newRows == 1) getString(R.string.new_lines_one) else getString(R.string.new_lines, newRows)
+            b.newLinesChip.visible = !following && newRows > 0
+            b.newLinesText.text =
+                if (newRows == 1) getString(R.string.new_lines_one) else getString(R.string.new_lines, newRows)
         }
         term.onFontSizeChanged = { sp -> app.settings.fontSizeSp = sp }
         term.onCopy = { text -> copy(text) }
@@ -130,7 +134,7 @@ class TerminalFragment : Fragment() {
 
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) {
             when {
-                b.searchBar.isVisible -> toggleSearch(false)
+                b.searchBar.visible -> toggleSearch(false)
                 term.hasSelection() -> term.clearSelection()
                 else -> { isEnabled = false; requireActivity().onBackPressedDispatcher.onBackPressed() }
             }
@@ -146,13 +150,20 @@ class TerminalFragment : Fragment() {
                     app.agents.agents.combine(app.client.state) { agents, state -> agents.firstOrNull { it.agentId == agentId } to state }
                         .collect { (agent, state) ->
                             if (agent == null) { host.onBackPressedDispatcher.onBackPressed(); return@collect }
-                            b.machineName.text = agent.name
-                            val (label, color) = Format.presence(requireContext(), agent, state)
-                            b.machineStatus.text = label
-                            b.machineStatus.setTextColor(ContextCompat.getColor(requireContext(), color))
-                            b.machineDot.backgroundTintList = ContextCompat.getColorStateList(requireContext(), color)
-                            updateBanner()
+                            b.machineName.text = agent.name.ifEmpty { agent.hostname }
+                            val (label, colour) = Format.presence(requireContext(), agent, state)
+                            val host = listOf(agent.hostname, agent.os).filter { it.isNotEmpty() }.joinToString("  •  ")
+                            b.machineStatus.text = host.ifEmpty { label }
+                            b.machineDot.backgroundTintList = Design.stateList(requireContext(), colour)
+                            updateStatus(state, label, colour)
                         }
+                }
+                // The footer clock has to move on its own; nothing else ticks.
+                launch {
+                    while (true) {
+                        kotlinx.coroutines.delay(30_000)
+                        updateStatus()
+                    }
                 }
                 launch {
                     app.sessions.tabs(agentId).collect { list ->
@@ -174,8 +185,9 @@ class TerminalFragment : Fragment() {
     private fun applyOrientation(config: Configuration) {
         val land = config.orientation == Configuration.ORIENTATION_LANDSCAPE
         binding.extraKeys.compact = land
-        binding.commandBar.isVisible = !land && app.settings.commandBar
-        binding.machineStatus.isVisible = !land
+        binding.commandBar.visible = !land && app.settings.commandBar
+        // Landscape gives the grid every row it can get.
+        binding.statusFooter.visible = !land
     }
 
     private fun applySettings() {
@@ -183,15 +195,24 @@ class TerminalFragment : Fragment() {
         val term = binding.terminal
         term.setFontSizeSp(s.fontSizeSp, notify = false)
         term.setLineSpacing(s.lineSpacing)
+        term.setPreferSystemFont(s.terminalFontFamily == Settings.FONT_SYSTEM)
         term.theme = TerminalTheme.byId(s.terminalTheme)
-        term.cursorStyleSetting = when (s.cursorStyle) { "underline" -> TerminalEmulator.CURSOR_UNDERLINE; "bar" -> TerminalEmulator.CURSOR_BAR; else -> TerminalEmulator.CURSOR_BLOCK }
+        term.cursorStyleSetting = when (s.cursorStyle) {
+            "underline" -> TerminalEmulator.CURSOR_UNDERLINE
+            "bar" -> TerminalEmulator.CURSOR_BAR
+            else -> TerminalEmulator.CURSOR_BLOCK
+        }
         term.blinkEnabled = s.cursorBlink
         term.hapticsEnabled = s.haptics
         term.keepScreenOn = s.keepAwake
         binding.extraKeys.hapticsEnabled = s.haptics
         binding.extraKeys.setRows(listOf(s.extraKeysRow1, s.extraKeysRow2, s.extraKeysRow3))
-        binding.commandBar.isVisible = s.commandBar && resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE
-        binding.terminalFrame.setBackgroundColor(term.theme.background)
+        binding.extraKeys.visible = s.showExtraKeys
+        binding.commandBar.visible = s.commandBar && resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE
+        // The well keeps the design outline; its fill follows the chosen scheme
+        // so a light terminal theme does not sit in a black frame.
+        binding.terminalFrame.backgroundTintList =
+            android.content.res.ColorStateList.valueOf(term.theme.background)
     }
 
     /* -------------------------------- tabs -------------------------------- */
@@ -208,7 +229,7 @@ class TerminalFragment : Fragment() {
         if (pick != null) selectTab(pick)
         else if (!creating) {
             val agent = app.agents.agent(agentId)
-            if (agent != null && agent.online) newTerminal() else updateBanner()
+            if (agent != null && agent.online) newTerminal() else updateStatus()
         }
     }
 
@@ -229,9 +250,11 @@ class TerminalFragment : Fragment() {
         ensureAttached(s)
         tabAdapter.submit(tabs, s)
         binding.tabs.scrollToPosition(tabs.indexOf(s).coerceAtLeast(0))
-        updateBanner()
+        updateStatus()
         viewLifecycleOwner.lifecycleScope.launch {
-            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) { s.version.collect { if (s === current) { updateBanner(); tabAdapter.notifyTab(s) } } }
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                s.version.collect { if (s === current) { updateStatus(); tabAdapter.notifyTab(s) } }
+            }
         }
     }
 
@@ -243,24 +266,27 @@ class TerminalFragment : Fragment() {
 
     private fun newTerminal() {
         val agent = app.agents.agent(agentId) ?: return
-        if (!agent.online) { Toast.makeText(requireContext(), R.string.agent_offline_hint, Toast.LENGTH_SHORT).show(); return }
-        ShellChooser.show(requireContext(), agent, app.settings.lastShell(agentId)) { createSession(it) }
+        if (!agent.online) {
+            Toast.makeText(requireContext(), R.string.agent_offline_hint, Toast.LENGTH_SHORT).show()
+            return
+        }
+        // The full form is a screen of its own; go there rather than stacking dialogs.
+        host.openNewTerminal(agentId)
     }
 
     private fun createSession(shell: String?) {
         if (creating) return
         creating = true
-        binding.banner.text = getString(R.string.creating_terminal)
-        binding.banner.isVisible = true
+        updateStatus()
         viewLifecycleOwner.lifecycleScope.launch {
             val term = binding.terminal
             val r = app.sessions.create(agentId, shell, term.cols, term.rows, null)
             creating = false
             r.onSuccess { selectTab(it) }
             r.onFailure { e ->
-                updateBanner()
+                updateStatus()
                 Toast.makeText(requireContext(), e.message ?: getString(R.string.error_generic, ""), Toast.LENGTH_LONG).show()
-                if (tabs.isEmpty()) (requireActivity() as MainActivity).onBackPressedDispatcher.onBackPressed()
+                if (tabs.isEmpty()) host.onBackPressedDispatcher.onBackPressed()
             }
         }
     }
@@ -273,33 +299,83 @@ class TerminalFragment : Fragment() {
         )
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(getString(R.string.tab_close_title, s.displayTitle))
-            .setItems(items) { _, which -> app.sessions.closeTab(s, terminate = which == 1) }
+            .setItems(items) { _, which ->
+                if (which == 1) app.settings.forgetSessionPrefs(s.key)
+                app.sessions.closeTab(s, terminate = which == 1)
+            }
             .setNegativeButton(R.string.cancel, null)
             .show()
     }
 
     /* ------------------------------- status ------------------------------- */
 
-    private fun updateBanner() {
+    private fun updateStatus(
+        state: RelayClient.ConnectionState = app.client.state.value,
+        presenceLabel: String? = null,
+        presenceColour: Int? = null,
+    ) {
         val b = _binding ?: return
+        val context = requireContext()
         val s = current
         val agent = app.agents.agent(agentId)
-        val state = app.client.state.value
-        val text: String? = when {
+
+        // The banner only speaks up when something is wrong or in progress.
+        val banner: String? = when {
             uploadLabel != null -> uploadLabel
             creating -> getString(R.string.creating_terminal)
-            state !is RelayClient.ConnectionState.Connected -> Format.connectionLabel(requireContext(), state)
+            state !is RelayClient.ConnectionState.Connected -> Format.connectionLabel(context, state)
             agent != null && !agent.online -> getString(R.string.terminal_offline)
             s == null -> null
             s.state == "exited" -> getString(R.string.terminal_exited)
-            s.state == "closed" -> if (s.closedReason == "gone" || s.closedReason == "removed") getString(R.string.terminal_gone) else getString(R.string.terminal_closed)
+            s.state == "closed" ->
+                if (s.closedReason == "gone" || s.closedReason == "removed") getString(R.string.terminal_gone)
+                else getString(R.string.terminal_closed)
             s.attachError != null -> s.attachError
             s.stream.state == SessionStream.State.ATTACHING -> getString(R.string.terminal_attaching)
             else -> null
         }
-        b.banner.text = text ?: ""
-        b.banner.isVisible = text != null
+        b.banner.text = banner ?: ""
+        b.banner.visible = banner != null
         b.terminal.alpha = if (s != null && s.stream.state == SessionStream.State.ATTACHED) 1f else 0.85f
+
+        // Footer: state in words, the shell, and how long the session has run.
+        val attached = s != null && s.stream.state == SessionStream.State.ATTACHED
+        val footerLabel: String
+        val footerColour: Int
+        when {
+            state !is RelayClient.ConnectionState.Connected -> {
+                footerLabel = Format.connectionLabel(context, state)
+                footerColour = Format.connectionColor(state)
+            }
+            agent != null && !agent.online -> {
+                footerLabel = presenceLabel ?: getString(R.string.machine_offline)
+                footerColour = presenceColour ?: R.color.rt_status_offline
+            }
+            s != null && !s.isRunning -> {
+                footerLabel = getString(R.string.terminal_exited)
+                footerColour = R.color.rt_status_warn
+            }
+            attached -> {
+                footerLabel = getString(R.string.state_connected)
+                footerColour = R.color.rt_status_online
+            }
+            else -> {
+                footerLabel = getString(R.string.terminal_attaching)
+                footerColour = R.color.rt_status_warn
+            }
+        }
+        b.footerState.text = footerLabel
+        b.footerState.setTextColor(Design.color(context, footerColour))
+        b.footerDot.backgroundTintList = Design.stateList(context, footerColour)
+
+        val info = s?.let { app.agents.session(agentId, it.sessionId) }
+        b.footerTransport.text = s?.shell?.ifEmpty { getString(R.string.terminal) } ?: getString(R.string.terminal)
+        // Prefer the machine's own start time; fall back to when this phone opened the tab.
+        val startedAt = info?.createdAt?.takeIf { it > 0 } ?: s?.openedAt ?: 0L
+        b.footerUptime.text =
+            if (startedAt > 0) Format.duration(context, (System.currentTimeMillis() - startedAt) / 1000)
+            else getString(R.string.value_unknown)
+        b.statusFooter.contentDescription = "$footerLabel, ${b.footerTransport.text}, ${b.footerUptime.text}"
     }
 
     /* -------------------------------- input ------------------------------- */
@@ -314,21 +390,33 @@ class TerminalFragment : Fragment() {
 
     private fun sendCommandLine() {
         val line = binding.commandInput.text.toString()
+        if (line.isBlank()) return
         binding.commandInput.setText("")
+        app.settings.noteCommand(line)
         binding.terminal.sendRaw(line + "\r")
     }
 
     private fun showKeyboard() {
         val term = binding.terminal
         term.requestFocus()
-        (requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(term, InputMethodManager.SHOW_IMPLICIT)
+        (requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
+            .showSoftInput(term, InputMethodManager.SHOW_IMPLICIT)
+    }
+
+    /** The header key toggles: tapping it again puts the rows back. */
+    private fun toggleKeyboard() {
+        val imm = requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        val term = binding.terminal
+        term.requestFocus()
+        imm.toggleSoftInput(InputMethodManager.SHOW_IMPLICIT, InputMethodManager.HIDE_IMPLICIT_ONLY)
     }
 
     private fun toggleSearch(show: Boolean) {
-        binding.searchBar.isVisible = show
+        binding.searchBar.visible = show
         if (show) {
             binding.searchInput.requestFocus()
-            (requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(binding.searchInput, InputMethodManager.SHOW_IMPLICIT)
+            (requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
+                .showSoftInput(binding.searchInput, InputMethodManager.SHOW_IMPLICIT)
         } else {
             binding.terminal.clearSearch()
             binding.searchInput.setText("")
@@ -388,17 +476,17 @@ class TerminalFragment : Fragment() {
 
         viewLifecycleOwner.lifecycleScope.launch {
             uploadLabel = getString(R.string.paste_image_uploading)
-            updateBanner()
+            updateStatus()
             val loaded = withContext(Dispatchers.IO) { runCatching { readImage(uri, mime) } }
             val payload = loaded.getOrNull()
             if (payload == null) {
-                uploadLabel = null; updateBanner()
+                uploadLabel = null; updateStatus()
                 toast(getString(R.string.paste_image_failed, loaded.exceptionOrNull()?.message ?: "unreadable"))
                 return@launch
             }
             val result = app.sessions.sendFile(s, payload.first, mime, payload.second)
             uploadLabel = null
-            updateBanner()
+            updateStatus()
             result.onSuccess { path ->
                 binding.terminal.sendRaw(shellQuote(path))
                 toast(getString(R.string.paste_image_done, path))
@@ -434,18 +522,24 @@ class TerminalFragment : Fragment() {
     private fun moreMenu(anchor: View) {
         val menu = PopupMenu(requireContext(), anchor)
         menu.menuInflater.inflate(R.menu.menu_terminal, menu.menu)
-        menu.menu.findItem(R.id.action_command_bar).isChecked = binding.commandBar.isVisible
+        menu.menu.findItem(R.id.action_command_bar).isChecked = binding.commandBar.visible
+        menu.menu.findItem(R.id.action_extra_keys).isChecked = binding.extraKeys.visible
+        val s = current
+        menu.menu.findItem(R.id.action_pin).title =
+            getString(if (s != null && app.settings.isPinnedTerminal(agentId, s.sessionId)) R.string.action_unpin else R.string.action_pin)
         menu.setOnMenuItemClickListener { item ->
             val term = binding.terminal
             when (item.itemId) {
                 R.id.action_new_terminal -> newTerminal()
                 R.id.action_rename -> current?.let { renameTab(it) }
+                R.id.action_pin -> current?.let { app.settings.togglePinnedTerminal(agentId, it.sessionId) }
                 R.id.action_shortcuts -> ShortcutsSheet().show(childFragmentManager, "shortcuts")
                 R.id.action_paste -> paste()
                 R.id.action_paste_image -> pasteImage(explicit = true)
                 R.id.action_select_all -> term.selectAll()
                 R.id.action_clear -> { term.emulator.clearScreen(); term.notifyUpdated() }
-                R.id.action_command_bar -> { val v = !binding.commandBar.isVisible; app.settings.commandBar = v; binding.commandBar.isVisible = v }
+                R.id.action_command_bar -> { val v = !binding.commandBar.visible; app.settings.commandBar = v; binding.commandBar.visible = v }
+                R.id.action_extra_keys -> { val v = !binding.extraKeys.visible; app.settings.showExtraKeys = v; binding.extraKeys.visible = v }
                 R.id.action_close_tab -> current?.let { confirmClose(it) }
                 else -> return@setOnMenuItemClickListener false
             }
@@ -455,18 +549,25 @@ class TerminalFragment : Fragment() {
     }
 
     private fun renameTab(s: TerminalSession) {
-        val input = EditText(requireContext()).apply { setText(s.title); inputType = InputType.TYPE_CLASS_TEXT; setSelection(text.length) }
+        val input = EditText(requireContext()).apply {
+            setText(s.title); inputType = InputType.TYPE_CLASS_TEXT; setSelection(text.length)
+        }
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.rename_terminal)
             .setView(input)
-            .setPositiveButton(R.string.save) { _, _ -> input.text.toString().trim().takeIf { it.isNotEmpty() }?.let { app.sessions.rename(s, it) } }
+            .setPositiveButton(R.string.save) { _, _ ->
+                input.text.toString().trim().takeIf { it.isNotEmpty() }?.let { app.sessions.rename(s, it) }
+            }
             .setNegativeButton(R.string.cancel, null)
             .show()
     }
 
     /** Called by the shortcuts sheet. */
     fun sendShortcut(bytes: String) = binding.terminal.sendRaw(bytes)
-    fun sendCommand(command: String) = binding.terminal.sendRaw(command + "\r")
+    fun sendCommand(command: String) {
+        app.settings.noteCommand(command)
+        binding.terminal.sendRaw(command + "\r")
+    }
 
     override fun onDestroyView() {
         for (s in tabs) if (s.onOutput != null) s.onOutput = { s.unreadRows++ }
@@ -486,8 +587,14 @@ class TerminalFragment : Fragment() {
 
         class VH(val b: ItemTabBinding) : RecyclerView.ViewHolder(b.root)
 
-        fun submit(list: List<TerminalSession>, current: TerminalSession?) { items = list; selected = current; notifyDataSetChanged() }
-        fun notifyTab(s: TerminalSession) { val i = items.indexOf(s); if (i >= 0) notifyItemChanged(i) }
+        fun submit(list: List<TerminalSession>, current: TerminalSession?) {
+            items = list; selected = current; notifyDataSetChanged()
+        }
+
+        fun notifyTab(s: TerminalSession) {
+            val i = items.indexOf(s)
+            if (i >= 0) notifyItemChanged(i)
+        }
 
         override fun getItemCount() = items.size + 1
 
@@ -496,16 +603,15 @@ class TerminalFragment : Fragment() {
 
         override fun onBindViewHolder(holder: VH, position: Int) {
             val ctx = holder.b.root.context
-            val pad = (12 * ctx.resources.displayMetrics.density).toInt()
             if (position == items.size) {
-                // The "+" chip: symmetric padding, nothing else inside it.
-                holder.b.tabTitle.text = "+"
-                holder.b.tabTitle.textSize = 18f
-                holder.b.tabTitle.setTextColor(color(holder, com.google.android.material.R.attr.colorOnSurfaceVariant))
+                // The "new tab" chip: a plus and nothing else.
+                holder.b.tabIcon.setImageResource(R.drawable.ic_rt_plus)
+                Design.tint(holder.b.tabIcon, R.color.rt_text_muted)
+                holder.b.tabTitle.text = ctx.getString(R.string.terminal_new_tab)
+                holder.b.tabTitle.setTextColor(Design.color(ctx, R.color.rt_text_muted))
                 holder.b.root.contentDescription = ctx.getString(R.string.new_terminal)
-                holder.b.root.setPadding(pad, 0, pad, 0)
-                holder.b.tabClose.isVisible = false
-                holder.b.tabBadge.isVisible = false
+                holder.b.tabClose.visible = false
+                holder.b.tabBadge.visible = false
                 holder.b.root.isSelected = false
                 holder.b.root.alpha = 1f
                 holder.b.root.setOnClickListener { onNew() }
@@ -513,26 +619,27 @@ class TerminalFragment : Fragment() {
             }
             val s = items[position]
             val active = s === selected
-            holder.b.tabTitle.textSize = 14f
-            holder.b.tabTitle.text = if (s.isRunning) s.displayTitle else "${'$'}{s.displayTitle} ·"
+            holder.b.tabIcon.setImageResource(R.drawable.ic_rt_terminal_square)
+            holder.b.tabTitle.text = s.displayTitle
             holder.b.root.contentDescription = s.displayTitle
-            holder.b.root.setPadding(pad, 0, (pad * 2 / 3), 0)
-            holder.b.tabClose.isVisible = true
+            holder.b.tabClose.visible = true
             holder.b.tabClose.contentDescription = ctx.getString(R.string.tab_close)
-            holder.b.tabBadge.isVisible = s.unreadRows > 0 && !active
+            holder.b.tabBadge.visible = s.unreadRows > 0 && !active
             holder.b.tabBadge.text = if (s.unreadRows > 99) "99+" else s.unreadRows.toString()
             holder.b.root.isSelected = active
-            val fg = if (active) color(holder, com.google.android.material.R.attr.colorOnPrimaryContainer)
-                     else color(holder, com.google.android.material.R.attr.colorOnSurfaceVariant)
+            val fg = Design.color(ctx, if (active) R.color.rt_text else R.color.rt_text_secondary)
             holder.b.tabTitle.setTextColor(fg)
-            holder.b.tabClose.imageTintList = android.content.res.ColorStateList.valueOf(fg)
-            holder.b.root.alpha = if (s.isRunning) 1f else 0.65f
+            Design.tintColor(holder.b.tabIcon, Design.color(ctx, if (active) R.color.rt_primary else R.color.rt_text_muted))
+            holder.b.tabClose.imageTintList = android.content.res.ColorStateList.valueOf(Design.color(ctx, R.color.rt_text_muted))
+            // An exited shell stays readable but visibly inert.
+            holder.b.root.alpha = if (s.isRunning) 1f else 0.6f
+            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                holder.b.root.stateDescription =
+                    ctx.getString(if (active) R.string.a11y_selected else R.string.a11y_not_selected)
+            }
             holder.b.root.setOnClickListener { onSelect(s) }
             holder.b.tabClose.setOnClickListener { onClose(s) }
         }
-
-        private fun color(holder: VH, attr: Int): Int =
-            com.google.android.material.color.MaterialColors.getColor(holder.b.root, attr)
     }
 
     companion object {

@@ -1,0 +1,123 @@
+<resources>
+
+    <!-- Hairline between the columns of a machine action strip. -->
+    <style name="RtQuickActionDivider">
+        <item name="android:layout_width">1dp</item>
+        <item name="android:layout_height">40dp</item>
+        <item name="android:layout_gravity">center_vertical</item>
+        <item name="android:background">@color/rt_divider</item>
+        <item name="android:importantForAccessibility">no</item>
+    </style>
+
+    <!-- Hairline between rows inside a card. -->
+    <style name="RtRowDivider">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">1dp</item>
+        <item name="android:background">@color/rt_divider</item>
+        <item name="android:importantForAccessibility">no</item>
+    </style>
+
+    <!-- Section heading row: title on the left, optional action on the right. -->
+    <style name="RtSectionRow">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:paddingStart">@dimen/rt_gutter</item>
+        <item name="android:paddingEnd">@dimen/rt_gutter</item>
+        <item name="android:minHeight">34dp</item>
+    </style>
+
+    <!-- Green-outlined secondary action. -->
+    <style name="RtOutlineButton">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">34dp</item>
+        <item name="android:background">@drawable/rt_button_outline</item>
+        <item name="android:gravity">center</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">14dp</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+
+    <!-- Primary call to action, full width. -->
+    <style name="RtCta">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">@dimen/rt_cta_height</item>
+        <item name="android:background">@drawable/rt_cta_bg</item>
+        <item name="android:gravity">center</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+
+    <!-- Form field well; the label sits above it. -->
+    <style name="RtField">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">@dimen/rt_field_height_lg</item>
+        <item name="android:background">@drawable/rt_field_state</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">14dp</item>
+    </style>
+
+    <!-- The bare EditText inside a field well. -->
+    <style name="RtFieldInput" parent="Widget.AppCompat.EditText">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:background">@null</item>
+        <item name="android:textSize">11.5sp</item>
+        <item name="android:textColor">@color/rt_text</item>
+        <item name="android:textColorHint">@color/rt_text_muted</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:paddingStart">10dp</item>
+        <item name="android:paddingEnd">8dp</item>
+        <item name="android:textCursorDrawable">@null</item>
+    </style>
+
+    <!-- Status badge pill. -->
+    <style name="RtBadge">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">23dp</item>
+        <item name="android:background">@drawable/rt_badge</item>
+        <item name="android:gravity">center</item>
+        <item name="android:paddingStart">11dp</item>
+        <item name="android:paddingEnd">11dp</item>
+        <item name="android:textSize">9sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/rt_primary</item>
+    </style>
+
+    <!-- Toggle switch built from the design track and thumb. -->
+    <style name="RtSwitch" parent="Widget.AppCompat.CompoundButton.Switch">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:track">@drawable/rt_switch_track</item>
+        <item name="android:thumb">@drawable/rt_switch_thumb</item>
+        <item name="android:background">@null</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="switchMinWidth">46dp</item>
+        <item name="thumbTextPadding">0dp</item>
+        <item name="track">@drawable/rt_switch_track</item>
+        <item name="android:paddingStart">0dp</item>
+        <item name="android:paddingEnd">0dp</item>
+    </style>
+
+    <!-- Segmented control item (Terminals / Details / Settings). -->
+    <style name="RtSegmentItem">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:background">@drawable/rt_segment_item</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:textColor">@color/rt_text_muted</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+</resources>

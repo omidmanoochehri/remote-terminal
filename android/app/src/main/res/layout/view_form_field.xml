@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Labelled form field: label, then a well containing a leading glyph, the input
+  and an optional trailing hint or action. Used by every form in the app.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/fieldLabel"
+        style="@style/RtText.FieldLabel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        tools:text="Machine name" />
+
+    <LinearLayout
+        android:id="@+id/fieldWell"
+        style="@style/RtField"
+        android:layout_marginTop="8dp">
+
+        <ImageView
+            android:id="@+id/fieldIcon"
+            android:layout_width="@dimen/rt_icon_lg"
+            android:layout_height="@dimen/rt_icon_lg"
+            android:importantForAccessibility="no"
+            app:tint="@color/rt_text_muted"
+            tools:src="@drawable/ic_rt_monitor" />
+
+        <EditText
+            android:id="@+id/fieldInput"
+            style="@style/RtFieldInput"
+            android:inputType="text"
+            tools:text="Cactus Server"
+            tools:ignore="Autofill,LabelFor" />
+
+        <TextView
+            android:id="@+id/fieldTrailing"
+            style="@style/RtText.FieldHint"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:paddingStart="8dp"
+            android:paddingEnd="0dp"
+            android:visibility="gone"
+            tools:text="Secure"
+            tools:visibility="visible" />
+
+        <ImageView
+            android:id="@+id/fieldTrailingIcon"
+            android:layout_width="@dimen/rt_icon_md"
+            android:layout_height="@dimen/rt_icon_md"
+            android:layout_marginStart="8dp"
+            android:visibility="gone"
+            android:importantForAccessibility="no"
+            app:tint="@color/rt_text_muted"
+            tools:src="@drawable/ic_rt_chevron_down" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/fieldError"
+        style="@style/RtText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textSize="9.5sp"
+        android:textColor="@color/rt_status_error"
+        android:visibility="gone"
+        tools:text="Enter the 6-digit code"
+        tools:visibility="visible" />
+</LinearLayout>

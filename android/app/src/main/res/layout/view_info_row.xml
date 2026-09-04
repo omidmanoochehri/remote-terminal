@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One fact in the system-information card: glyph, label, value, optional badge. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/infoRow"
+    android:layout_width="match_parent"
+    android:layout_height="50dp"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingStart="13dp"
+    android:paddingEnd="13dp"
+    android:background="?attr/selectableItemBackground">
+
+    <ImageView
+        android:id="@+id/infoIcon"
+        android:layout_width="@dimen/rt_icon_lg"
+        android:layout_height="@dimen/rt_icon_lg"
+        android:importantForAccessibility="no"
+        app:tint="@color/rt_text_muted"
+        tools:src="@drawable/ic_rt_monitor_cog" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="18dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/infoLabel"
+            style="@style/RtText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="8.5sp"
+            android:textColor="@color/rt_text_muted"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="Operating system" />
+
+        <TextView
+            android:id="@+id/infoValue"
+            style="@style/RtText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textSize="10.5sp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="Ubuntu 24.04.4 LTS · x64" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/infoBadge"
+        style="@style/RtBadge"
+        android:layout_marginStart="8dp"
+        android:visibility="gone"
+        tools:text="Latest" />
+</LinearLayout>

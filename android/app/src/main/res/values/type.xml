@@ -1,0 +1,134 @@
+<resources>
+    <!--
+      Typography scale lifted from the reference artboards (390dp wide, so the
+      SVG font sizes are dp == sp at the default font scale). Sizes stay in sp
+      so the system font-size setting still applies.
+    -->
+
+    <style name="RtText" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:textColor">@color/rt_text</item>
+        <item name="android:fontFamily">sans-serif</item>
+    </style>
+
+    <!-- Screen title, e.g. "Remote Terminal" / "Machines" (19 / 700) -->
+    <style name="RtText.ScreenTitle">
+        <item name="android:textSize">19sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">-0.005</item>
+    </style>
+
+    <!-- Screen subtitle under the title (10.5 / 400, muted) -->
+    <style name="RtText.ScreenSubtitle">
+        <item name="android:textSize">10.5sp</item>
+        <item name="android:textColor">@color/rt_text_muted</item>
+    </style>
+
+    <!-- Section heading, e.g. "Machines", "Recent terminals" (14 / 700) -->
+    <style name="RtText.Section">
+        <item name="android:textSize">14sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <!-- Small caps group label, e.g. "APPEARANCE", "CACTUS SERVER" (9.5 / 700) -->
+    <style name="RtText.GroupLabel">
+        <item name="android:textSize">9.5sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/rt_text_muted</item>
+        <item name="android:letterSpacing">0.06</item>
+        <item name="android:textAllCaps">true</item>
+    </style>
+
+    <!-- Card title, e.g. a machine name (15 / 700) -->
+    <style name="RtText.CardTitle">
+        <item name="android:textSize">15sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <!-- Row title, e.g. a terminal name (12.5 / 600) -->
+    <style name="RtText.RowTitle">
+        <item name="android:textSize">12.5sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <!-- Settings row title (12 / 700) -->
+    <style name="RtText.ListTitle">
+        <item name="android:textSize">12sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <!-- Supporting line under a row (9 / 400, muted) -->
+    <style name="RtText.RowMeta">
+        <item name="android:textSize">9sp</item>
+        <item name="android:textColor">@color/rt_text_muted</item>
+    </style>
+
+    <!-- Slightly larger supporting text (9.5 / 400, muted) -->
+    <style name="RtText.Meta">
+        <item name="android:textSize">9.5sp</item>
+        <item name="android:textColor">@color/rt_text_muted</item>
+    </style>
+
+    <!-- Body copy inside cards (10.5 / 400) -->
+    <style name="RtText.Body">
+        <item name="android:textSize">10.5sp</item>
+        <item name="android:textColor">@color/rt_text_secondary</item>
+        <item name="android:lineSpacingMultiplier">1.14</item>
+    </style>
+
+    <!-- Field label above an input (10.5 / 400, muted) -->
+    <style name="RtText.FieldLabel">
+        <item name="android:textSize">10.5sp</item>
+        <item name="android:textColor">@color/rt_text_muted</item>
+    </style>
+
+    <!-- Trailing hint inside a field ("Secure", "Scan") (10 / 400, muted) -->
+    <style name="RtText.FieldHint">
+        <item name="android:textSize">10sp</item>
+        <item name="android:textColor">@color/rt_text_muted</item>
+    </style>
+
+    <!-- Primary call to action (12.5 / 700 on green) -->
+    <style name="RtText.Cta">
+        <item name="android:textSize">12.5sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/rt_on_primary</item>
+    </style>
+
+    <!-- Stat tile: caption then value -->
+    <style name="RtText.StatCaption">
+        <item name="android:textSize">8sp</item>
+        <item name="android:textColor">@color/rt_text_muted</item>
+    </style>
+    <style name="RtText.StatValue">
+        <item name="android:textSize">10.5sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+    <style name="RtText.MetricValue">
+        <item name="android:textSize">16sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <!-- Bottom navigation label (9.5) -->
+    <style name="RtText.NavLabel">
+        <item name="android:textSize">9.5sp</item>
+        <item name="android:textColor">@color/rt_text_dim</item>
+    </style>
+
+    <!-- Quick-access tile -->
+    <style name="RtText.QuickValue">
+        <item name="android:textSize">12sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+    <style name="RtText.QuickLabel">
+        <item name="android:textSize">8.7sp</item>
+        <item name="android:textColor">@color/rt_text_secondary</item>
+    </style>
+
+    <!-- Terminal typography: the emulator itself renders with the bundled
+         mono face; these cover the mono chrome around it (command bar, keys,
+         code snippets). -->
+    <style name="RtText.Mono" parent="RtText">
+        <item name="android:fontFamily">@font/terminal_mono</item>
+        <item name="android:textSize">11.5sp</item>
+    </style>
+</resources>

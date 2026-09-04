@@ -45,6 +45,57 @@ data class SessionInfo(
     }
 }
 
+/**
+ * System metrics an agent may publish alongside its identity. Protocol v3 does
+ * not require them, so every field is optional and the Machine details screen
+ * renders a "not reported" state when they are missing rather than inventing
+ * numbers. Newer agents can start sending `metrics` without a protocol bump.
+ */
+data class MachineMetrics(
+    /** 0..1 */
+    val cpuLoad: Float?,
+    val memoryUsedBytes: Long?,
+    val memoryTotalBytes: Long?,
+    val storageUsedBytes: Long?,
+    val storageTotalBytes: Long?,
+    val uptimeSec: Long?,
+) {
+    val hasAny: Boolean
+        get() = cpuLoad != null || memoryTotalBytes != null || storageTotalBytes != null || uptimeSec != null
+
+    val memoryFraction: Float?
+        get() {
+            val used = memoryUsedBytes ?: return null
+            val total = memoryTotalBytes?.takeIf { it > 0 } ?: return null
+            return (used.toFloat() / total).coerceIn(0f, 1f)
+        }
+
+    val storageFraction: Float?
+        get() {
+            val used = storageUsedBytes ?: return null
+            val total = storageTotalBytes?.takeIf { it > 0 } ?: return null
+            return (used.toFloat() / total).coerceIn(0f, 1f)
+        }
+
+    companion object {
+        val EMPTY = MachineMetrics(null, null, null, null, null, null)
+
+        fun fromJson(o: JSONObject?): MachineMetrics {
+            if (o == null) return EMPTY
+            fun f(key: String): Float? = if (o.has(key) && !o.isNull(key)) o.optDouble(key).toFloat() else null
+            fun l(key: String): Long? = if (o.has(key) && !o.isNull(key)) o.optLong(key) else null
+            return MachineMetrics(
+                cpuLoad = f("cpuLoad")?.coerceIn(0f, 1f),
+                memoryUsedBytes = l("memoryUsed"),
+                memoryTotalBytes = l("memoryTotal"),
+                storageUsedBytes = l("storageUsed"),
+                storageTotalBytes = l("storageTotal"),
+                uptimeSec = l("uptimeSec"),
+            )
+        }
+    }
+}
+
 data class AgentInfo(
     val agentId: String,
     val name: String,
@@ -59,8 +110,12 @@ data class AgentInfo(
     val lastSeen: Long?,
     val instanceId: String?,
     val sessions: List<SessionInfo>,
+    val metrics: MachineMetrics = MachineMetrics.EMPTY,
 ) {
     val isWindows: Boolean get() = platform == "win32"
+
+    /** Terminals still running on the machine (exited ones stay listed but do not count). */
+    val runningSessions: Int get() = sessions.count { it.isRunning }
 
     companion object {
         fun fromJson(o: JSONObject): AgentInfo = AgentInfo(
@@ -77,6 +132,7 @@ data class AgentInfo(
             lastSeen = if (o.isNull("lastSeen")) null else o.optLong("lastSeen"),
             instanceId = if (o.isNull("instanceId")) null else o.optString("instanceId"),
             sessions = o.optJSONArray("sessions").toList { SessionInfo.fromJson(it) },
+            metrics = MachineMetrics.fromJson(o.optJSONObject("metrics")),
         )
     }
 }

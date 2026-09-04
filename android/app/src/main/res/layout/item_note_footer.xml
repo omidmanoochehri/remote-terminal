@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The note card as a list footer, with the list gutter applied. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="@dimen/rt_gutter"
+    android:paddingEnd="@dimen/rt_gutter"
+    android:paddingTop="18dp">
+
+    <include
+        android:id="@+id/note"
+        layout="@layout/view_note_card" />
+</FrameLayout>

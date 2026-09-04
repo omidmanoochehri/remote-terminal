@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Quick-access tile on Home: a coloured glyph over a count and a label. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="0dp"
+    android:layout_height="@dimen/rt_quick_tile_height"
+    android:layout_weight="1"
+    android:orientation="vertical"
+    android:gravity="center_horizontal"
+    android:paddingTop="11dp"
+    android:background="@drawable/rt_tile_clickable"
+    android:clickable="true"
+    android:focusable="true">
+
+    <ImageView
+        android:id="@+id/quickTileIcon"
+        android:layout_width="@dimen/rt_icon_lg"
+        android:layout_height="@dimen/rt_icon_lg"
+        android:importantForAccessibility="no"
+        tools:src="@drawable/ic_rt_server_cog" />
+
+    <TextView
+        android:id="@+id/quickTileValue"
+        style="@style/RtText.QuickValue"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        tools:text="3" />
+
+    <TextView
+        android:id="@+id/quickTileLabel"
+        style="@style/RtText.QuickLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        tools:text="Machines" />
+</LinearLayout>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Field background that reacts to focus; the error variant is set in code. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true" android:drawable="@drawable/rt_field_focused" />
+    <item android:drawable="@drawable/rt_field" />
+</selector>

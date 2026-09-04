@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Relay connection strip. Shown on every list screen while the phone is not
+  connected, so an empty list is never mistaken for "you have no machines".
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/connectionBanner"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="@dimen/rt_gutter"
+    android:layout_marginEnd="@dimen/rt_gutter"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:minHeight="44dp"
+    android:paddingStart="14dp"
+    android:paddingEnd="6dp"
+    android:background="@drawable/rt_tile"
+    android:visibility="gone">
+
+    <View
+        android:id="@+id/bannerDot"
+        android:layout_width="@dimen/status_dot"
+        android:layout_height="@dimen/status_dot"
+        android:background="@drawable/rt_dot"
+        android:importantForAccessibility="no" />
+
+    <TextView
+        android:id="@+id/bannerText"
+        style="@style/RtText.Meta"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="10dp"
+        android:maxLines="2"
+        tools:text="Reconnecting in 3s…" />
+
+    <TextView
+        android:id="@+id/bannerAction"
+        style="@style/RtText"
+        android:layout_width="wrap_content"
+        android:layout_height="34dp"
+        android:gravity="center"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:textSize="10sp"
+        android:textStyle="bold"
+        android:textColor="@color/rt_primary"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:clickable="true"
+        android:focusable="true"
+        android:text="@string/retry_now" />
+</LinearLayout>

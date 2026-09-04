@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Screen backdrop: the artboard's vertical #06101A -> #030811 wash. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <gradient
+        android:angle="270"
+        android:startColor="@color/rt_bg_top"
+        android:endColor="@color/rt_bg_bottom"
+        android:type="linear" />
+</shape>

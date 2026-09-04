@@ -1,45 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Phones paired to this account: rename this one, revoke the others, add another. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="?android:attr/colorBackground">
+    android:orientation="vertical">
 
-    <com.google.android.material.appbar.MaterialToolbar
-        android:id="@+id/toolbar"
-        android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
-        android:background="?attr/colorSurface"
-        app:title="@string/devices"
-        app:titleTextAppearance="?attr/textAppearanceTitleLarge"
-        app:navigationIcon="@drawable/ic_arrow_back"
-        app:navigationContentDescription="@string/back" />
+    <include
+        android:id="@+id/headerBar"
+        layout="@layout/view_back_header" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/list"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1"
+        android:layout_marginTop="8dp"
+        android:clipToPadding="false"
+        android:paddingBottom="@dimen/space_l"
+        android:scrollbars="none" />
 
-    <TextView
-        android:id="@+id/emptyText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:padding="@dimen/screen_padding"
-        android:text="@string/devices_empty"
-        android:textAppearance="?attr/textAppearanceBodyMedium"
-        android:textColor="?attr/colorOnSurfaceVariant"
-        android:visibility="gone" />
+    <include
+        android:id="@+id/stateBlock"
+        layout="@layout/view_state_block" />
 
-    <com.google.android.material.button.MaterialButton
+    <LinearLayout
         android:id="@+id/addButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="@dimen/space_m"
-        android:layout_marginEnd="@dimen/space_m"
-        android:layout_marginTop="@dimen/space_s"
-        android:layout_marginBottom="@dimen/space_m"
-        android:text="@string/add_phone"
-        app:icon="@drawable/ic_phone_android" />
+        style="@style/RtCta"
+        android:layout_marginStart="@dimen/rt_gutter"
+        android:layout_marginEnd="@dimen/rt_gutter"
+        android:layout_marginBottom="@dimen/rt_gutter">
+
+        <ImageView
+            android:layout_width="@dimen/rt_icon_lg"
+            android:layout_height="@dimen/rt_icon_lg"
+            android:layout_marginEnd="14dp"
+            android:src="@drawable/ic_rt_qr_code"
+            android:importantForAccessibility="no"
+            app:tint="@color/rt_on_primary" />
+
+        <TextView
+            style="@style/RtText.Cta"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="13sp"
+            android:text="@string/add_phone" />
+    </LinearLayout>
 </LinearLayout>

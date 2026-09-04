@@ -192,6 +192,18 @@ class TerminalView @JvmOverloads constructor(context: Context, attrs: AttributeS
     }
 
     /**
+     * Prefer the system monospace face when the user asked for it in settings,
+     * falling back to the bundled one if the platform face is not really
+     * fixed-width (which would leave every line short of the right edge).
+     */
+    fun setPreferSystemFont(preferSystem: Boolean) {
+        val wanted = if (preferSystem && isFixedWidth(Typeface.MONOSPACE)) Typeface.MONOSPACE else pickMonoTypeface()
+        if (wanted == monoTypeface) return
+        monoTypeface = wanted
+        applyFont(); recomputeGeometry(); invalidate()
+    }
+
+    /**
      * The bundled font, so the cell width we measure is the width the glyphs are
      * actually drawn at. Some ROMs alias "monospace" to their proportional UI
      * font, which would leave every line short of the right edge; the system

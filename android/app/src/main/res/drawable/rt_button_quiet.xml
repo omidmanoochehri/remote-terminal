@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Neutral flat action ("Scan pairing QR code", "Advanced options"). -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="@color/rt_primary_soft">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/rt_surface_tile" />
+            <stroke android:width="@dimen/rt_stroke" android:color="@color/rt_divider" />
+            <corners android:radius="@dimen/rt_radius_field" />
+        </shape>
+    </item>
+</ripple>

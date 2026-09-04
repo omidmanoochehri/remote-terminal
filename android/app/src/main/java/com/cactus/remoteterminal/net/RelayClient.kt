@@ -64,6 +64,24 @@ class RelayClient(context: Context, private val credentials: CredentialStore) : 
     /** Errors not consumed by a pending request (for snackbars). */
     val errors: SharedFlow<RelayEvent.Error> = _errors
 
+    private val _latencyMs = MutableStateFlow<Int?>(null)
+    /**
+     * Round-trip time to the relay, measured with the protocol's ping/pong and
+     * refreshed every [PING_INTERVAL_MS] while connected in the foreground.
+     * Null when it has not been measured since the last connect.
+     */
+    val latencyMs: StateFlow<Int?> = _latencyMs
+
+    private var pingSentAt = 0L
+    private var pingRunnable: Runnable? = null
+
+    /**
+     * Asked when the app goes to the background: false closes the socket at
+     * once instead of holding it for the grace period. Set by [App] from the
+     * per-machine "Keep alive" setting.
+     */
+    var keepAliveInBackground: (() -> Boolean)? = null
+
     /** The last welcome, for limits/ids. */
     var deviceId: String? = credentials.deviceId; private set
     var accountId: String? = credentials.accountId; private set
@@ -104,6 +122,8 @@ class RelayClient(context: Context, private val credentials: CredentialStore) : 
     fun stop() {
         wanted = false
         cancelReconnect()
+        cancelPing()
+        _latencyMs.value = null
         val g = ++generation
         ws?.close(1000, "app closed")
         ws = null
@@ -139,6 +159,15 @@ class RelayClient(context: Context, private val credentials: CredentialStore) : 
             else if (!wanted && credentials.isPaired) start()
         } else if (wanted) {
             cancelBackgroundClose()
+            // Machines can opt out of the background grace period ("Keep alive"
+            // in machine settings); with none opted in the socket goes at once.
+            if (keepAliveInBackground?.invoke() == false) {
+                Log.i(TAG, "no machine wants background keep-alive; closing socket")
+                cancelReconnect()
+                cancelPing()
+                ws?.close(1000, "background")
+                return
+            }
             backgroundClose = Runnable {
                 backgroundClose = null
                 if (!foreground) {
@@ -260,6 +289,11 @@ class RelayClient(context: Context, private val credentials: CredentialStore) : 
                 deviceId = event.deviceId
                 accountId = event.accountId
                 setState(ConnectionState.Connected)
+                schedulePing(immediate = true)
+            }
+            is RelayEvent.Pong -> if (pingSentAt > 0L) {
+                _latencyMs.value = (System.currentTimeMillis() - pingSentAt).toInt().coerceAtLeast(0)
+                pingSentAt = 0L
             }
             is RelayEvent.Error -> {
                 val d = event.reqId?.let { pending.remove(it) }
@@ -274,9 +308,35 @@ class RelayClient(context: Context, private val credentials: CredentialStore) : 
         for (l in listeners.toList()) l.onRelayEvent(event)
     }
 
+    /**
+     * Keep one ping in flight at a time. The relay answers with `pong`, which
+     * gives the Machines and Machine-details screens a real latency figure
+     * instead of a guess; it also keeps middleboxes from idling the socket out.
+     */
+    private fun schedulePing(immediate: Boolean = false) {
+        cancelPing()
+        val run = Runnable {
+            pingRunnable = null
+            if (!isConnected) return@Runnable
+            pingSentAt = System.currentTimeMillis()
+            if (!send(com.cactus.remoteterminal.protocol.Outgoing.ping())) pingSentAt = 0L
+            schedulePing()
+        }
+        pingRunnable = run
+        main.postDelayed(run, if (immediate) 0L else PING_INTERVAL_MS)
+    }
+
+    private fun cancelPing() {
+        pingRunnable?.let { main.removeCallbacks(it) }
+        pingRunnable = null
+    }
+
     override fun onClose(code: Int, reason: String, remote: Boolean) {
         main.post {
             ws = null
+            cancelPing()
+            pingSentAt = 0L
+            _latencyMs.value = null
             for (d in pending.values) d.complete(RelayEvent.Error("disconnected", "Connection lost.", null, null, null))
             pending.clear()
             when (code) {
@@ -305,6 +365,8 @@ class RelayClient(context: Context, private val credentials: CredentialStore) : 
     companion object {
         private const val TAG = "RelayClient"
         const val BACKGROUND_GRACE_MS = 90_000L
+        /** Cheap enough to be a keepalive, slow enough not to matter on mobile data. */
+        private const val PING_INTERVAL_MS = 20_000L
         val APP_VERSION: String = BuildConfig.VERSION_NAME
     }
 }

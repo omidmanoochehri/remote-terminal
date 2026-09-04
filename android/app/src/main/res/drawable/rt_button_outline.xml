@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Secondary green-outlined action ("Add machine"). -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="@color/rt_primary_soft">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/rt_primary_softer" />
+            <stroke android:width="@dimen/rt_stroke" android:color="@color/rt_primary_edge" />
+            <corners android:radius="11dp" />
+        </shape>
+    </item>
+</ripple>
