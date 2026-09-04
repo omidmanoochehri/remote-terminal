@@ -32,7 +32,7 @@ it left off when you come back.
                     └───────────────────────────────────────┘
 ```
 
-Version **0.3.0**, wire protocol **v3** — see [`PROTOCOL.md`](./PROTOCOL.md).
+Version **0.5.0**, wire protocol **v3** — see [`PROTOCOL.md`](./PROTOCOL.md).
 
 ---
 
