@@ -110,6 +110,7 @@ class Router {
     const rt = reg.runtime.get(conn.agentId);
     if (!rt || rt.conn !== null) return; // replaced by a newer connection, or already handled
     this.clearAttachments(rt);
+    reg.clearAgentMetrics(conn.agentId); // load and free memory from an offline machine mean nothing
     reg.touchAgent(conn.agentId);
     const a = reg.getAgent(conn.agentId);
     if (a) this.broadcastAccount(conn.accountId, { type: 'agent.offline', agent: conn.agentId, lastSeen: a.lastSeen });
@@ -351,10 +352,17 @@ class Router {
         this.clearAttachments(rt);
         rt.sessions = new Map();
         for (const s of m.sessions || []) rt.sessions.set(s.sessionId, this.mirrorEntry(s));
+        reg.setAgentMetrics(conn.agentId, m.metrics);
         const a = reg.updateAgentMeta(conn.agentId, m);
         conn.log.info('agent registered', { instanceId: m.instanceId, sessions: rt.sessions.size, platform: m.platform, agentVersion: m.agentVersion });
         this.send(conn, { type: 'agent.registered', agentId: conn.agentId, name: a.name });
         return this.broadcastAccount(conn.accountId, { type: 'agent.online', agent: reg.agentInfo(conn.agentId) });
+      }
+
+      case 'agent.metrics': {
+        const metrics = reg.setAgentMetrics(conn.agentId, m.metrics);
+        if (!metrics) return undefined;
+        return this.broadcastAccount(conn.accountId, { type: 'agent.metrics', agent: conn.agentId, metrics });
       }
 
       case 'agent.update': {

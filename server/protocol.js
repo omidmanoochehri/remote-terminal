@@ -75,6 +75,23 @@ function validSessionInfo(s) {
     && (s.seq === undefined || isInt(s.seq, 0, Number.MAX_SAFE_INTEGER));
 }
 
+/**
+ * Validate the optional system metrics an agent publishes. Every field is
+ * optional — a platform that cannot answer omits it rather than guessing —
+ * but a field that is present has to be a real, sane number: the phone draws
+ * meters from these, and a NaN or a negative byte count would draw nonsense.
+ */
+function validMetrics(m) {
+  if (m === undefined) return true;
+  if (!m || typeof m !== 'object' || Array.isArray(m)) return false;
+  if (m.cpuLoad !== undefined && !(typeof m.cpuLoad === 'number' && Number.isFinite(m.cpuLoad) && m.cpuLoad >= 0 && m.cpuLoad <= 1)) return false;
+  for (const k of ['memoryUsed', 'memoryTotal', 'storageUsed', 'storageTotal', 'uptimeSec']) {
+    if (m[k] === undefined) continue;
+    if (!(typeof m[k] === 'number' && Number.isFinite(m[k]) && m[k] >= 0 && m[k] <= Number.MAX_SAFE_INTEGER)) return false;
+  }
+  return true;
+}
+
 /** @returns {{ok:boolean, message?:string}} */
 function validatePhoneMessage(m, limits) {
   if (!m || typeof m !== 'object' || Array.isArray(m)) return bad('message must be an object');
@@ -184,7 +201,10 @@ function validateAgentMessage(m) {
         if (!Array.isArray(m.sessions) || m.sessions.length > 256) return bad('invalid sessions');
         for (const s of m.sessions) if (!validSessionInfo(s)) return bad('invalid session entry');
       }
+      if (!validMetrics(m.metrics)) return bad('invalid metrics');
       return OK;
+    case 'agent.metrics':
+      return validMetrics(m.metrics) ? OK : bad('invalid metrics');
     case 'agent.update':
       return cleanName(m.name) ? OK : bad('invalid name');
     case 'session.created':

@@ -34,7 +34,7 @@ function testConfig(over) {
     replayBytes: 4096, coalesceMs: 5, maxChunk: 1024, maxSessions: 3, maxInputBytes: 1000,
     idleTimeoutSec: 3600, exitedRetentionSec: 60, inheritEnv: false,
     server: 'ws://127.0.0.1:1', name: '', baseBackoffMs: 10, maxBackoffMs: 50,
-    backpressureHighBytes: 1 << 20, backpressureLowBytes: 1 << 16,
+    backpressureHighBytes: 1 << 20, backpressureLowBytes: 1 << 16, metricsIntervalMs: 0,
   }, over);
 }
 

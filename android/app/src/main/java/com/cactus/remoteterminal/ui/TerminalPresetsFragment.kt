@@ -172,13 +172,21 @@ class TerminalPresetsFragment : Fragment(), RtScreen {
             val context = holder.b.root.context
             val preset = items[position]
             holder.b.presetName.text = preset.name
-            holder.b.presetPath.text = preset.summary.ifEmpty { context.getString(R.string.preset_no_directory) }
+            holder.b.presetPath.text = preset.directory.ifEmpty { context.getString(R.string.preset_no_directory) }
             holder.b.presetPath.visible = true
+            // The start-up command reads as the line the shell will run.
+            holder.b.presetCommand.text = context.getString(R.string.preset_command_line, preset.command)
+            holder.b.presetCommand.visible = preset.command.isNotEmpty()
             holder.b.presetMachine.text = listOfNotNull(
                 machineName(preset.agentId),
                 preset.shellId?.takeIf { it.isNotEmpty() },
             ).joinToString("  •  ")
-            holder.b.row.contentDescription = "${preset.name}, ${holder.b.presetPath.text}, ${holder.b.presetMachine.text}"
+            holder.b.row.contentDescription = listOf(
+                preset.name,
+                holder.b.presetPath.text.toString(),
+                preset.command.ifEmpty { context.getString(R.string.preset_no_command) },
+                holder.b.presetMachine.text.toString(),
+            ).joinToString(", ")
             holder.b.row.setOnClickListener { onStart(preset) }
             holder.b.presetMenu.setOnClickListener { onMenu(preset, it) }
         }

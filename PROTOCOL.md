@@ -49,12 +49,21 @@ In routed messages the routing keys are the short names `agent`, `session`,
 // AgentInfo (relay → phone)
 { "agentId": "a_…", "name": "Production Server", "hostname": "prod-01",
   "platform": "linux",            // "win32" | "linux" | "darwin"
-  "os": "Ubuntu 24.04", "arch": "x64", "agentVersion": "0.6.0", "protocol": 3,
+  "os": "Ubuntu 24.04", "arch": "x64", "agentVersion": "0.7.0", "protocol": 3,
   "shells": [ { "id": "bash", "label": "bash", "default": true }, { "id": "sh", "label": "sh" } ],
-  "caps": ["sessions", "replay", "resize", "ping"],
+  "caps": ["sessions", "replay", "resize", "ping", "files", "metrics"],
   "online": true, "lastSeen": 1725264000000,   // ms since epoch
   "instanceId": "…",              // changes every time the agent process restarts
+  "metrics": { /* MachineMetrics */ },  // present only while online, and only if the agent reports them
   "sessions": [ /* SessionInfo */ ] }
+
+// MachineMetrics — every field optional: a platform that cannot answer omits
+// it, and the app shows "not reported" rather than a fabricated number.
+{ "cpuLoad": 0.24,                // 0..1, busy share since the agent's previous sample
+  "memoryUsed": 5798205849, "memoryTotal": 16687661056,   // bytes; on Linux "used" is total − MemAvailable
+  "storageUsed": 41231265792, "storageTotal": 105089261568, // bytes on the filesystem the agent runs from
+  "uptimeSec": 279484,            // machine uptime, not agent uptime
+  "at": 1725264100000 }           // when the relay received the sample (added by the relay)
 
 // SessionInfo
 { "sessionId": "s_…", "title": "API Logs", "shell": "bash",
@@ -152,10 +161,13 @@ and terminates sockets that miss a pong.
   "instanceId": "…",                  // random per process start
   "name": "…",                        // used only if the relay has no name for this agent yet
   "hostname": "prod-01", "platform": "linux", "os": "Ubuntu 24.04", "arch": "x64",
-  "agentVersion": "0.6.0", "protocol": 3,
+  "agentVersion": "0.7.0", "protocol": 3,
   "shells": [ { "id": "bash", "label": "bash", "default": true } ],
-  "caps": ["sessions", "replay", "resize", "ping"],
+  "caps": ["sessions", "replay", "resize", "ping", "files", "metrics"],
+  "metrics": { /* MachineMetrics, optional */ },
   "sessions": [ /* SessionInfo… (sessions that survived the disconnect) */ ] }
+
+{ "type": "agent.metrics", "metrics": { /* MachineMetrics */ } }  // periodic; see §4a
 
 { "type": "agent.update", "name": "Office PC" }               // agent-side rename (CLI)
 
@@ -192,6 +204,23 @@ The relay strips `agent` from phone messages before forwarding (the agent
 connection *is* the agent) and strips `client` from agent messages before
 forwarding to a phone.
 
+### 4a. System metrics
+
+An agent may publish CPU, memory, disk and uptime figures for the machine
+screen: a first sample on `agent.register`, then an `agent.metrics` message
+every `metricsIntervalMs` (20s by default, `METRICS_INTERVAL_MS=0` disables
+reporting entirely). The relay validates the numbers, keeps the last sample
+**in memory only** and broadcasts `agent.metrics` to the account's phones.
+
+Because they are never persisted, metrics disappear when the agent
+disconnects: an offline `AgentInfo` has no `metrics` field, and the next
+registration replaces whatever was there. CPU load is a delta between two
+samples, so the very first sample after a start-up usually has no `cpuLoad`.
+
+Metrics are advisory. Nothing in the protocol depends on them, an agent that
+never sends any is fully conformant, and phones must render a missing field as
+"not reported" rather than as zero.
+
 ---
 
 ## 5. Phone messages
@@ -225,6 +254,7 @@ forwarding to a phone.
 ```jsonc
 { "type": "agent.list",     "agents": [ /* AgentInfo… */ ] }
 { "type": "agent.online",   "agent": { /* AgentInfo */ } }      // also carries the (possibly new) instanceId
+{ "type": "agent.metrics",  "agent": "a_…", "metrics": { /* MachineMetrics */ } }  // see §4a
 { "type": "agent.offline",  "agent": "a_…", "lastSeen": 1725264100000 }
 { "type": "agent.updated",  "agent": "a_…", "name": "…" }
 { "type": "agent.removed",  "agent": "a_…", "by": "d_…" }
@@ -406,6 +436,7 @@ Advertised in `welcome.caps` (relay), `agent.register.caps` (agent, echoed in
 | `resize` | PTY resize is supported |
 | `ping` | app-level ping/pong |
 | `files` | the agent accepts files pushed into a session (§6a) |
+| `metrics` | the agent publishes CPU/memory/disk/uptime samples (§4a) |
 | `pairing` | the relay exposes the `/v3/pair/*` endpoints |
 | `color` | phone renders full SGR/ANSI (informational) |
 | `legacy` | relay also serves v2 room clients (`LEGACY_V2=1`) |

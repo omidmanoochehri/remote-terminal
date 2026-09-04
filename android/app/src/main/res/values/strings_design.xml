@@ -311,6 +311,9 @@
     <string name="preset_machine_gone">Machine not paired</string>
     <string name="preset_no_directory">Home directory</string>
     <string name="preset_no_machine">That machine is no longer paired.</string>
+    <string name="preset_command_help">Typed into the new shell as its first line, right after the working directory. Leave it empty to just open a shell.</string>
+    <string name="preset_no_command">No start-up command</string>
+    <string name="preset_command_line">❯ %1$s</string>
     <string name="preset_delete_title">Delete “%1$s”?</string>
     <string name="preset_delete_body">The preset is removed from this phone. Terminals already started from it keep running.</string>
     <string name="edit">Edit</string>

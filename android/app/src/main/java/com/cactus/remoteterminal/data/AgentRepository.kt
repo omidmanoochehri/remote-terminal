@@ -4,6 +4,7 @@ import android.content.Context
 import com.cactus.remoteterminal.net.RelayClient
 import com.cactus.remoteterminal.protocol.AgentInfo
 import com.cactus.remoteterminal.protocol.DeviceInfo
+import com.cactus.remoteterminal.protocol.MachineMetrics
 import com.cactus.remoteterminal.protocol.Outgoing
 import com.cactus.remoteterminal.protocol.RelayEvent
 import com.cactus.remoteterminal.protocol.SessionInfo
@@ -45,8 +46,15 @@ class AgentRepository(context: Context, private val client: RelayClient) : Relay
             is RelayEvent.Welcome -> { setAgents(event.agents); _devices.value = event.devices }
             is RelayEvent.AgentList -> setAgents(event.agents)
             is RelayEvent.AgentOnline -> upsert(event.agent)
-            is RelayEvent.AgentOffline -> update(event.agentId) { it.copy(online = false, lastSeen = event.lastSeen ?: it.lastSeen, sessions = it.sessions) }
+            // An offline machine keeps its terminals, but its CPU and free
+            // memory are last week's news: drop them rather than show them.
+            is RelayEvent.AgentOffline -> update(event.agentId) {
+                it.copy(online = false, lastSeen = event.lastSeen ?: it.lastSeen, sessions = it.sessions, metrics = MachineMetrics.EMPTY)
+            }
             is RelayEvent.AgentUpdated -> update(event.agentId) { it.copy(name = event.name) }
+            // Metrics tick every few seconds and mean nothing offline, so they
+            // move the flow without rewriting the on-disk snapshot.
+            is RelayEvent.AgentMetrics -> update(event.agentId, cache = false) { it.copy(metrics = event.metrics) }
             is RelayEvent.AgentRemoved -> setAgents(_agents.value.filterNot { it.agentId == event.agentId })
             is RelayEvent.DeviceList -> _devices.value = event.devices
             is RelayEvent.DeviceUpdated -> _devices.value = _devices.value.map { if (it.deviceId == event.deviceId) it.copy(name = event.name) else it }
@@ -71,20 +79,22 @@ class AgentRepository(context: Context, private val client: RelayClient) : Relay
     override fun onConnectionState(state: RelayClient.ConnectionState) {
         // While disconnected nobody is reachable; keep the list but show everything offline.
         if (state !is RelayClient.ConnectionState.Connected && state !is RelayClient.ConnectionState.Connecting) {
-            if (_agents.value.any { it.online }) _agents.value = _agents.value.map { it.copy(online = false) }
+            if (_agents.value.any { it.online }) {
+                _agents.value = _agents.value.map { it.copy(online = false, metrics = MachineMetrics.EMPTY) }
+            }
         }
     }
 
-    private fun setAgents(list: List<AgentInfo>) {
+    private fun setAgents(list: List<AgentInfo>, cache: Boolean = true) {
         _agents.value = list.sortedWith(compareBy({ !it.online }, { it.name.lowercase() }))
-        saveCache(list)
+        if (cache) saveCache(list)
     }
 
     private fun upsert(agent: AgentInfo) = setAgents(_agents.value.filterNot { it.agentId == agent.agentId } + agent)
 
-    private fun update(agentId: String, f: (AgentInfo) -> AgentInfo) {
+    private fun update(agentId: String, cache: Boolean = true, f: (AgentInfo) -> AgentInfo) {
         if (_agents.value.none { it.agentId == agentId }) return
-        setAgents(_agents.value.map { if (it.agentId == agentId) f(it) else it })
+        setAgents(_agents.value.map { if (it.agentId == agentId) f(it) else it }, cache)
     }
 
     private fun updateSession(agentId: String, sessionId: String, f: (SessionInfo) -> SessionInfo) = update(agentId) { a ->

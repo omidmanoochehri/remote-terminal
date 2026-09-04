@@ -13,6 +13,8 @@
   "sessionIdleTimeoutSec": 21600,
   "exitedRetentionSec": 300,
 
+  "metricsIntervalMs": 20000,
+
   "inheritEnv": false,
   "allowRoot": false,
   "logLevel": "info",

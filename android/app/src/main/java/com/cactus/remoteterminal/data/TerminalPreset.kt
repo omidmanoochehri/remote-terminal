@@ -20,10 +20,6 @@ data class TerminalPreset(
     val directory: String = "",
     val command: String = "",
 ) {
-    /** What the row under the name says: the directory, or the command, or the shell. */
-    val summary: String
-        get() = listOf(directory, command).firstOrNull { it.isNotEmpty() } ?: ""
-
     fun toJson(): JSONObject {
         val o = JSONObject()
         o.put("id", id)

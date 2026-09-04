@@ -189,6 +189,70 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/advancedToggle"
+                android:layout_width="match_parent"
+                android:layout_height="42dp"
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:background="@drawable/rt_button_quiet"
+                android:clickable="true"
+                android:focusable="true">
+
+                <TextView
+                    style="@style/RtText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/rt_text_muted"
+                    android:text="@string/advanced_options" />
+
+                <ImageView
+                    android:id="@+id/advancedChevron"
+                    android:layout_width="@dimen/rt_icon_md"
+                    android:layout_height="@dimen/rt_icon_md"
+                    android:layout_marginStart="14dp"
+                    android:src="@drawable/ic_rt_chevron_down"
+                    android:importantForAccessibility="no"
+                    app:tint="@color/rt_text_muted" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/advancedPanel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical"
+                android:padding="14dp"
+                android:background="@drawable/rt_card"
+                android:visibility="gone">
+
+                <include
+                    android:id="@+id/commandField"
+                    layout="@layout/view_form_field" />
+
+                <!-- Preset mode only: the command is the point of a preset. -->
+                <TextView
+                    android:id="@+id/commandHelp"
+                    style="@style/RtText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:textSize="8.5sp"
+                    android:textColor="@color/rt_text_muted"
+                    android:visibility="gone"
+                    android:text="@string/preset_command_help" />
+
+                <include
+                    android:id="@+id/scrollbackField"
+                    layout="@layout/view_form_field"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="17dp" />
+            </LinearLayout>
+
+            <LinearLayout
                 android:id="@+id/createButton"
                 style="@style/RtCta"
                 android:layout_height="52dp"
@@ -242,57 +306,6 @@
                     android:text="@string/preset_save_as" />
             </LinearLayout>
 
-            <LinearLayout
-                android:id="@+id/advancedToggle"
-                android:layout_width="match_parent"
-                android:layout_height="42dp"
-                android:layout_marginTop="12dp"
-                android:orientation="horizontal"
-                android:gravity="center"
-                android:background="@drawable/rt_button_quiet"
-                android:clickable="true"
-                android:focusable="true">
-
-                <TextView
-                    style="@style/RtText"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textSize="10sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/rt_text_muted"
-                    android:text="@string/advanced_options" />
-
-                <ImageView
-                    android:id="@+id/advancedChevron"
-                    android:layout_width="@dimen/rt_icon_md"
-                    android:layout_height="@dimen/rt_icon_md"
-                    android:layout_marginStart="14dp"
-                    android:src="@drawable/ic_rt_chevron_down"
-                    android:importantForAccessibility="no"
-                    app:tint="@color/rt_text_muted" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/advancedPanel"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:orientation="vertical"
-                android:padding="14dp"
-                android:background="@drawable/rt_card"
-                android:visibility="gone">
-
-                <include
-                    android:id="@+id/commandField"
-                    layout="@layout/view_form_field" />
-
-                <include
-                    android:id="@+id/scrollbackField"
-                    layout="@layout/view_form_field"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="17dp" />
-            </LinearLayout>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 </LinearLayout>

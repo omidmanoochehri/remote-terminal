@@ -49,6 +49,10 @@ function loadConfig(env = process.env, overrides = {}) {
     idleTimeoutSec: n(env.SESSION_IDLE_TIMEOUT, file.sessionIdleTimeoutSec, 6 * 3600),
     exitedRetentionSec: n(env.EXITED_RETENTION_SEC, file.exitedRetentionSec, 300),
     sweepIntervalMs: n(env.SWEEP_INTERVAL_MS, file.sweepIntervalMs, 30000),
+    // CPU/memory/disk/uptime for the phone's machine screen; 0 turns reporting
+    // off. Anything faster than 2s is pointless (CPU load is a delta) and is
+    // clamped up, so a typo cannot flood the relay.
+    metricsIntervalMs: metricsInterval(n(env.METRICS_INTERVAL_MS, file.metricsIntervalMs, 20000)),
     // Files pasted from a phone (images, mostly) land here.
     uploadsDir: s(env.UPLOADS_DIR, file.uploadsDir, ''),
     maxUploadBytes: n(env.MAX_UPLOAD_BYTES, file.maxUploadBytes, 16 * 1024 * 1024),
@@ -64,6 +68,11 @@ function loadConfig(env = process.env, overrides = {}) {
     backpressureHighBytes: n(env.BACKPRESSURE_HIGH_BYTES, file.backpressureHighBytes, 2 * 1024 * 1024),
     backpressureLowBytes: n(env.BACKPRESSURE_LOW_BYTES, file.backpressureLowBytes, 256 * 1024),
   };
+}
+
+function metricsInterval(ms) {
+  if (!Number.isFinite(ms) || ms <= 0) return 0;
+  return Math.max(2000, ms);
 }
 
 /* --------------------------------- state ---------------------------------- */

@@ -47,6 +47,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private val app get() = application as App
     private var unlocked = false
+    private var splashDismissed = false
 
     private val notificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* optional */ }
@@ -120,14 +121,23 @@ class MainActivity : AppCompatActivity() {
         binding.splashCopyright.text = getString(R.string.splash_copyright, year)
         cover.alpha = 1f
         cover.visible = true
-        cover.postDelayed({
-            if (isFinishing || isDestroyed) return@postDelayed
-            cover.animate()
-                .alpha(0f)
-                .setDuration(SPLASH_FADE_MS)
-                .withEndAction { cover.visible = false }
-                .start()
-        }, SPLASH_HOLD_MS)
+        // Nobody has to sit through it: a tap takes the cover away at once.
+        cover.setOnClickListener { hideSplash() }
+        cover.postDelayed({ hideSplash() }, SPLASH_HOLD_MS)
+    }
+
+    /** Fade the brand card out, once, whether the hold ran out or a tap cut it short. */
+    private fun hideSplash() {
+        if (isFinishing || isDestroyed) return
+        val cover = binding.splashCover
+        if (!cover.visible || splashDismissed) return
+        splashDismissed = true
+        cover.setOnClickListener(null)
+        cover.animate()
+            .alpha(0f)
+            .setDuration(SPLASH_FADE_MS)
+            .withEndAction { cover.visible = false }
+            .start()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -306,8 +316,8 @@ class MainActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_AGENT = "agent"
         const val EXTRA_SESSION = "session"
-        /** Long enough to read the mark, short enough not to be in the way. */
-        private const val SPLASH_HOLD_MS = 900L
-        private const val SPLASH_FADE_MS = 320L
+        /** Long enough to read the mark; the app is already live underneath. */
+        private const val SPLASH_HOLD_MS = 2200L
+        private const val SPLASH_FADE_MS = 450L
     }
 }

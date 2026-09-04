@@ -59,10 +59,13 @@ class TerminalPresetTest {
     }
 
     @Test
-    fun summaryPrefersTheDirectoryThenTheCommand() {
-        assertEquals("/srv/api", full.summary)
-        assertEquals("htop", TerminalPreset(id = "c", name = "Top", command = "htop").summary)
-        assertEquals("", TerminalPreset(id = "d", name = "Plain").summary)
+    fun aStartUpCommandSurvivesEditingRoundTrips() {
+        val edited = full.copy(command = "docker compose logs -f api")
+        assertEquals("docker compose logs -f api", TerminalPreset.fromJson(edited.toJson())?.command)
+        // A preset that only runs something, with no directory, is legitimate.
+        val bare = TerminalPreset(id = "c", name = "Top", command = "htop")
+        assertEquals(bare, TerminalPreset.fromJson(bare.toJson()))
+        assertEquals("", TerminalPreset.fromJson(TerminalPreset(id = "d", name = "Plain").toJson())?.command)
     }
 
     @Test

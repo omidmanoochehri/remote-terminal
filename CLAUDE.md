@@ -19,14 +19,27 @@ See `README.md` for the full tour and `PROTOCOL.md` for the wire protocol.
 ## Versioning
 
 The project has **one version number**, shared by the server, the agent and the
-Android app. It is currently **0.6.0**.
+Android app. It is currently **0.7.0**.
 
-Bump it whenever the user asks for a version bump, or when cutting a release.
-Keep semver: patch for fixes, minor for features, major for breaking changes.
+**Bump it automatically — do not wait to be asked.** Any piece of work that
+changes shipped behaviour ends with a version bump, in the same commit as the
+change and before the release APK is built, so the APK carries the new version.
+Decide the size from what the work did, using semver:
+
+- **patch** (0.7.0 → 0.7.1) — bug fixes, wording, docs, refactors, test-only work.
+- **minor** (0.7.0 → 0.8.0) — anything a user would notice as new: a feature, a
+  new screen or field, a new protocol message, a new agent capability.
+- **major** — a breaking change to the wire protocol or to stored state.
+
+Bump once per piece of work, not once per file touched: several changes
+delivered together share one bump, and the largest of them decides its size. A
+question, an investigation or an abandoned experiment is not a bump. An explicit
+version from the user wins over this rule.
+
 The Android `versionCode` is a plain integer that must strictly increase on
-every release. It has so far tracked the minor version (0.3.0 → 3, 0.6.0 → 6);
+every release. It has so far tracked the minor version (0.3.0 → 3, 0.7.0 → 7);
 keep that going, and if two builds ever share a `versionName`, increment
-`versionCode` anyway.
+`versionCode` anyway — including for a patch bump.
 
 A bump means editing **all** of these, in one commit:
 
@@ -53,9 +66,12 @@ everywhere at once.
 Verify a bump with:
 
 ```bash
-grep -rn "0\.6\.0" --include="*.json" --include="*.gradle" --include="*.md" . \
+grep -rn "0\.7\.0" --include="*.json" --include="*.gradle" --include="*.md" . \
   | grep -v node_modules | grep -v /build/
 ```
+
+Two hits in `agent/package-lock.json` are dependency versions that happen to
+read `0.6.0` (`deep-extend`, `tunnel-agent`) — leave those alone.
 
 ## Release APK
 

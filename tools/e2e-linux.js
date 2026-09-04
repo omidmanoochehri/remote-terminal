@@ -64,6 +64,8 @@ function agentEnv(stateFile) {
     CONFIG: cfgFile,
     SERVER: `ws://127.0.0.1:${PORT}`, ENROLL_TOKEN: ENROLL, AGENT_STATE: stateFile, AGENT_NAME: 'E2E Ubuntu',
     LOG_LEVEL: 'warn', ALLOW_ROOT: '1', BASE_BACKOFF_MS: '200', MAX_BACKOFF_MS: '1000', EXITED_RETENTION_SEC: '2', SWEEP_INTERVAL_MS: '500',
+    // Fast enough that the scenario can watch a second sample arrive (2s is the floor the agent clamps to).
+    METRICS_INTERVAL_MS: '2000',
   });
 }
 
@@ -168,6 +170,17 @@ async function main() {
     check('welcome lists the agent online with metadata', !!a && a.online && a.platform === 'linux' && /Ubuntu|Linux/.test(a.os), a && `${a.name} · ${a.os} · shells=${a.shells.map((s) => s.id).join(',')}`);
     check('bash is an advertised shell', !!a && a.shells.some((s) => s.id === 'bash'));
     const agentId = state.agentId;
+
+    // System metrics: the register payload carries a first sample, and the
+    // machine screen keeps getting fresh ones while the agent is connected.
+    const m0 = a && a.metrics;
+    check('welcome carries system metrics for this Linux box',
+      !!m0 && m0.memoryTotal > 0 && m0.memoryUsed > 0 && m0.memoryUsed < m0.memoryTotal && m0.storageTotal > 0 && m0.uptimeSec > 0,
+      m0 && `mem ${Math.round((m0.memoryUsed / m0.memoryTotal) * 100)}% of ${(m0.memoryTotal / 1024 ** 3).toFixed(1)}GiB · disk ${Math.round((m0.storageUsed / m0.storageTotal) * 100)}% · up ${Math.round(m0.uptimeSec / 60)}min`);
+    const m1 = await phone.next((m) => m.type === 'agent.metrics', 8000);
+    check('metrics refresh on their own timer, with a CPU figure once there are two samples',
+      m1.agent === agentId && typeof m1.metrics.cpuLoad === 'number' && m1.metrics.cpuLoad >= 0 && m1.metrics.cpuLoad <= 1,
+      `cpu ${Math.round(m1.metrics.cpuLoad * 100)}%`);
 
     // Two simultaneous terminals.
     const s1 = await phone.create(agentId, 'bash', 100, 30, 'Terminal 1');

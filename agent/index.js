@@ -23,6 +23,7 @@ const path = require('path');
 const { loadConfig, loadState, saveState, deleteState, machineMeta } = require('./lib/config');
 const { makeLogger } = require('./lib/log');
 const { discoverShells, advertise } = require('./lib/shells');
+const { Metrics } = require('./lib/metrics');
 const { spawnPty, ptyAvailable } = require('./lib/pty');
 const { SessionManager } = require('./lib/sessions');
 const { UploadManager } = require('./lib/uploads');
@@ -126,6 +127,7 @@ async function cmdDoctor(cfg, state, log) {
   console.log(`  Env policy:   ${cfg.inheritEnv ? 'INHERIT_ENV=1 (full environment passed to shells!)' : 'minimal allowlist'}`);
   console.log(`  Uploads:      ${cfg.uploadsDir || path.join(os.homedir(), 'RemoteTerminal')} (max ${Math.round(cfg.maxUploadBytes / (1024 * 1024))} MiB)`);
   console.log(`  Limits:       maxSessions=${cfg.maxSessions} replayBytes=${cfg.replayBytes} idleTimeoutSec=${cfg.idleTimeoutSec}`);
+  console.log(`  Metrics:      ${describeMetrics(cfg, log)}`);
   const shells = await discoverShells({ configured: cfg.shells, defaultShell: cfg.defaultShell, warn: (m, f) => log.warn(m, f) });
   console.log(`  Shells (${cfg.shells ? 'from config' : 'discovered'}):`);
   for (const s of shells) console.log(`    ${s.default ? '*' : ' '} ${s.id.padEnd(14)} ${s.label.padEnd(22)} ${s.cmd}${s.args && s.args.length ? ' ' + s.args.join(' ') : ''}`);
@@ -133,6 +135,29 @@ async function cmdDoctor(cfg, state, log) {
   if (process.platform !== 'win32' && typeof process.getuid === 'function' && process.getuid() === 0) {
     console.log(`  Warning:      running as root${cfg.allowRoot ? ' (allowed by config)' : ' — refused unless --allow-root / ALLOW_ROOT=1'}`);
   }
+}
+
+/**
+ * What the phone's machine screen will show, sampled twice so the CPU figure
+ * (a delta between two readings) is real. This is the quickest way to see
+ * whether a platform can answer every field.
+ */
+function describeMetrics(cfg, log) {
+  if (cfg.metricsIntervalMs <= 0) return 'disabled (metricsIntervalMs=0)';
+  const metrics = new Metrics({ log });
+  const wait = Date.now() + 400;
+  while (Date.now() < wait) { /* busy on purpose: a sleeping CPU still has to show load */ }
+  const s = metrics.sample();
+  const pct = (used, total) => (total ? `${Math.round((used / total) * 100)}%` : '?');
+  const gib = (b) => `${(b / 1024 ** 3).toFixed(1)} GiB`;
+  const parts = [
+    `every ${Math.round(cfg.metricsIntervalMs / 1000)}s`,
+    `cpu ${s.cpuLoad === undefined ? 'not reported' : `${Math.round(s.cpuLoad * 100)}%`}`,
+    `memory ${s.memoryTotal === undefined ? 'not reported' : `${pct(s.memoryUsed, s.memoryTotal)} of ${gib(s.memoryTotal)}`}`,
+    `disk ${s.storageTotal === undefined ? `not reported (${metrics.diskPath})` : `${pct(s.storageUsed, s.storageTotal)} of ${gib(s.storageTotal)} on ${metrics.diskPath}`}`,
+    `uptime ${s.uptimeSec === undefined ? 'not reported' : `${Math.round(s.uptimeSec / 3600)}h`}`,
+  ];
+  return parts.join(', ');
 }
 
 /* --------------------------------- agent ---------------------------------- */

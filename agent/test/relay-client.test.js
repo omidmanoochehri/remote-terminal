@@ -201,6 +201,59 @@ test('4409 (replaced) and 4426 (upgrade required) are fatal too; normal errors b
   client.stop();
 });
 
+test('metrics ride along with register and then refresh on their own timer', async (t) => {
+  const relay = fakeRelay();
+  t.after(() => relay.close());
+  const { client } = makeClient(relay, { metricsIntervalMs: 20 });
+  t.after(() => client.stop());
+  // A stand-in collector: real sampling is covered in metrics.test.js.
+  let n = 0;
+  client.metrics = { sample: () => ({ cpuLoad: 0.1 * ++n, memoryUsed: 1, memoryTotal: 2, uptimeSec: 5 }) };
+  const p = relay.nextConn();
+  client.start();
+  const c = await p;
+
+  const reg = await c.next((m) => m.type === 'agent.register');
+  assert.strictEqual(reg.metrics.cpuLoad, 0.1, 'the first sample arrives with the registration');
+  assert.ok(reg.caps.includes('metrics'));
+  const tick = await c.next((m) => m.type === 'agent.metrics');
+  assert.strictEqual(tick.metrics.memoryTotal, 2);
+  assert.ok(tick.metrics.cpuLoad > 0.1, 'each tick is a fresh sample');
+
+  client.stop();
+  await relay.close();
+});
+
+test('a collector that throws is logged, not fatal, and metrics can be turned off', async (t) => {
+  const relay = fakeRelay();
+  t.after(() => relay.close());
+  const { client } = makeClient(relay, { metricsIntervalMs: 20 });
+  t.after(() => client.stop());
+  client.metrics = { sample: () => { throw new Error('no /proc/stat here'); } };
+  const p = relay.nextConn();
+  client.start();
+  const c = await p;
+  const reg = await c.next((m) => m.type === 'agent.register');
+  assert.strictEqual(reg.metrics, undefined, 'registration still goes out');
+  await sleep(60);
+  assert.ok(!c.inbox.some((m) => m.type === 'agent.metrics'), 'nothing is published');
+  client.stop();
+  await relay.close();
+
+  // metricsIntervalMs=0 keeps the timer from ever starting.
+  const relay2 = fakeRelay();
+  t.after(() => relay2.close());
+  const off = makeClient(relay2, { metricsIntervalMs: 0 }).client;
+  t.after(() => off.stop());
+  const p2 = relay2.nextConn();
+  off.start();
+  const c2 = await p2;
+  await c2.next((m) => m.type === 'agent.register');
+  assert.strictEqual(off.metricsTimer, null);
+  off.stop();
+  await relay2.close();
+});
+
 test('backpressure pauses shells while the socket buffer is high and resumes after drain', async (t) => {
   const relay = fakeRelay();
   t.after(() => relay.close());

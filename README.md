@@ -32,7 +32,7 @@ it left off when you come back.
                     └───────────────────────────────────────┘
 ```
 
-Version **0.6.0**, wire protocol **v3** — see [`PROTOCOL.md`](./PROTOCOL.md).
+Version **0.7.0**, wire protocol **v3** — see [`PROTOCOL.md`](./PROTOCOL.md).
 
 ---
 
@@ -134,11 +134,18 @@ machine of the account automatically — no codes, no rooms.
 - **Machines** — every enrolled agent with presence (● online / ○ offline + last
   seen), hostname · OS, and how many terminals are running. Machines stay listed
   while offline. Menu: Paired phones, Settings, install help.
-- **Machine** — facts, the running terminals (state, age, whether open on this
-  phone), *New terminal* with a shell chooser (PowerShell 7 / Windows PowerShell /
-  Command Prompt / WSL distributions on Windows; bash / zsh / sh … on Linux; the
-  last choice is remembered per machine), rename, copy hostname, remove
-  (revokes the agent's token).
+- **Machine** — facts, live CPU / memory / disk / uptime for the machine
+  (reported by the agent on Windows and Linux alike; a figure a platform cannot
+  answer reads *not reported* rather than zero), saved presets as one-tap chips,
+  the running terminals (state, age, whether open on this phone), *New terminal*
+  with a shell chooser (PowerShell 7 / Windows PowerShell / Command Prompt / WSL
+  distributions on Windows; bash / zsh / sh … on Linux; the last choice is
+  remembered per machine), rename, copy hostname, remove (revokes the agent's
+  token).
+- **Presets** — a saved way to start a terminal: a name, a machine (or *any
+  machine*, which asks when it runs), a shell, a working directory and a
+  start-up command that is typed into the new shell as its first line. Save one
+  from the New terminal form, or edit them under Settings → Terminal presets.
 - **Terminal** — scrollable tabs (one per terminal, unread-rows badge, close
   offers *Keep running* or *Terminate*), a slim bar with presence, search,
   keyboard and more. Type directly into the terminal; the extra-keys bar has
@@ -250,6 +257,7 @@ default next to `index.js`; the installers use `/etc/remote-terminal-agent/confi
 | `UPLOADS_DIR` | `<home>/RemoteTerminal` | Where files pasted from a phone are written (0700, files 0600) |
 | `MAX_UPLOAD_BYTES` / `MAX_UPLOADS` | 16 MiB / 3 | Largest pasted file, and transfers in flight per phone |
 | `UPLOAD_TIMEOUT_SEC` | 120 | A stalled transfer is discarded after this |
+| `METRICS_INTERVAL_MS` | 20000 | How often CPU/memory/disk/uptime are published (0 turns reporting off; minimum 2000) |
 | `ALLOW_ROOT` | 0 | Permit running as root on Linux |
 | `LOG_LEVEL` | info | |
 | `BASE_BACKOFF_MS` / `MAX_BACKOFF_MS` | 1000 / 30000 | Reconnect backoff |

@@ -14,18 +14,19 @@ const { EventEmitter } = require('events');
 const crypto = require('crypto');
 const WebSocket = require('ws');
 const { advertise } = require('./shells');
+const { Metrics } = require('./metrics');
 const { SessionError } = require('./sessions');
 const { buildEnv } = require('./env');
 
 const PROTOCOL_VERSION = 3;
-const AGENT_CAPS = ['sessions', 'replay', 'resize', 'ping', 'files'];
+const AGENT_CAPS = ['sessions', 'replay', 'resize', 'ping', 'files', 'metrics'];
 const FATAL_CLOSE = { 4401: 'revoked', 4409: 'replaced', 4426: 'upgrade_required' };
 
 class RelayClient extends EventEmitter {
   /**
-   * @param {{cfg, state, log, sessions, meta, shells, WebSocketImpl?, now?}} opts
+   * @param {{cfg, state, log, sessions, meta, shells, uploads?, metrics?, WebSocketImpl?, now?}} opts
    */
-  constructor({ cfg, state, log, sessions, meta, shells, uploads = null, WebSocketImpl = WebSocket, now = Date.now }) {
+  constructor({ cfg, state, log, sessions, meta, shells, uploads = null, metrics = undefined, WebSocketImpl = WebSocket, now = Date.now }) {
     super();
     this.cfg = cfg;
     this.uploads = uploads;
@@ -37,6 +38,8 @@ class RelayClient extends EventEmitter {
     this.WS = WebSocketImpl;
     this.now = now;
     this.instanceId = crypto.randomBytes(8).toString('hex');
+    // null disables reporting entirely (metricsIntervalMs=0); undefined takes the default collector.
+    this.metrics = metrics === undefined ? new Metrics({ log }) : metrics;
     this.ws = null;
     this.attempt = 0;
     this.stopped = false;
@@ -44,6 +47,7 @@ class RelayClient extends EventEmitter {
     this.reconnectTimer = null;
     this.pingTimer = null;
     this.pongTimer = null;
+    this.metricsTimer = null;
     this.drainTimer = null;
     this.paused = false;
 
@@ -84,6 +88,7 @@ class RelayClient extends EventEmitter {
       this.log.info('connected to relay');
       this.register();
       this.startPing();
+      this.startMetrics();
       this.emit('connected');
     });
 
@@ -140,9 +145,51 @@ class RelayClient extends EventEmitter {
     }, 30000);
   }
 
+  /**
+   * Publish system metrics while connected. They ride along with the register
+   * payload so the machine screen has numbers the moment an agent appears,
+   * then refresh on a timer — the relay keeps them in memory only, so a
+   * reconnect always re-sends them.
+   */
+  startMetrics() {
+    if (this.metricsTimer) { clearInterval(this.metricsTimer); this.metricsTimer = null; }
+    const every = this.metricsEvery();
+    if (!every) return;
+    this.metricsTimer = setInterval(() => this.sendMetrics(), every);
+    if (this.metricsTimer.unref) this.metricsTimer.unref();
+  }
+
+  /** How often to publish metrics, or 0 when they are off (or unconfigured). */
+  metricsEvery() {
+    if (!this.metrics) return 0;
+    const every = Number(this.cfg.metricsIntervalMs);
+    return Number.isFinite(every) && every > 0 ? every : 0;
+  }
+
+  sendMetrics() {
+    if (!this.connected || !this.metrics) return;
+    let sample;
+    try { sample = this.metrics.sample(); } catch (err) { return this.log.warn('metrics sample failed', { err: err.message }); }
+    if (sample && Object.keys(sample).length) this.send({ type: 'agent.metrics', metrics: sample });
+    return undefined;
+  }
+
+  /** The sample to register with, or undefined when metrics are off. */
+  registerMetrics() {
+    if (!this.metricsEvery()) return undefined;
+    try {
+      const sample = this.metrics.sample();
+      return sample && Object.keys(sample).length ? sample : undefined;
+    } catch (err) {
+      this.log.warn('metrics sample failed', { err: err.message });
+      return undefined;
+    }
+  }
+
   stopTimers() {
     if (this.pingTimer) { clearInterval(this.pingTimer); this.pingTimer = null; }
     if (this.pongTimer) { clearTimeout(this.pongTimer); this.pongTimer = null; }
+    if (this.metricsTimer) { clearInterval(this.metricsTimer); this.metricsTimer = null; }
     if (this.drainTimer) { clearInterval(this.drainTimer); this.drainTimer = null; }
     this.paused = false;
   }
@@ -188,6 +235,7 @@ class RelayClient extends EventEmitter {
       shells: advertise(this.shells),
       caps: AGENT_CAPS,
       sessions: this.sessions.list(),
+      metrics: this.registerMetrics(),
     }, this.meta));
   }
 

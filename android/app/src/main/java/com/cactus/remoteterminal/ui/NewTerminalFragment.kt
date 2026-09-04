@@ -141,20 +141,24 @@ class NewTerminalFragment : Fragment(), RtScreen {
         binding.savePresetButton.setOnClickListener { saveFormAsPreset() }
 
         // Preset mode keeps the fields and drops everything that only makes
-        // sense for a session that is starting right now.
+        // sense for a session that is starting right now. The start-up command
+        // is the point of a preset, so there it is a plain field rather than
+        // something to go looking for under Advanced.
         binding.savePresetButton.visible = !presetMode
         binding.behaviourCard.visible = !presetMode
         binding.scrollbackField.root.visible = !presetMode
+        binding.advancedToggle.visible = !presetMode
         if (presetMode) {
             binding.createIcon.setImageResource(R.drawable.ic_rt_bookmark)
             binding.nameField.fieldInput.hint = getString(R.string.preset_name_hint)
+            binding.advancedPanel.visible = true
+            binding.commandHelp.visible = true
         }
         if (editing != null) pendingShellId = editing.shellId
         if (savedInstanceState == null && editing != null) {
             binding.nameField.fieldInput.setText(editing.name)
             binding.directoryField.fieldInput.setText(editing.directory)
             binding.commandField.fieldInput.setText(editing.command)
-            if (editing.command.isNotEmpty()) toggleAdvanced()
         }
 
         viewLifecycleOwner.lifecycleScope.launch {

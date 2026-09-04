@@ -194,12 +194,31 @@ class Registry {
         instanceId: null,
         /** @type {Map<string, object>} sessionId -> SessionInfo (display cache) */
         sessions: new Map(),
+        /** Last system metrics the agent published, or null. Never persisted. */
+        metrics: null,
         /** @type {Map<string, Set<string>>} sessionId -> phone connIds */
         attachments: new Map(),
       };
       this.runtime.set(agentId, r);
     }
     return r;
+  }
+
+  /**
+   * Remember the metrics an agent just published. They live on the runtime
+   * slot rather than the record on purpose: CPU load and free memory from the
+   * last time a machine was up say nothing about it now, so they go away with
+   * the connection instead of being served as if they were current.
+   */
+  setAgentMetrics(agentId, metrics) {
+    const r = this.rt(agentId);
+    r.metrics = sanitizeMetrics(metrics);
+    return r.metrics;
+  }
+
+  clearAgentMetrics(agentId) {
+    const r = this.runtime.get(agentId);
+    if (r) r.metrics = null;
   }
 
   isOnline(agentId) {
@@ -248,6 +267,7 @@ class Registry {
       lastSeen: a.lastSeen,
       instanceId: r ? r.instanceId : null,
     };
+    if (r && r.metrics && this.isOnline(agentId)) info.metrics = r.metrics;
     if (withSessions) info.sessions = r ? [...r.sessions.values()].map((s) => this.sessionInfo(r, s)) : [];
     return info;
   }
@@ -331,4 +351,20 @@ class Registry {
 
 const EMPTY = new Set();
 
-module.exports = { Registry };
+const METRIC_FIELDS = ['memoryUsed', 'memoryTotal', 'storageUsed', 'storageTotal', 'uptimeSec'];
+
+/**
+ * Keep the known metric fields and nothing else, so what the relay hands to a
+ * phone is exactly the shape the app parses. Validation already rejected
+ * nonsense values; this drops anything extra an agent decided to send.
+ */
+function sanitizeMetrics(metrics) {
+  if (!metrics || typeof metrics !== 'object') return null;
+  const out = {};
+  if (typeof metrics.cpuLoad === 'number') out.cpuLoad = Math.min(1, Math.max(0, metrics.cpuLoad));
+  for (const k of METRIC_FIELDS) if (typeof metrics[k] === 'number' && metrics[k] >= 0) out[k] = Math.round(metrics[k]);
+  out.at = Date.now();
+  return Object.keys(out).length > 1 ? out : null;
+}
+
+module.exports = { Registry, sanitizeMetrics };

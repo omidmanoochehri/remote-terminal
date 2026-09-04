@@ -65,6 +65,20 @@
             tools:text="/srv/api" />
 
         <TextView
+            android:id="@+id/presetCommand"
+            style="@style/RtText.Mono"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:textSize="9.5sp"
+            android:textColor="@color/rt_primary"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:visibility="gone"
+            tools:text="❯ tail -f log/production.log"
+            tools:visibility="visible" />
+
+        <TextView
             android:id="@+id/presetMachine"
             style="@style/RtText"
             android:layout_width="match_parent"
