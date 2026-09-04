@@ -2,6 +2,7 @@ package com.cactus.remoteterminal.ui
 
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.ContentResolver
 import android.content.Context
 import android.content.res.Configuration
 import android.net.Uri
@@ -18,6 +19,7 @@ import android.widget.EditText
 import android.widget.PopupMenu
 import android.widget.Toast
 import androidx.activity.addCallback
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -39,6 +41,7 @@ import com.cactus.remoteterminal.ui.design.Design
 import com.cactus.remoteterminal.ui.design.visible
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -60,6 +63,13 @@ class TerminalFragment : Fragment(), RtScreen {
     private var tabs: List<TerminalSession> = emptyList()
     private var creating = false
     private var uploadLabel: String? = null
+    /** Collector for the visible tab's metadata; replaced on every tab switch. */
+    private var tabWatcher: Job? = null
+
+    /** "Attach file" picker: anything the phone can open, uploaded to the machine. */
+    private val pickFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) uploadUri(uri, null)
+    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentTerminalBinding.inflate(inflater, container, false)
@@ -99,6 +109,7 @@ class TerminalFragment : Fragment(), RtScreen {
         term.onFontSizeChanged = { sp -> app.settings.fontSizeSp = sp }
         term.onCopy = { text -> copy(text) }
         term.onPasteRequest = { paste() }
+        term.onSwipeTab = { forward -> swipeToTab(forward) }
         term.onSearchResult = { cur, total ->
             b.searchCount.text = if (total == 0) getString(R.string.search_none) else getString(R.string.search_count, cur, total)
         }
@@ -170,7 +181,14 @@ class TerminalFragment : Fragment(), RtScreen {
                         tabs = list
                         for (s in list) bindSession(s)
                         tabAdapter.submit(list, current)
-                        if (current == null || current !in list) chooseInitialTab()
+                        val active = current
+                        when {
+                            active == null || active !in list -> chooseInitialTab()
+                            // Coming back from another screen the fragment is
+                            // the same but its view is new, so the grid is a
+                            // fresh empty emulator until the tab is bound again.
+                            binding.terminal.emulator !== active.emulator -> selectTab(active)
+                        }
                     }
                 }
             }
@@ -196,7 +214,7 @@ class TerminalFragment : Fragment(), RtScreen {
         term.setFontSizeSp(s.fontSizeSp, notify = false)
         term.setLineSpacing(s.lineSpacing)
         term.setPreferSystemFont(s.terminalFontFamily == Settings.FONT_SYSTEM)
-        term.theme = TerminalTheme.byId(s.terminalTheme)
+        term.swipeTabsEnabled = s.swipeSwitchTabs
         term.cursorStyleSetting = when (s.cursorStyle) {
             "underline" -> TerminalEmulator.CURSOR_UNDERLINE
             "bar" -> TerminalEmulator.CURSOR_BAR
@@ -209,10 +227,43 @@ class TerminalFragment : Fragment(), RtScreen {
         binding.extraKeys.setRows(listOf(s.extraKeysRow1, s.extraKeysRow2, s.extraKeysRow3))
         binding.extraKeys.visible = s.showExtraKeys
         binding.commandBar.visible = s.commandBar && resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE
-        // The well keeps the design outline; its fill follows the chosen scheme
-        // so a light terminal theme does not sit in a black frame.
-        binding.terminalFrame.backgroundTintList =
-            android.content.res.ColorStateList.valueOf(term.theme.background)
+        applyTheme()
+    }
+
+    /**
+     * The visible tab's own colour scheme when it has one, otherwise the
+     * app-wide setting. The well keeps the design outline; its fill follows the
+     * scheme so a light terminal does not sit in a black frame.
+     */
+    private fun themeForCurrent(): TerminalTheme {
+        val override = current?.let { app.settings.terminalTheme(it.key) }
+        return TerminalTheme.byId(override ?: app.settings.terminalTheme)
+    }
+
+    private fun applyTheme() {
+        val b = _binding ?: return
+        val theme = themeForCurrent()
+        b.terminal.theme = theme
+        b.terminalFrame.backgroundTintList = android.content.res.ColorStateList.valueOf(theme.background)
+    }
+
+    private fun chooseTheme() {
+        val s = current ?: return
+        val themes = TerminalTheme.ALL
+        val appDefault = TerminalTheme.byId(app.settings.terminalTheme)
+        val labels = (listOf(getString(R.string.terminal_theme_default, appDefault.name)) + themes.map { it.name })
+            .toTypedArray<CharSequence>()
+        val chosen = app.settings.terminalTheme(s.key)
+        val checked = if (chosen == null) 0 else themes.indexOfFirst { it.id == chosen } + 1
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.terminal_theme_title)
+            .setSingleChoiceItems(labels, checked.coerceAtLeast(0)) { dialog, which ->
+                app.settings.setTerminalTheme(s.key, if (which == 0) null else themes[which - 1].id)
+                applyTheme()
+                dialog.dismiss()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     /* -------------------------------- tabs -------------------------------- */
@@ -247,15 +298,29 @@ class TerminalFragment : Fragment(), RtScreen {
         val term = binding.terminal
         term.emulator = s.emulator
         term.pushGeometry()
+        applyTheme()
         ensureAttached(s)
         tabAdapter.submit(tabs, s)
         binding.tabs.scrollToPosition(tabs.indexOf(s).coerceAtLeast(0))
         updateStatus()
-        viewLifecycleOwner.lifecycleScope.launch {
+        // One collector at a time: switching tabs is cheap and frequent now
+        // that a swipe does it.
+        tabWatcher?.cancel()
+        tabWatcher = viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 s.version.collect { if (s === current) { updateStatus(); tabAdapter.notifyTab(s) } }
             }
         }
+    }
+
+    /** Sideways swipe across the grid: the neighbouring tab, nothing at the ends. */
+    private fun swipeToTab(forward: Boolean) {
+        if (tabs.size < 2) return
+        val index = tabs.indexOf(current)
+        if (index < 0) return
+        val next = index + if (forward) 1 else -1
+        if (next !in tabs.indices) return
+        selectTab(tabs[next])
     }
 
     private fun ensureAttached(s: TerminalSession) {
@@ -431,9 +496,12 @@ class TerminalFragment : Fragment(), RtScreen {
 
     private fun paste() {
         val cm = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        // An image on the clipboard is uploaded to the machine instead of being typed.
-        if (clipboardImage(cm) != null) { pasteImage(explicit = false); return }
-        val text = cm.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(requireContext())?.toString() ?: return
+        val text = cm.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(requireContext())?.toString() ?: ""
+        // A file on the clipboard is uploaded to the machine instead of being
+        // typed — unless the agent cannot take files and there is text to fall
+        // back to, which is better than refusing the paste outright.
+        val filesSupported = app.agents.agent(agentId)?.caps?.contains("files") == true
+        if (clipboardFile(cm) != null && (filesSupported || text.isEmpty())) { pasteFile(explicit = false); return }
         if (text.isEmpty()) return
         val lines = text.trimEnd('\n', '\r').count { it == '\n' } + 1
         val term = binding.terminal
@@ -447,41 +515,70 @@ class TerminalFragment : Fragment(), RtScreen {
         } else term.paste(text)
     }
 
-    /* ----------------------------- paste image ---------------------------- */
+    /* ------------------------------ paste file ---------------------------- */
 
-    /** The first clipboard item that is an image, if any. */
-    private fun clipboardImage(cm: ClipboardManager): Pair<Uri, String>? {
+    /** The first clipboard item that is a file this phone can read, if any. */
+    private fun clipboardFile(cm: ClipboardManager): Pair<Uri, String>? {
         val clip = cm.primaryClip ?: return null
         val cr = requireContext().contentResolver
         for (i in 0 until clip.itemCount) {
             val uri = clip.getItemAt(i).uri ?: continue
-            val mime = try { cr.getType(uri) } catch (_: Exception) { null } ?: continue
-            if (mime.startsWith("image/")) return uri to mime
+            // Only real files: an http:// link on the clipboard is text, not an upload.
+            if (uri.scheme != ContentResolver.SCHEME_CONTENT && uri.scheme != ContentResolver.SCHEME_FILE) continue
+            val mime = try { cr.getType(uri) } catch (_: Exception) { null } ?: DEFAULT_MIME
+            return uri to mime
         }
         return null
     }
 
-    /**
-     * Upload a pasted image to the machine and type its path at the cursor, so
-     * the user can do whatever they like with the file. Nothing is executed.
-     */
-    private fun pasteImage(explicit: Boolean) {
-        val s = current ?: return
+    /** Menu action: upload whatever file is on the clipboard. */
+    private fun pasteFile(explicit: Boolean) {
         val cm = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val found = clipboardImage(cm)
-        if (found == null) { if (explicit) toast(getString(R.string.paste_image_none)); return }
-        if (app.agents.agent(agentId)?.caps?.contains("files") != true) { toast(getString(R.string.paste_image_unsupported)); return }
-        if (s.stream.state != SessionStream.State.ATTACHED) { toast(getString(R.string.terminal_not_connected)); return }
-        val (uri, mime) = found
+        val found = clipboardFile(cm)
+        if (found == null) { if (explicit) toast(getString(R.string.paste_file_none)); return }
+        uploadUri(found.first, found.second)
+    }
+
+    /** Menu action: pick any file on the phone and upload that. */
+    private fun attachFile() {
+        if (!canUpload()) return
+        try {
+            pickFile.launch(arrayOf("*/*"))
+        } catch (_: Exception) {
+            toast(getString(R.string.attach_file_unavailable))
+        }
+    }
+
+    /** Both upload paths need an attached session on a machine that takes files. */
+    private fun canUpload(): Boolean {
+        val s = current
+        if (app.agents.agent(agentId)?.caps?.contains("files") != true) {
+            toast(getString(R.string.paste_file_unsupported)); return false
+        }
+        if (s == null || s.stream.state != SessionStream.State.ATTACHED) {
+            toast(getString(R.string.terminal_not_connected)); return false
+        }
+        return true
+    }
+
+    /**
+     * Upload a file to the machine and type its path at the cursor, so the user
+     * can do whatever they like with it. Nothing is executed.
+     */
+    private fun uploadUri(uri: Uri, mimeHint: String?) {
+        if (!canUpload()) return
+        val s = current ?: return
+        val cr = requireContext().contentResolver
+        val mime = mimeHint ?: try { cr.getType(uri) } catch (_: Exception) { null } ?: DEFAULT_MIME
 
         viewLifecycleOwner.lifecycleScope.launch {
-            uploadLabel = getString(R.string.paste_image_uploading)
+            uploadLabel = getString(R.string.paste_file_uploading)
             updateStatus()
-            val loaded = withContext(Dispatchers.IO) { runCatching { readImage(uri, mime) } }
+            val loaded = withContext(Dispatchers.IO) { runCatching { readFile(uri, mime) } }
             val payload = loaded.getOrNull()
             if (payload == null) {
                 uploadLabel = null; updateStatus()
-                toast(getString(R.string.paste_image_failed, loaded.exceptionOrNull()?.message ?: "unreadable"))
+                toast(getString(R.string.paste_file_failed, loaded.exceptionOrNull()?.message ?: "unreadable"))
                 return@launch
             }
             val result = app.sessions.sendFile(s, payload.first, mime, payload.second)
@@ -489,26 +586,27 @@ class TerminalFragment : Fragment(), RtScreen {
             updateStatus()
             result.onSuccess { path ->
                 binding.terminal.sendRaw(shellQuote(path))
-                toast(getString(R.string.paste_image_done, path))
-            }.onFailure { e -> toast(getString(R.string.paste_image_failed, e.message ?: "failed")) }
+                toast(getString(R.string.paste_file_done, path))
+            }.onFailure { e -> toast(getString(R.string.paste_file_failed, e.message ?: "failed")) }
         }
     }
 
-    /** @return display name and bytes; throws when the image is unreadable or too large. */
-    private fun readImage(uri: Uri, mime: String): Pair<String, ByteArray> {
+    /** @return display name and bytes; throws when the file is unreadable or too large. */
+    private fun readFile(uri: Uri, mime: String): Pair<String, ByteArray> {
         val cr = requireContext().contentResolver
         val declared = try { cr.openFileDescriptor(uri, "r")?.use { it.statSize } ?: -1L } catch (_: Exception) { -1L }
-        if (declared > MAX_UPLOAD_BYTES) throw IllegalStateException(getString(R.string.paste_image_too_large, MAX_UPLOAD_BYTES / (1024 * 1024)))
-        val bytes = cr.openInputStream(uri)?.use { it.readBytes() } ?: throw IllegalStateException("cannot read image")
-        if (bytes.size > MAX_UPLOAD_BYTES) throw IllegalStateException(getString(R.string.paste_image_too_large, MAX_UPLOAD_BYTES / (1024 * 1024)))
+        if (declared > MAX_UPLOAD_BYTES) throw IllegalStateException(getString(R.string.paste_file_too_large, MAX_UPLOAD_BYTES / (1024 * 1024)))
+        val bytes = cr.openInputStream(uri)?.use { it.readBytes() } ?: throw IllegalStateException("cannot read file")
+        if (bytes.size > MAX_UPLOAD_BYTES) throw IllegalStateException(getString(R.string.paste_file_too_large, MAX_UPLOAD_BYTES / (1024 * 1024)))
         var name = try {
             cr.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
                 if (c.moveToFirst() && !c.isNull(0)) c.getString(0) else null
             }
         } catch (_: Exception) { null }
+        if (name.isNullOrBlank()) name = uri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() && '.' in it }
         if (name.isNullOrBlank()) {
-            val ext = MimeTypeMap.getSingleton().getExtensionFromMimeType(mime) ?: "png"
-            name = "pasted.$ext"
+            val ext = MimeTypeMap.getSingleton().getExtensionFromMimeType(mime)
+            name = if (ext != null) "pasted.$ext" else "pasted"
         }
         return name to bytes
     }
@@ -527,15 +625,20 @@ class TerminalFragment : Fragment(), RtScreen {
         val s = current
         menu.menu.findItem(R.id.action_pin).title =
             getString(if (s != null && app.settings.isPinnedTerminal(agentId, s.sessionId)) R.string.action_unpin else R.string.action_pin)
+        menu.menu.findItem(R.id.action_preset).isVisible = app.settings.presetsFor(agentId).isNotEmpty()
         menu.setOnMenuItemClickListener { item ->
             val term = binding.terminal
             when (item.itemId) {
                 R.id.action_new_terminal -> newTerminal()
+                R.id.action_duplicate -> duplicateCurrent()
+                R.id.action_preset -> choosePreset(anchor)
                 R.id.action_rename -> current?.let { renameTab(it) }
                 R.id.action_pin -> current?.let { app.settings.togglePinnedTerminal(agentId, it.sessionId) }
                 R.id.action_shortcuts -> ShortcutsSheet().show(childFragmentManager, "shortcuts")
                 R.id.action_paste -> paste()
-                R.id.action_paste_image -> pasteImage(explicit = true)
+                R.id.action_paste_file -> pasteFile(explicit = true)
+                R.id.action_attach_file -> attachFile()
+                R.id.action_theme -> chooseTheme()
                 R.id.action_select_all -> term.selectAll()
                 R.id.action_clear -> { term.emulator.clearScreen(); term.notifyUpdated() }
                 R.id.action_command_bar -> { val v = !binding.commandBar.visible; app.settings.commandBar = v; binding.commandBar.visible = v }
@@ -543,6 +646,37 @@ class TerminalFragment : Fragment(), RtScreen {
                 R.id.action_close_tab -> current?.let { confirmClose(it) }
                 else -> return@setOnMenuItemClickListener false
             }
+            true
+        }
+        menu.show()
+    }
+
+    /**
+     * Another terminal beside this one, in the same directory. The open tab is
+     * the freshest source for where the shell is; the relay's copy is the
+     * fallback for a tab this phone only just restored.
+     */
+    private fun duplicateCurrent() {
+        val s = current ?: return
+        val info = app.agents.session(agentId, s.sessionId)
+            ?: com.cactus.remoteterminal.protocol.SessionInfo(
+                sessionId = s.sessionId, title = s.title, shell = s.shell, state = s.state,
+                createdAt = 0L, lastActiveAt = 0L, cols = 0, rows = 0, seq = 0L, attached = 0,
+                exitCode = s.exitCode,
+            )
+        TerminalStarter.duplicate(this, agentId, info, s.cwd.ifEmpty { info.cwd })
+    }
+
+    /** Start one of the saved presets on this machine, without leaving the terminal. */
+    private fun choosePreset(anchor: View) {
+        val presets = app.settings.presetsFor(agentId)
+        if (presets.isEmpty()) { host.openTerminalPresets(); return }
+        val menu = PopupMenu(requireContext(), anchor)
+        for ((index, preset) in presets.withIndex()) menu.menu.add(0, index, index, preset.name)
+        menu.menu.add(0, presets.size, presets.size, getString(R.string.presets_manage))
+        menu.setOnMenuItemClickListener { item ->
+            if (item.itemId == presets.size) host.openTerminalPresets()
+            else TerminalStarter.launch(this, presets[item.itemId], agentId)
             true
         }
         menu.show()
@@ -645,8 +779,10 @@ class TerminalFragment : Fragment(), RtScreen {
     companion object {
         private const val ARG_AGENT = "agent"
         private const val ARG_SESSION = "session"
-        /** Matches the agent's default upload cap; larger images are refused before sending. */
+        /** Matches the agent's default upload cap; larger files are refused before sending. */
         private const val MAX_UPLOAD_BYTES = 16 * 1024 * 1024
+        /** What an upload claims to be when the phone cannot say. */
+        private const val DEFAULT_MIME = "application/octet-stream"
         /** Session argument prefix meaning "create a new terminal with this shell id". */
         const val NEW_SESSION_PREFIX = "new:"
         fun newInstance(agentId: String, sessionId: String?) = TerminalFragment().apply {

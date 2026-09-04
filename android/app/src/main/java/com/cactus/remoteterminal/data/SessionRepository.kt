@@ -21,6 +21,13 @@ class TerminalSession(val agentId: String, val sessionId: String, scrollback: In
 
     var title: String = ""
     var shell: String = ""
+    /**
+     * Where the shell is, as far as this phone can tell: the agent reports it
+     * when the platform can resolve it, a shell that sends OSC 7 keeps it live,
+     * and starting a terminal in a directory seeds it. Empty means unknown, and
+     * everything that uses it treats that as "do not assume".
+     */
+    var cwd: String = ""
     var state: String = "running"          // "running" | "exited" | "closed"
     var exitCode: Int? = null
     var closedReason: String? = null
@@ -53,6 +60,14 @@ class TerminalSession(val agentId: String, val sessionId: String, scrollback: In
 
     fun applyInfo(info: SessionInfo) {
         title = info.title; shell = info.shell; state = info.state; exitCode = info.exitCode
+        if (info.cwd.isNotEmpty()) cwd = info.cwd
+        bump()
+    }
+
+    /** A new working directory from the shell itself or from the agent. */
+    fun noteDirectory(dir: String) {
+        if (dir.isEmpty() || dir == cwd) return
+        cwd = dir
         bump()
     }
 }
@@ -97,6 +112,9 @@ class SessionRepository(
         agents.session(agentId, sessionId)?.let { s.applyInfo(it) }
         s.emulator.onBell = { onBell?.invoke(s) }
         s.emulator.onClipboard = { text -> onClipboard?.invoke(s, text) }
+        // Wired on the session, not the view, so a tab learns where its shell
+        // went even while another tab is the visible one.
+        s.emulator.onWorkingDirectory = { dir -> s.noteDirectory(dir) }
         sessions[s.key] = s
         publish(agentId)
         return s
@@ -293,6 +311,7 @@ class SessionRepository(
                 event.title?.let { s.title = it }
                 event.state?.let { s.state = it }
                 event.exitCode?.let { s.exitCode = it }
+                event.cwd?.let { s.noteDirectory(it) }
                 if (event.cols != null && event.rows != null && event.cols > 0 && event.rows > 0 && s.stream.state == SessionStream.State.ATTACHED
                     && (event.cols != s.emulator.cols || event.rows != s.emulator.rows)) {
                     s.emulator.resize(event.cols, event.rows); s.onOutput?.invoke()

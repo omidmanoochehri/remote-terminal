@@ -18,7 +18,7 @@ sealed class RelayEvent {
     data class DeviceRevoked(val deviceId: String, val by: String?) : RelayEvent()
     data class SessionCreated(val agentId: String, val session: SessionInfo, val reqId: String?) : RelayEvent()
     data class SessionAttached(val agentId: String, val sessionId: String, val from: Long, val seq: Long, val cols: Int, val rows: Int, val reqId: String?) : RelayEvent()
-    data class SessionUpdated(val agentId: String, val sessionId: String, val title: String?, val state: String?, val cols: Int?, val rows: Int?, val exitCode: Int?) : RelayEvent()
+    data class SessionUpdated(val agentId: String, val sessionId: String, val title: String?, val state: String?, val cols: Int?, val rows: Int?, val exitCode: Int?, val cwd: String?) : RelayEvent()
     data class Exit(val agentId: String, val sessionId: String, val code: Int?) : RelayEvent()
     data class SessionClosed(val agentId: String, val sessionId: String, val reason: String) : RelayEvent()
     data class SessionLag(val agentId: String, val sessionId: String) : RelayEvent()
@@ -72,7 +72,8 @@ object Incoming {
                 o.getString("agent"), o.getString("session"), o.getLong("from"), o.getLong("seq"), o.optInt("cols"), o.optInt("rows"), o.str("reqId"),
             )
             "session.updated" -> RelayEvent.SessionUpdated(
-                o.getString("agent"), o.getString("session"), o.str("title"), o.str("state"), o.int("cols"), o.int("rows"), o.int("exitCode"),
+                o.getString("agent"), o.getString("session"), o.str("title"), o.str("state"),
+                o.int("cols"), o.int("rows"), o.int("exitCode"), o.str("cwd"),
             )
             "exit" -> RelayEvent.Exit(o.getString("agent"), o.getString("session"), o.int("code"))
             "session.closed" -> RelayEvent.SessionClosed(o.getString("agent"), o.getString("session"), o.optString("reason", "closed"))

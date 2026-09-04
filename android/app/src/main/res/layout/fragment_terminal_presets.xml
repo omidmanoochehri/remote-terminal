@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Saved ways to start a terminal. Tapping one starts it; the button at the
+  bottom opens the same form the New terminal screen uses, in preset mode.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <include
+        android:id="@+id/headerBar"
+        layout="@layout/view_back_header" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginTop="4dp"
+            android:clipToPadding="false"
+            android:paddingBottom="96dp"
+            android:scrollbars="none" />
+
+        <include
+            android:id="@+id/stateBlock"
+            layout="@layout/view_state_block" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:id="@+id/newPresetButton"
+        style="@style/RtCta"
+        android:layout_height="52dp"
+        android:layout_marginStart="@dimen/rt_gutter"
+        android:layout_marginEnd="@dimen/rt_gutter"
+        android:layout_marginBottom="16dp">
+
+        <ImageView
+            android:layout_width="@dimen/rt_icon_lg"
+            android:layout_height="@dimen/rt_icon_lg"
+            android:layout_marginEnd="14dp"
+            android:src="@drawable/ic_rt_plus"
+            android:importantForAccessibility="no"
+            app:tint="@color/rt_on_primary" />
+
+        <TextView
+            style="@style/RtText.Cta"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:text="@string/preset_new" />
+    </LinearLayout>
+</LinearLayout>

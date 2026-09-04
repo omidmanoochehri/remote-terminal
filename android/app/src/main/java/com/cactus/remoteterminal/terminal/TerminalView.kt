@@ -20,6 +20,7 @@ import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.inputmethod.BaseInputConnection
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
@@ -83,6 +84,8 @@ class TerminalView @JvmOverloads constructor(context: Context, attrs: AttributeS
     var onPasteRequest: (() -> Unit)? = null
     /** Search state changed: (current 1-based or 0, total). */
     var onSearchResult: ((Int, Int) -> Unit)? = null
+    /** A sideways swipe across the grid: true for the next tab, false for the previous one. */
+    var onSwipeTab: ((forward: Boolean) -> Unit)? = null
 
     /** Cursor style from settings; a DECSCUSR request from the application overrides it. */
     var cursorStyleSetting: Int = TerminalEmulator.CURSOR_BLOCK
@@ -91,6 +94,8 @@ class TerminalView @JvmOverloads constructor(context: Context, attrs: AttributeS
     var hapticsEnabled: Boolean = true
     /** In the alternate screen without mouse reporting, vertical swipes send arrow keys (for less/vim/man). */
     var swipeArrowsInAltScreen: Boolean = true
+    /** Whether a sideways swipe switches tabs (settings; the gesture is off while selecting). */
+    var swipeTabsEnabled: Boolean = true
 
     /* ------------------------------- paints ------------------------------- */
 
@@ -140,6 +145,22 @@ class TerminalView @JvmOverloads constructor(context: Context, attrs: AttributeS
     private var draggingHandle = 0 // 0 none, 1 start, 2 end
     private var actionMode: ActionMode? = null
     private val handleRadius get() = charW * 1.6f
+
+    /* ------------------------------ tab swipe ----------------------------- */
+
+    /** Which way the current drag committed: 0 undecided, 1 up/down, 2 sideways. */
+    private var dragAxis = AXIS_NONE
+    private var dragStartX = 0f
+    private var dragStartY = 0f
+    /** A drag switches at most one tab; the rest of it is ignored. */
+    private var swipeHandled = false
+
+    private val viewConfig = ViewConfiguration.get(context)
+    private val touchSlop = viewConfig.scaledTouchSlop.toFloat()
+    private val flingVelocity = viewConfig.scaledMinimumFlingVelocity * 2f
+    /** How far a sideways drag travels before it counts as a tab switch. */
+    private val swipeDistance =
+        TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 64f, resources.displayMetrics)
 
     /* -------------------------------- search ------------------------------ */
 
@@ -559,6 +580,7 @@ class TerminalView @JvmOverloads constructor(context: Context, attrs: AttributeS
 
         override fun onScroll(e1: MotionEvent?, e2: MotionEvent, dx: Float, dy: Float): Boolean {
             if (draggingHandle != 0) return true
+            if (trackTabSwipe(e2)) return true
             val em = emulator
             scrollRemainder += dy
             val lines = (scrollRemainder / lineH).toInt()
@@ -582,6 +604,11 @@ class TerminalView @JvmOverloads constructor(context: Context, attrs: AttributeS
 
         override fun onFling(e1: MotionEvent?, e2: MotionEvent, vx: Float, vy: Float): Boolean {
             val em = emulator
+            // A quick flick sideways counts even when it did not travel the full distance.
+            if (dragAxis == AXIS_HORIZONTAL) {
+                if (!swipeHandled && abs(vx) > flingVelocity && abs(vx) > abs(vy)) fireTabSwipe(vx < 0)
+                return true
+            }
             if (draggingHandle != 0 || (em.mouseMode != TerminalEmulator.MOUSE_OFF && follow) || (em.isAltScreen && swipeArrowsInAltScreen && follow)) return false
             scroller.fling(0, topRow, 0, (-vy / lineH).roundToInt(), 0, 0, 0, maxTop())
             postInvalidateOnAnimation()
@@ -593,6 +620,33 @@ class TerminalView @JvmOverloads constructor(context: Context, attrs: AttributeS
             startWordSelection(e.x, e.y)
         }
     })
+
+    /**
+     * Decide, once per drag, whether it is a sideways tab swipe. Returns true
+     * while the drag belongs to the swipe, so scrollback never moves under a
+     * gesture the user meant horizontally.
+     */
+    private fun trackTabSwipe(e: MotionEvent): Boolean {
+        if (!swipeTabsEnabled || onSwipeTab == null || selection != null) return false
+        if (dragAxis == AXIS_VERTICAL) return false
+        val dx = e.x - dragStartX
+        val dy = e.y - dragStartY
+        if (dragAxis == AXIS_NONE) {
+            if (max(abs(dx), abs(dy)) < touchSlop) return false
+            // Sideways only when it is clearly sideways; anything else scrolls.
+            dragAxis = if (abs(dx) > abs(dy) * AXIS_BIAS) AXIS_HORIZONTAL else AXIS_VERTICAL
+            if (dragAxis == AXIS_HORIZONTAL) parent?.requestDisallowInterceptTouchEvent(true)
+            if (dragAxis == AXIS_VERTICAL) return false
+        }
+        if (!swipeHandled && abs(dx) > swipeDistance) fireTabSwipe(dx < 0)
+        return true
+    }
+
+    private fun fireTabSwipe(forward: Boolean) {
+        swipeHandled = true
+        if (hapticsEnabled) performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+        onSwipeTab?.invoke(forward)
+    }
 
     /** Cell under a point: absolute row (or screen row when screenRelative) and column. */
     private fun cellAt(x: Float, y: Float, screenRelative: Boolean = false): Pair<Int, Int> {
@@ -607,11 +661,18 @@ class TerminalView @JvmOverloads constructor(context: Context, attrs: AttributeS
         if (scaleDetector.isInProgress) return true
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                dragAxis = AXIS_NONE
+                swipeHandled = false
+                dragStartX = event.x
+                dragStartY = event.y
                 draggingHandle = handleAt(event.x, event.y)
                 if (draggingHandle != 0) { parent?.requestDisallowInterceptTouchEvent(true); actionMode?.finish() }
             }
             MotionEvent.ACTION_MOVE -> if (draggingHandle != 0) { moveHandle(event.x, event.y); return true }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> if (draggingHandle != 0) { draggingHandle = 0; showSelectionMenu(); return true }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                if (draggingHandle != 0) { draggingHandle = 0; showSelectionMenu(); return true }
+                if (dragAxis == AXIS_HORIZONTAL) { gestures.onTouchEvent(event); dragAxis = AXIS_NONE; return true }
+            }
         }
         gestures.onTouchEvent(event)
         return true
@@ -861,5 +922,11 @@ class TerminalView @JvmOverloads constructor(context: Context, attrs: AttributeS
     private companion object {
         /** Glyphs a proportional font renders at clearly different widths. */
         val WIDTH_SAMPLE = arrayOf("i", "l", "W", "@", "1", " ", "m")
+
+        const val AXIS_NONE = 0
+        const val AXIS_VERTICAL = 1
+        const val AXIS_HORIZONTAL = 2
+        /** A drag counts as sideways only when it out-runs the vertical component by this much. */
+        const val AXIS_BIAS = 1.3f
     }
 }

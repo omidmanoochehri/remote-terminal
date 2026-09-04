@@ -19,12 +19,12 @@ See `README.md` for the full tour and `PROTOCOL.md` for the wire protocol.
 ## Versioning
 
 The project has **one version number**, shared by the server, the agent and the
-Android app. It is currently **0.5.0**.
+Android app. It is currently **0.6.0**.
 
 Bump it whenever the user asks for a version bump, or when cutting a release.
 Keep semver: patch for fixes, minor for features, major for breaking changes.
 The Android `versionCode` is a plain integer that must strictly increase on
-every release. It has so far tracked the minor version (0.3.0 → 3, 0.5.0 → 5);
+every release. It has so far tracked the minor version (0.3.0 → 3, 0.6.0 → 6);
 keep that going, and if two builds ever share a `versionName`, increment
 `versionCode` anyway.
 
@@ -53,7 +53,7 @@ everywhere at once.
 Verify a bump with:
 
 ```bash
-grep -rn "0\.5\.0" --include="*.json" --include="*.gradle" --include="*.md" . \
+grep -rn "0\.6\.0" --include="*.json" --include="*.gradle" --include="*.md" . \
   | grep -v node_modules | grep -v /build/
 ```
 

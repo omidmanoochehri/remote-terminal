@@ -290,4 +290,41 @@
     <string name="permission_notifications_body">Remote Terminal tells you when a machine drops off or a long command finishes. Nothing else is sent.</string>
     <string name="permission_allow">Allow</string>
     <string name="permission_not_now">Not now</string>
+    <!-- Terminal presets: a saved name, machine, shell, directory and command. -->
+    <string name="presets_title">Terminal presets</string>
+    <string name="presets_subtitle">Saved ways to start a terminal</string>
+    <string name="presets_manage">Manage presets</string>
+    <string name="presets_empty_title">No presets yet</string>
+    <string name="presets_empty_body">Save the machine, shell, folder and first command you keep typing, then start it in one tap.</string>
+    <string name="preset_new">New preset</string>
+    <string name="preset_edit_title">Edit preset</string>
+    <string name="preset_subtitle">Saved for one‑tap terminals</string>
+    <string name="preset_start">Start from preset</string>
+    <string name="preset_save">Save preset</string>
+    <string name="preset_save_as">Save as preset</string>
+    <string name="preset_saved">Saved “%1$s”</string>
+    <string name="preset_needs_name">Give the preset a name first.</string>
+    <string name="preset_name_hint">API logs</string>
+    <string name="preset_any_machine">Any machine</string>
+    <string name="preset_any_machine_desc">Asks which machine when it starts</string>
+    <string name="preset_default_shell">The machine’s default shell</string>
+    <string name="preset_machine_gone">Machine not paired</string>
+    <string name="preset_no_directory">Home directory</string>
+    <string name="preset_no_machine">That machine is no longer paired.</string>
+    <string name="preset_delete_title">Delete “%1$s”?</string>
+    <string name="preset_delete_body">The preset is removed from this phone. Terminals already started from it keep running.</string>
+    <string name="edit">Edit</string>
+
+    <!-- Per-terminal colours and the swipe gesture. -->
+    <string name="terminal_theme_title">Terminal theme</string>
+    <string name="terminal_theme_default">Use app default (%1$s)</string>
+    <string name="setting_swipe_tabs">Swipe between terminals</string>
+    <string name="setting_swipe_tabs_desc">Drag sideways across the grid to move to the next or previous tab</string>
+    <!-- Cold-start splash. -->
+    <string name="splash_powered_by">Powered by Cactus Software Group</string>
+    <string name="splash_copyright">© %1$d Cactus Software Group</string>
+    <string name="splash_logo_description">Cactus Software Group</string>
+    <!-- Duplicating a running terminal. -->
+    <string name="action_duplicate">Duplicate</string>
+    <string name="duplicate_no_path">The shell has not reported a directory, so the copy starts at home.</string>
 </resources>

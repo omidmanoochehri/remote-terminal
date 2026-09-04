@@ -80,6 +80,9 @@ class MainActivity : AppCompatActivity() {
         binding.bottomNav.onSelected = { destination -> openTab(destination, fromUser = true) }
         supportFragmentManager.addOnBackStackChangedListener { syncChrome() }
 
+        // Cold start only: a rotation must not replay the splash.
+        if (savedInstanceState == null) showSplash()
+
         if (savedInstanceState == null) {
             if (!app.credentials.isPaired) openAddMachine(initial = true)
             else {
@@ -104,6 +107,27 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    /**
+     * The brand card over the first screen while it settles. The system splash
+     * (Android 12+) paints the same backdrop, so the hand-over is a fade rather
+     * than a flash, and nothing waits on it: the app is live underneath.
+     */
+    private fun showSplash() {
+        val cover = binding.splashCover
+        val year = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+        binding.splashCopyright.text = getString(R.string.splash_copyright, year)
+        cover.alpha = 1f
+        cover.visible = true
+        cover.postDelayed({
+            if (isFinishing || isDestroyed) return@postDelayed
+            cover.animate()
+                .alpha(0f)
+                .setDuration(SPLASH_FADE_MS)
+                .withEndAction { cover.visible = false }
+                .start()
+        }, SPLASH_HOLD_MS)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -226,6 +250,12 @@ class MainActivity : AppCompatActivity() {
 
     fun openNewTerminal(agentId: String?) = push(NewTerminalFragment.newInstance(agentId), "newTerminal")
 
+    fun openTerminalPresets() = push(TerminalPresetsFragment(), "presets")
+
+    /** The New terminal form in preset mode: [presetId] null creates a new one. */
+    fun openPresetEditor(presetId: String?, agentId: String?) =
+        push(NewTerminalFragment.forPreset(presetId, agentId), "preset:${presetId ?: "new"}")
+
     fun openAddMachine(initial: Boolean = false) {
         supportFragmentManager.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE)
         push(AddMachineFragment(), "addMachine", addToBackStack = !initial)
@@ -276,5 +306,8 @@ class MainActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_AGENT = "agent"
         const val EXTRA_SESSION = "session"
+        /** Long enough to read the mark, short enough not to be in the way. */
+        private const val SPLASH_HOLD_MS = 900L
+        private const val SPLASH_FADE_MS = 320L
     }
 }

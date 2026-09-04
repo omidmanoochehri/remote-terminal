@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One saved preset: tapping it starts a terminal, the menu edits or removes it. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/row"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="@dimen/rt_gutter"
+    android:layout_marginEnd="@dimen/rt_gutter"
+    android:layout_marginTop="10dp"
+    android:minHeight="64dp"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingStart="13dp"
+    android:paddingEnd="4dp"
+    android:paddingTop="11dp"
+    android:paddingBottom="11dp"
+    android:background="@drawable/rt_card_clickable"
+    android:clickable="true"
+    android:focusable="true">
+
+    <FrameLayout
+        android:layout_width="38dp"
+        android:layout_height="38dp"
+        android:background="@drawable/rt_icon_tile_accent">
+
+        <ImageView
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_rt_bookmark"
+            android:importantForAccessibility="no"
+            app:tint="@color/rt_primary" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="12dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/presetName"
+            style="@style/RtText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="API logs" />
+
+        <TextView
+            android:id="@+id/presetPath"
+            style="@style/RtText.Mono"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textSize="9.5sp"
+            android:textColor="@color/rt_text_secondary"
+            android:maxLines="1"
+            android:ellipsize="middle"
+            tools:text="/srv/api" />
+
+        <TextView
+            android:id="@+id/presetMachine"
+            style="@style/RtText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textSize="9sp"
+            android:textColor="@color/rt_text_muted"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="prod-01 · bash" />
+    </LinearLayout>
+
+    <ImageButton
+        android:id="@+id/presetMenu"
+        style="@style/Widget.RemoteTerminal.IconButton"
+        android:src="@drawable/ic_rt_more"
+        android:padding="13dp"
+        android:contentDescription="@string/more" />
+</LinearLayout>

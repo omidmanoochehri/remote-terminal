@@ -42,6 +42,8 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24, maxScrollback: Int = 5000
     var onBell: (() -> Unit)? = null
     var onTitle: ((String) -> Unit)? = null
     var onClipboard: ((String) -> Unit)? = null
+    /** The shell reported a new working directory (OSC 7). */
+    var onWorkingDirectory: ((String) -> Unit)? = null
     var onAltScreen: ((Boolean) -> Unit)? = null
 
     /* ------------------------------ buffers ------------------------------ */
@@ -443,6 +445,9 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24, maxScrollback: Int = 5000
         val arg = if (semi < 0) "" else s.substring(semi + 1)
         when (code) {
             0, 2 -> { title = arg; onTitle?.invoke(arg) }
+            // OSC 7: the shell says where it is. Shells that do not send it
+            // simply never move the value, which is why nothing depends on it.
+            7 -> parseFileUrl(arg)?.let { onWorkingDirectory?.invoke(it) }
             52 -> {
                 val sep = arg.indexOf(';')
                 if (sep < 0) return
@@ -453,6 +458,38 @@ class TerminalEmulator(cols: Int = 80, rows: Int = 24, maxScrollback: Int = 5000
             }
             else -> {}
         }
+    }
+
+    /**
+     * `file://host/path` from OSC 7 to a plain path. The host is ignored (the
+     * agent is the only machine that could have written it) and percent
+     * escapes are decoded; anything else is refused rather than guessed at.
+     */
+    private fun parseFileUrl(raw: String): String? {
+        if (!raw.startsWith("file://")) return null
+        val afterScheme = raw.substring(7)
+        val slash = afterScheme.indexOf('/')
+        if (slash < 0) return null
+        val path = unescapePercent(afterScheme.substring(slash))
+        if (path.isEmpty() || path.any { it.code < 0x20 }) return null
+        // Windows shells send /C:/Users/..., which is that path with a stray slash.
+        return if (path.length > 2 && path[0] == '/' && path[2] == ':') path.substring(1) else path
+    }
+
+    private fun unescapePercent(s: String): String {
+        if ('%' !in s) return s
+        val bytes = java.io.ByteArrayOutputStream(s.length)
+        var i = 0
+        while (i < s.length) {
+            val c = s[i]
+            if (c == '%' && i + 2 < s.length) {
+                val hex = s.substring(i + 1, i + 3).toIntOrNull(16)
+                if (hex != null) { bytes.write(hex); i += 3; continue }
+            }
+            bytes.write(c.toString().toByteArray(Charsets.UTF_8))
+            i++
+        }
+        return bytes.toString("UTF-8")
     }
 
     /* ------------------------------ printing ------------------------------ */

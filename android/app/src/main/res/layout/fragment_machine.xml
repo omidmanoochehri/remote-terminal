@@ -41,6 +41,25 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
+                <!-- Saved presets for this machine: one tap starts the terminal. -->
+                <HorizontalScrollView
+                    android:id="@+id/presetScroll"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="13dp"
+                    android:clipToPadding="false"
+                    android:paddingStart="@dimen/rt_gutter"
+                    android:paddingEnd="@dimen/rt_gutter"
+                    android:scrollbars="none"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:id="@+id/presetRow"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+                </HorizontalScrollView>
+
                 <LinearLayout
                     android:id="@+id/terminalList"
                     android:layout_width="match_parent"

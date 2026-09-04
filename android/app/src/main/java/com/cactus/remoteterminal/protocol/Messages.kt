@@ -25,6 +25,8 @@ data class SessionInfo(
     val seq: Long,
     val attached: Int,
     val exitCode: Int?,
+    /** Where the shell is now, when the agent can resolve it; "" otherwise. */
+    val cwd: String = "",
 ) {
     val isRunning: Boolean get() = state == "running"
 
@@ -41,6 +43,7 @@ data class SessionInfo(
             seq = o.optLong("seq", 0L),
             attached = o.optInt("attached", 0),
             exitCode = if (o.isNull("exitCode")) null else o.optInt("exitCode"),
+            cwd = o.optString("cwd", ""),
         )
     }
 }

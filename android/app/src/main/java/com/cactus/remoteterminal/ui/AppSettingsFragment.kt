@@ -136,6 +136,16 @@ class AppSettingsFragment : Fragment(), RtScreen {
             ) { host.openTerminalFontSettings() }
 
         builder.section(getString(R.string.group_terminal))
+            .row(
+                R.drawable.ic_rt_bookmark, R.color.rt_primary,
+                getString(R.string.presets_title), getString(R.string.presets_subtitle),
+                value = s.terminalPresets.size.toString(),
+            ) { host.openTerminalPresets() }
+            .toggle(
+                R.drawable.ic_rt_swipe, R.color.rt_accent,
+                getString(R.string.setting_swipe_tabs), getString(R.string.setting_swipe_tabs_desc),
+                checked = s.swipeSwitchTabs,
+            ) { value -> s.raw.edit().putBoolean(Settings.KEY_SWIPE_TABS, value).apply() }
             .toggle(
                 R.drawable.ic_rt_keyboard, R.color.rt_primary,
                 getString(R.string.setting_extra_keys), getString(R.string.setting_extra_keys_desc),

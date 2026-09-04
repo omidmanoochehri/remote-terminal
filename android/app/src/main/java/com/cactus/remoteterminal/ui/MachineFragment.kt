@@ -19,6 +19,7 @@ import com.cactus.remoteterminal.net.RelayClient
 import com.cactus.remoteterminal.protocol.AgentInfo
 import com.cactus.remoteterminal.protocol.SessionInfo
 import com.cactus.remoteterminal.ui.design.Design
+import com.cactus.remoteterminal.ui.design.FilterChips
 import com.cactus.remoteterminal.ui.design.hide
 import com.cactus.remoteterminal.ui.design.show
 import com.cactus.remoteterminal.ui.design.visible
@@ -179,11 +180,34 @@ class MachineFragment : Fragment(), RtScreen {
         hero.heroIcon.setImageResource(if (agent.isWindows) R.drawable.ic_rt_monitor else R.drawable.ic_rt_server)
         Design.tint(hero.heroIcon, if (agent.online) R.color.rt_primary else R.color.rt_text_muted)
 
+        renderPresets(agent)
         renderTerminals(agent)
         renderDetails(agent, state)
 
         binding.newTerminalButton.isEnabled = agent.online
         binding.newTerminalButton.alpha = if (agent.online) 1f else 0.5f
+    }
+
+    /**
+     * The presets that can run here, as chips above the list. The last chip
+     * opens the presets screen, so this row is also how they are managed.
+     */
+    private fun renderPresets(agent: AgentInfo) {
+        val presets = app.settings.presetsFor(agent.agentId)
+        binding.presetScroll.visible = presets.isNotEmpty()
+        if (presets.isEmpty()) return
+        val chips = presets.map { FilterChips.Chip(id = it.id, label = it.name, icon = R.drawable.ic_rt_bookmark) } +
+            FilterChips.Chip(id = CHIP_MANAGE, label = getString(R.string.presets_manage), icon = R.drawable.ic_rt_settings)
+        FilterChips.render(
+            row = binding.presetRow,
+            chips = chips,
+            selectedId = "",
+            onSelect = { },
+            onAction = { id, _ ->
+                if (id == CHIP_MANAGE) host.openTerminalPresets()
+                else app.settings.preset(id)?.let { TerminalStarter.launch(this, it, agent.agentId) }
+            },
+        )
     }
 
     private fun renderTerminals(agent: AgentInfo) {
@@ -370,6 +394,8 @@ class MachineFragment : Fragment(), RtScreen {
         private const val ARG_AGENT = "agent"
         private const val ARG_TAB = "tab"
         private const val STATE_TAB = "state_tab"
+        /** Chip id of the "Manage" affordance at the end of the preset row. */
+        private const val CHIP_MANAGE = "__manage"
 
         fun newInstance(agentId: String, tab: Tab) = MachineFragment().apply {
             arguments = Bundle().apply {

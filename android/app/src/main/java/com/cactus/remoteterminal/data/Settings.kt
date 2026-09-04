@@ -46,6 +46,8 @@ class Settings(context: Context) {
     val bell: String get() = prefs.getString(KEY_BELL, "vibrate") ?: "vibrate"
     val osc52Clipboard: Boolean get() = prefs.getBoolean(KEY_OSC52, true)
     val pasteConfirmLines: Int get() = (prefs.getString(KEY_PASTE_CONFIRM, "3")?.toIntOrNull() ?: 3)
+    /** A horizontal swipe across the grid moves to the next/previous tab. */
+    val swipeSwitchTabs: Boolean get() = prefs.getBoolean(KEY_SWIPE_TABS, true)
     var commandBar: Boolean
         get() = prefs.getBoolean(KEY_COMMAND_BAR, true)
         set(v) { prefs.edit().putBoolean(KEY_COMMAND_BAR, v).apply() }
@@ -171,8 +173,47 @@ class Settings(context: Context) {
     fun notifyOnFinish(sessionKey: String): Boolean = prefs.getBoolean("notify_finish.$sessionKey", notifyExit)
     fun setNotifyOnFinish(sessionKey: String, value: Boolean) = prefs.edit().putBoolean("notify_finish.$sessionKey", value).apply()
 
-    fun forgetSessionPrefs(sessionKey: String) =
-        prefs.edit().remove("restore.$sessionKey").remove("notify_finish.$sessionKey").apply()
+    /**
+     * Colour scheme for one terminal, or null when it follows the app-wide
+     * setting. Kept per session so a production shell can stay visibly
+     * different from a scratch one.
+     */
+    fun terminalTheme(sessionKey: String): String? = prefs.getString("theme.$sessionKey", null)
+
+    fun setTerminalTheme(sessionKey: String, themeId: String?) = prefs.edit()
+        .apply { if (themeId == null) remove("theme.$sessionKey") else putString("theme.$sessionKey", themeId) }
+        .apply()
+
+    fun forgetSessionPrefs(sessionKey: String) = prefs.edit()
+        .remove("restore.$sessionKey")
+        .remove("notify_finish.$sessionKey")
+        .remove("theme.$sessionKey")
+        .apply()
+
+    /* ------------------------- terminal presets --------------------------- */
+
+    /** Saved ways to start a terminal, in the order the user arranged them. */
+    var terminalPresets: List<TerminalPreset>
+        get() = prefs.getString(KEY_PRESETS, null)?.let { TerminalPreset.listFromJson(it) } ?: emptyList()
+        set(v) { prefs.edit().putString(KEY_PRESETS, TerminalPreset.listToJson(v)).apply() }
+
+    fun preset(id: String): TerminalPreset? = terminalPresets.firstOrNull { it.id == id }
+
+    /** Presets that can start on [agentId]: its own, plus the machine-agnostic ones. */
+    fun presetsFor(agentId: String): List<TerminalPreset> =
+        terminalPresets.filter { it.agentId == null || it.agentId == agentId }
+
+    /** Insert, or replace the one carrying the same id. */
+    fun savePreset(preset: TerminalPreset) {
+        val current = terminalPresets
+        terminalPresets =
+            if (current.any { it.id == preset.id }) current.map { if (it.id == preset.id) preset else it }
+            else current + preset
+    }
+
+    fun deletePreset(id: String) {
+        terminalPresets = terminalPresets.filterNot { it.id == id }
+    }
 
     /* ------------------------- command history ---------------------------- */
 
@@ -233,6 +274,8 @@ class Settings(context: Context) {
         const val KEY_FAVOURITE_MACHINES = "favourite_machines"
         const val KEY_PINNED_TERMINALS = "pinned_terminals"
         const val KEY_COMMAND_HISTORY = "command_history"
+        const val KEY_SWIPE_TABS = "swipe_switch_tabs"
+        const val KEY_PRESETS = "terminal_presets"
 
         const val SORT_STATUS = "status"
         const val SORT_NAME = "name"

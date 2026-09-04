@@ -49,7 +49,7 @@ In routed messages the routing keys are the short names `agent`, `session`,
 // AgentInfo (relay → phone)
 { "agentId": "a_…", "name": "Production Server", "hostname": "prod-01",
   "platform": "linux",            // "win32" | "linux" | "darwin"
-  "os": "Ubuntu 24.04", "arch": "x64", "agentVersion": "0.5.0", "protocol": 3,
+  "os": "Ubuntu 24.04", "arch": "x64", "agentVersion": "0.6.0", "protocol": 3,
   "shells": [ { "id": "bash", "label": "bash", "default": true }, { "id": "sh", "label": "sh" } ],
   "caps": ["sessions", "replay", "resize", "ping"],
   "online": true, "lastSeen": 1725264000000,   // ms since epoch
@@ -62,7 +62,8 @@ In routed messages the routing keys are the short names `agent`, `session`,
   "createdAt": 1725264000000, "lastActiveAt": 1725264100000,
   "cols": 120, "rows": 35, "seq": 48211,   // output stream position (see §6)
   "attached": 1,                  // number of attached clients
-  "exitCode": null }
+  "exitCode": null,
+  "cwd": "/srv/api" }             // where the shell is; "" when the platform cannot say
 
 // DeviceInfo
 { "deviceId": "d_…", "name": "Pixel 8", "createdAt": 1725264000000,
@@ -151,7 +152,7 @@ and terminates sockets that miss a pong.
   "instanceId": "…",                  // random per process start
   "name": "…",                        // used only if the relay has no name for this agent yet
   "hostname": "prod-01", "platform": "linux", "os": "Ubuntu 24.04", "arch": "x64",
-  "agentVersion": "0.5.0", "protocol": 3,
+  "agentVersion": "0.6.0", "protocol": 3,
   "shells": [ { "id": "bash", "label": "bash", "default": true } ],
   "caps": ["sessions", "replay", "resize", "ping"],
   "sessions": [ /* SessionInfo… (sessions that survived the disconnect) */ ] }
@@ -161,7 +162,7 @@ and terminates sockets that miss a pong.
 { "type": "session.created", "reqId": "…", "client": "c_…", "session": { /* SessionInfo */ } }
 { "type": "session.attached", "reqId": "…", "client": "c_…", "session": "s_…",
   "from": 47000, "seq": 48211, "cols": 120, "rows": 35 }     // see §6
-{ "type": "session.updated", "session": "s_…", "title": "…", "cols": 120, "rows": 35, "state": "running" }  // any subset
+{ "type": "session.updated", "session": "s_…", "title": "…", "cols": 120, "rows": 35, "state": "running", "cwd": "/srv/api" }  // any subset
 { "type": "exit",           "session": "s_…", "code": 0 }     // shell process ended; session stays until closed/expired
 { "type": "session.closed", "session": "s_…", "reason": "closed" }  // "closed" | "exited" | "idle" | "shutdown" | "limit"
 { "type": "output",         "session": "s_…", "seq": 48211, "data": "…" }               // live: fan-out to attached clients
@@ -232,7 +233,7 @@ forwarding to a phone.
 { "type": "device.revoked", "device": "d_…", "by": "d_…" }
 { "type": "session.created",  "reqId": "…", "agent": "a_…", "session": { /* SessionInfo */ } }  // reqId only for the requester
 { "type": "session.attached", "reqId": "…", "agent": "a_…", "session": "s_…", "from": 47000, "seq": 48211, "cols": 120, "rows": 35 }
-{ "type": "session.updated",  "agent": "a_…", "session": "s_…", "title": "…", "cols": 120, "rows": 35, "state": "running" }
+{ "type": "session.updated",  "agent": "a_…", "session": "s_…", "title": "…", "cols": 120, "rows": 35, "state": "running", "cwd": "/srv/api" }
 { "type": "exit",             "agent": "a_…", "session": "s_…", "code": 0 }
 { "type": "session.closed",   "agent": "a_…", "session": "s_…", "reason": "closed" }
 { "type": "session.lag",      "agent": "a_…", "session": "s_…" }  // output was dropped for you: re-attach with `since`
@@ -276,6 +277,13 @@ agent   → output { seq, data }          …   live from then on       (fan-out
 - After replay the agent resizes the PTY to the attaching phone's `cols`/`rows`
   (last writer wins) and, if that changed anything, broadcasts
   `session.updated {cols, rows}` so other attached phones follow.
+- **Working directory.** `cwd` is where the shell is now, so a phone can open
+  another terminal in the same place. The agent re-reads it when a burst of
+  output settles (at most once every 750 ms) and sends `session.updated {cwd}`
+  only when it moved. Linux resolves it from `/proc/<pid>/cwd`; on Windows and
+  macOS it stays the directory the shell was started in. It is advisory: an
+  agent that never sends it simply reports `""`, and clients must treat that as
+  "unknown" rather than as the home directory.
 - Relay bookkeeping: a phone becomes *attached* only when the agent's
   `session.attached` acknowledgement passes through the relay. Live `output`
   is fanned out to attached phones only. The relay sends `client.gone` to the

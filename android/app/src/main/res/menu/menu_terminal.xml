@@ -1,11 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:id="@+id/action_new_terminal" android:title="@string/new_terminal" />
+    <item android:id="@+id/action_duplicate" android:title="@string/action_duplicate" />
+    <item android:id="@+id/action_preset" android:title="@string/preset_start" />
     <item android:id="@+id/action_rename" android:title="@string/rename_terminal" />
+    <item android:id="@+id/action_theme" android:title="@string/terminal_theme_title" />
     <item android:id="@+id/action_pin" android:title="@string/action_pin" />
     <item android:id="@+id/action_shortcuts" android:title="@string/shortcuts" />
     <item android:id="@+id/action_paste" android:title="@string/paste" />
-    <item android:id="@+id/action_paste_image" android:title="@string/paste_image" />
+    <item android:id="@+id/action_paste_file" android:title="@string/paste_file" />
+    <item android:id="@+id/action_attach_file" android:title="@string/attach_file" />
     <item android:id="@+id/action_select_all" android:title="@string/select_all" />
     <item android:id="@+id/action_clear" android:title="@string/clear_terminal" />
     <item android:id="@+id/action_command_bar" android:title="@string/command_bar" android:checkable="true" />

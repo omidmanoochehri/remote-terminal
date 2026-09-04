@@ -27,14 +27,16 @@ object TerminalActions {
 
         val menu = PopupMenu(context, anchor)
         menu.menu.add(0, ID_OPEN, 0, R.string.a11y_open_terminal)
-        menu.menu.add(0, ID_RENAME, 1, R.string.rename_terminal)
-        menu.menu.add(0, ID_PIN, 2, if (pinned) R.string.action_unpin else R.string.action_pin)
-        if (openLocally) menu.menu.add(0, ID_DISCONNECT, 3, R.string.confirm_disconnect_action)
-        if (session.isRunning) menu.menu.add(0, ID_TERMINATE, 4, R.string.tab_terminate)
+        if (agent.online) menu.menu.add(0, ID_DUPLICATE, 1, R.string.action_duplicate)
+        menu.menu.add(0, ID_RENAME, 2, R.string.rename_terminal)
+        menu.menu.add(0, ID_PIN, 3, if (pinned) R.string.action_unpin else R.string.action_pin)
+        if (openLocally) menu.menu.add(0, ID_DISCONNECT, 4, R.string.confirm_disconnect_action)
+        if (session.isRunning) menu.menu.add(0, ID_TERMINATE, 5, R.string.tab_terminate)
 
         menu.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 ID_OPEN -> host.openTerminal(agent.agentId, session.sessionId)
+                ID_DUPLICATE -> duplicate(fragment, agent, session)
                 ID_RENAME -> rename(fragment, agent, session)
                 ID_PIN -> app.settings.togglePinnedTerminal(agent.agentId, session.sessionId)
                 ID_DISCONNECT -> confirmDisconnect(fragment, agent, session)
@@ -43,6 +45,17 @@ object TerminalActions {
             true
         }
         menu.show()
+    }
+
+    /**
+     * Another terminal like this one. The open tab knows the freshest directory
+     * (a shell that reports one keeps it live), so prefer it over the copy the
+     * relay is holding.
+     */
+    fun duplicate(fragment: Fragment, agent: AgentInfo, session: SessionInfo) {
+        val app = fragment.requireActivity().application as App
+        val cwd = app.sessions.find(agent.agentId, session.sessionId)?.cwd?.takeIf { it.isNotEmpty() } ?: session.cwd
+        TerminalStarter.duplicate(fragment, agent.agentId, session, cwd)
     }
 
     fun rename(fragment: Fragment, agent: AgentInfo, session: SessionInfo) {
@@ -103,4 +116,5 @@ object TerminalActions {
     private const val ID_PIN = 3
     private const val ID_DISCONNECT = 4
     private const val ID_TERMINATE = 5
+    private const val ID_DUPLICATE = 6
 }

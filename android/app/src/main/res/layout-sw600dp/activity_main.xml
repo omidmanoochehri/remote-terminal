@@ -6,6 +6,7 @@
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -30,6 +31,71 @@
         android:layout_gravity="bottom|center_horizontal"
         android:layout_marginBottom="@dimen/rt_nav_margin"
         android:elevation="8dp" />
+
+    <!--
+      Cold-start splash. It carries the same backdrop as the app so the system
+      splash hands over without a flash, and fades out once the first screen is
+      in place.
+    -->
+    <FrameLayout
+        android:id="@+id/splashCover"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/rt_bg_screen"
+        android:elevation="32dp"
+        android:clickable="true"
+        android:focusable="false"
+        android:visibility="gone">
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/rt_bg_glow"
+            android:importantForAccessibility="no" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:orientation="vertical"
+            android:gravity="center_horizontal"
+            android:paddingStart="@dimen/rt_gutter"
+            android:paddingEnd="@dimen/rt_gutter">
+
+            <ImageView
+                android:id="@+id/splashLogo"
+                android:layout_width="132dp"
+                android:layout_height="wrap_content"
+                android:adjustViewBounds="true"
+                android:src="@drawable/cactus_logo"
+                android:contentDescription="@string/splash_logo_description" />
+
+            <TextView
+                android:id="@+id/splashTagline"
+                style="@style/RtText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="30dp"
+                android:textSize="9sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.16"
+                android:textAllCaps="true"
+                android:gravity="center"
+                android:textColor="@color/rt_text_muted"
+                android:text="@string/splash_powered_by" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/splashCopyright"
+            style="@style/RtText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="34dp"
+            android:textSize="8.5sp"
+            android:textColor="@color/rt_text_dim"
+            tools:text="© 2026 Cactus Software Group" />
+    </FrameLayout>
 
     <!-- Opaque cover while the app lock prompt is up, so nothing leaks behind it. -->
     <FrameLayout

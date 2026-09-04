@@ -230,6 +230,7 @@ class Registry {
       seq: s.seq || 0,
       attached: att ? att.size : 0,
       exitCode: s.exitCode === undefined ? null : s.exitCode,
+      cwd: s.cwd || '',
     };
   }
 

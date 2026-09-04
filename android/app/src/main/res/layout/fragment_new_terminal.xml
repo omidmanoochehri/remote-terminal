@@ -165,6 +165,7 @@
 
             <!-- Behaviour -->
             <LinearLayout
+                android:id="@+id/behaviourCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="15dp"
@@ -194,6 +195,7 @@
                 android:layout_marginTop="26dp">
 
                 <ImageView
+                    android:id="@+id/createIcon"
                     android:layout_width="@dimen/rt_icon_lg"
                     android:layout_height="@dimen/rt_icon_lg"
                     android:layout_marginEnd="14dp"
@@ -208,6 +210,36 @@
                     android:layout_height="wrap_content"
                     android:textSize="14sp"
                     android:text="@string/create_terminal" />
+            </LinearLayout>
+
+            <!-- Keep this way of starting a terminal for next time. -->
+            <LinearLayout
+                android:id="@+id/savePresetButton"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:layout_marginTop="10dp"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:background="@drawable/rt_button_quiet"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:layout_width="@dimen/rt_icon_md"
+                    android:layout_height="@dimen/rt_icon_md"
+                    android:layout_marginEnd="10dp"
+                    android:src="@drawable/ic_rt_bookmark"
+                    android:importantForAccessibility="no"
+                    app:tint="@color/rt_text_secondary" />
+
+                <TextView
+                    style="@style/RtText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/rt_text_secondary"
+                    android:text="@string/preset_save_as" />
             </LinearLayout>
 
             <LinearLayout

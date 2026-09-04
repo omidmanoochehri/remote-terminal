@@ -155,3 +155,63 @@ test('close kills the process once and ignores its late exit; closeAll on shutdo
   assert.ok(spawned[1].killed);
   mgr.pauseAll(); mgr.resumeAll(); // no sessions: no-ops
 });
+
+test('the working directory starts at the spawn directory and follows the shell', async () => {
+  const { spawn, spawned } = makeFakeSpawn();
+  const now = { t: 1_000_000 };
+  let reported = '';
+  const mgr = new SessionManager({
+    cfg: testConfig({ coalesceMs: 5 }), log, shells: SHELLS, spawn, now: () => now.t, cwd: '/home/u',
+    readCwd: () => reported,
+  });
+  const events = [];
+  mgr.on('session.updated', (s, patch) => events.push(patch));
+
+  const s = mgr.create({ shell: 'bash', cols: 80, rows: 24 });
+  assert.strictEqual(s.info().cwd, '/home/u', 'the directory it was started in, before the shell says anything');
+
+  // A burst of output is when a command has just finished, so that is when the
+  // directory is re-read.
+  reported = '/srv/api';
+  spawned[0].emitData('$ cd /srv/api\r\n');
+  await sleep(20);
+  assert.deepStrictEqual(events, [{ cwd: '/srv/api' }]);
+  assert.strictEqual(s.info().cwd, '/srv/api');
+
+  // Unchanged directories say nothing at all.
+  events.length = 0;
+  now.t += 5000;
+  spawned[0].emitData('ls\r\n');
+  await sleep(20);
+  assert.deepStrictEqual(events, []);
+});
+
+test('the working directory is re-read at most once a second, however loud the shell is', async () => {
+  const { spawn, spawned } = makeFakeSpawn();
+  const now = { t: 1_000_000 };
+  let reads = 0;
+  const mgr = new SessionManager({
+    cfg: testConfig({ coalesceMs: 1 }), log, shells: SHELLS, spawn, now: () => now.t, cwd: '/home/u',
+    readCwd: () => { reads++; return '/home/u'; },
+  });
+  mgr.create({ shell: 'bash', cols: 80, rows: 24 });
+  for (let i = 0; i < 5; i++) { spawned[0].emitData(`line ${i}\r\n`); await sleep(5); }
+  assert.strictEqual(reads, 1, 'the clock did not move, so one read covered every burst');
+  now.t += 5000;
+  spawned[0].emitData('later\r\n');
+  await sleep(5);
+  assert.strictEqual(reads, 2);
+});
+
+test('a platform that cannot answer keeps the directory the shell started in', async () => {
+  const { spawn, spawned } = makeFakeSpawn();
+  const now = { t: 1_000_000 };
+  const mgr = new SessionManager({
+    cfg: testConfig({ coalesceMs: 1 }), log, shells: SHELLS, spawn, now: () => now.t, cwd: 'C:\\Users\\u',
+    readCwd: () => '',
+  });
+  const s = mgr.create({ shell: 'bash', cols: 80, rows: 24 });
+  spawned[0].emitData('anything\r\n');
+  await sleep(10);
+  assert.strictEqual(s.info().cwd, 'C:\\Users\\u');
+});

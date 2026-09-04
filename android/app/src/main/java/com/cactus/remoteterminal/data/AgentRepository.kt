@@ -58,6 +58,7 @@ class AgentRepository(context: Context, private val client: RelayClient) : Relay
                 s.copy(
                     title = event.title ?: s.title, state = event.state ?: s.state,
                     cols = event.cols ?: s.cols, rows = event.rows ?: s.rows, exitCode = event.exitCode ?: s.exitCode,
+                    cwd = event.cwd ?: s.cwd,
                 )
             }
             is RelayEvent.SessionAttached -> updateSession(event.agentId, event.sessionId) { s -> s.copy(cols = event.cols, rows = event.rows, seq = event.seq) }

@@ -13,9 +13,23 @@
  */
 
 const crypto = require('crypto');
+const fs = require('fs');
 const { EventEmitter } = require('events');
 const { OutputRing } = require('./ring');
 const { findShell } = require('./shells');
+
+/** How often a session may re-read where its shell is (ms). */
+const CWD_SAMPLE_MS = 750;
+
+/**
+ * The working directory of a live process. Linux publishes it; Windows keeps
+ * it behind APIs Node cannot reach, and macOS behind `lsof`, so both keep the
+ * directory the shell was started in rather than guessing.
+ */
+function defaultReadCwd(pid) {
+  if (process.platform !== 'linux' || !pid) return '';
+  try { return fs.readlinkSync(`/proc/${pid}/cwd`); } catch (_) { return ''; }
+}
 
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyz234567';
 function newSessionId() {
@@ -26,7 +40,7 @@ function newSessionId() {
 }
 
 class Session extends EventEmitter {
-  constructor({ id, shell, title, cols, rows, term, replayBytes, coalesceMs, maxChunk, now }) {
+  constructor({ id, shell, title, cols, rows, term, replayBytes, coalesceMs, maxChunk, now, cwd = '', readCwd = defaultReadCwd }) {
     super();
     this.id = id;
     this.shell = shell;          // shell definition {id,label,cmd,args}
@@ -47,6 +61,15 @@ class Session extends EventEmitter {
     this.pending = '';
     this.flushTimer = null;
     this.paused = false;
+    /**
+     * Where the shell is. It starts as the directory it was spawned in and is
+     * re-read when output settles, which is when a command has just finished
+     * and a `cd` would have taken effect. Platforms that cannot answer keep
+     * the directory the shell started in.
+     */
+    this.cwd = cwd || '';
+    this.readCwd = readCwd;
+    this.cwdCheckedAt = 0;
 
     term.onData((data) => this.onData(data));
     term.onExit((code) => this.onExit(code));
@@ -76,6 +99,24 @@ class Session extends EventEmitter {
       const chunk = data.slice(off, off + this.maxChunk);
       this.emit('output', { seq: start + off + chunk.length, data: chunk });
     }
+    this.refreshCwd();
+  }
+
+  /**
+   * Re-read the shell's directory, at most once every CWD_SAMPLE_MS, and tell
+   * the relay when it moved. Cheap enough to do on every burst of output on
+   * the platforms that support it, and a no-op everywhere else.
+   */
+  refreshCwd() {
+    if (this.state !== 'running') return false;
+    const at = this.now();
+    if (at - this.cwdCheckedAt < CWD_SAMPLE_MS) return false;
+    this.cwdCheckedAt = at;
+    const next = this.readCwd(this.term.pid);
+    if (!next || next === this.cwd) return false;
+    this.cwd = next;
+    this.emit('updated', { cwd: next });
+    return true;
   }
 
   write(data) {
@@ -150,6 +191,7 @@ class Session extends EventEmitter {
       seq: this.ring.head,
       attached: this.clients.size,
       exitCode: this.exitCode,
+      cwd: this.cwd,
     };
   }
 }
@@ -163,9 +205,10 @@ class SessionManager extends EventEmitter {
    * @param {{cfg:object, log:object, shells:Array, spawn:Function, now?:Function, cwd?:string}} opts
    *   `spawn(opts)` must return a pty handle (see pty.js); injected for tests.
    */
-  constructor({ cfg, log, shells, spawn, now = Date.now, cwd = '' }) {
+  constructor({ cfg, log, shells, spawn, now = Date.now, cwd = '', readCwd = defaultReadCwd }) {
     super();
     this.cfg = cfg;
+    this.readCwd = readCwd;
     this.log = log;
     this.shells = shells;
     this.spawn = spawn;
@@ -181,6 +224,7 @@ class SessionManager extends EventEmitter {
     if (!shell) throw new SessionError('bad_request', `unknown shell "${shellId}"`);
     if (this.sessions.size >= this.cfg.maxSessions) throw new SessionError('limit_reached', `session limit (${this.cfg.maxSessions}) reached`);
     const id = newSessionId();
+    const startCwd = shell.cwd || this.cwd || process.cwd();
     let term;
     try {
       term = this.spawn({ cmd: shell.cmd, args: shell.args || [], cwd: shell.cwd || this.cwd || undefined, env, cols, rows });
@@ -191,6 +235,7 @@ class SessionManager extends EventEmitter {
     const session = new Session({
       id, shell, title: title || this.defaultTitle(shell), cols, rows, term,
       replayBytes: this.cfg.replayBytes, coalesceMs: this.cfg.coalesceMs, maxChunk: this.cfg.maxChunk, now: this.now,
+      cwd: startCwd, readCwd: this.readCwd,
     });
     this.sessions.set(id, session);
     this.log.info('session created', { sessionId: id, shell: shell.id, pid: term.pid, mode: term.mode, cols, rows });
@@ -264,4 +309,4 @@ class SessionManager extends EventEmitter {
   stopSweeper() { if (this.sweeper) { clearInterval(this.sweeper); this.sweeper = null; } }
 }
 
-module.exports = { Session, SessionManager, SessionError, newSessionId };
+module.exports = { Session, SessionManager, SessionError, newSessionId, defaultReadCwd };
