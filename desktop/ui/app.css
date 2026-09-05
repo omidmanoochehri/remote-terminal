@@ -349,6 +349,8 @@ button { cursor: pointer; }
   text-overflow: ellipsis;
 }
 
+.header-subtitle:empty { display: none; }
+
 .header-subtitle {
   margin-top: 2px;
   font-size: 10.5px;

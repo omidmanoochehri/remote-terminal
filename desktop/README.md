@@ -9,7 +9,7 @@ unread counts; the VT/xterm emulator with search, selection, themes and
 scrollback; presets; command history; the extra-keys bar; file and image
 upload into a session; pairing; paired devices; notifications; the app lock.
 
-Version **0.8.0**, wire protocol **v3** — the same numbers the rest of the
+Version **0.8.1**, wire protocol **v3** — the same numbers the rest of the
 project carries.
 
 ---

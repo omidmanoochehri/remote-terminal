@@ -1,6 +1,6 @@
 {
   "name": "remote-terminal-desktop",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "private": true,
   "description": "Remote Terminal for the desktop: the frontend, and the tests that keep it in step with the Android app.",
   "type": "module",

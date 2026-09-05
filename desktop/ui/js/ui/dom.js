@@ -84,7 +84,10 @@ export function header({ title, subtitle, mark = 'terminal_square', onBack, acti
       : el('div.header-mark', null, svgIcon(mark)),
     el('div.header-text', null,
       el('div.header-title', { text: title }),
-      subtitle ? el('div.header-subtitle', { text: subtitle }) : null),
+      // Always present, even when empty: screens that fill the header in later
+      // (Machine, Machine settings) hold on to this node. CSS hides it while
+      // it has no text, so an empty subtitle still costs nothing.
+      el('div.header-subtitle', { text: subtitle ?? '' })),
     ...actions.filter(Boolean));
 }
 

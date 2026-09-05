@@ -1,6 +1,6 @@
 [package]
 name = "remote-terminal-desktop"
-version = "0.8.0"
+version = "0.8.1"
 description = "Remote Terminal — real terminals on your machines, from the desktop"
 authors = ["Cactus Software Group"]
 edition = "2021"

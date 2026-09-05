@@ -24,12 +24,15 @@ export function machineScreen(app, { agentId, tab: initialTab = 'terminals' }) {
 
   const bodyContent = el('div');
   const body = el('div.screen-body.wide', null, bodyContent);
+  // The title and the star are rewritten on every render (the segment decides
+  // what the header says), so they are held rather than looked up again.
+  const starButton = headerAction('star', S.actionFavourite, () => toggleFavourite());
   const headerNode = header({
     title: '',
     subtitle: '',
     onBack: () => app.back(),
     actions: [
-      headerAction('star', S.actionFavourite, () => toggleFavourite(), 'starred'),
+      starButton,
       headerAction('more', S.more, (e) => {
         const agent = app.agents.agent(agentId);
         if (agent) machineMenu(app, e.currentTarget, agent);
@@ -40,7 +43,6 @@ export function machineScreen(app, { agentId, tab: initialTab = 'terminals' }) {
 
   const titleNode = headerNode.querySelector('.header-title');
   const subtitleNode = headerNode.querySelector('.header-subtitle');
-  const starButton = headerNode.querySelectorAll('.icon-button')[1];
 
   function toggleFavourite() {
     app.settings.toggleFavouriteMachine(agentId);

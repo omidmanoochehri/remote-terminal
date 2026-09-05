@@ -34,7 +34,7 @@ and picks up exactly where it left off when you come back.
   └────────────────────────────────────────┘  └────────────────────────────────┘
 ```
 
-Version **0.8.0**, wire protocol **v3** — see [`PROTOCOL.md`](./PROTOCOL.md)
+Version **0.8.1**, wire protocol **v3** — see [`PROTOCOL.md`](./PROTOCOL.md)
 for the complete wire format.
 
 ---
@@ -745,7 +745,7 @@ terminating the session.
 ## Versioning and releases
 
 The project has **one version number**, shared by the server, the agent and the
-Android app and the desktop app — currently **0.8.0** — bumped by semver according to what the work
+Android app and the desktop app — currently **0.8.1** — bumped by semver according to what the work
 did. The Android `versionCode` is a plain integer that must strictly increase on
 every release. The wire protocol version (`v3`) is independent and changes only
 for an actual breaking wire change.
