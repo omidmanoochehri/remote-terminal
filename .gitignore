@@ -19,6 +19,11 @@ android/local.properties
 android/keystore.properties
 android/keystore/
 
+# Desktop app build output (Rust target tree, installers, generated schemas)
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
+*.msi
+
 # win-pilot MCP runtime scratch (logs, screenshots, recordings) — not project code
 runtime/
 

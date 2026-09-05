@@ -559,7 +559,10 @@ class TerminalEmulatorTest {
         t.resize(8, 3)
         assertEquals(listOf("abcdefgh", "ijklmnop", ""), t.screenRows())
         assertTrue(t.row(0).wrapped)
-        assertEquals(2 to 0, t.cursor())
+        // Exactly past a full row: the cursor stays on the last cell with a
+        // pending wrap (xterm), rather than opening a blank row that would
+        // scroll content away. The next glyph is what moves it down.
+        assertEquals(1 to 7, t.cursor())
         t.feed("q")
         assertEquals("q", t.screenRow(2))
         assertEquals(3, t.totalRows())

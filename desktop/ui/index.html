@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Remote Terminal</title>
+  <link rel="stylesheet" href="./app.css">
+</head>
+<body>
+  <div id="app">
+    <nav id="nav" aria-label="Sections"></nav>
+    <main id="screen"></main>
+  </div>
+
+  <!-- Covers the content until the device credential prompt succeeds. -->
+  <div id="lock" class="hidden" aria-hidden="true"></div>
+
+  <!--
+    The brand card over the first screen while it settles. Nothing waits on it:
+    the app is live underneath, and a click takes it away at once.
+  -->
+  <div id="splash">
+    <div class="splash-card">
+      <div class="splash-mark">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="m7 11 2-2-2-2"/>
+          <path d="M11 13h4"/>
+          <path d="M5,3 h14 a2,2 0 0 1 2,2 v14 a2,2 0 0 1 -2,2 h-14 a2,2 0 0 1 -2,-2 v-14 a2,2 0 0 1 2,-2 Z"/>
+        </svg>
+      </div>
+      <div class="splash-title">Remote Terminal</div>
+      <div class="splash-sub">Powered by Cactus Software Group</div>
+    </div>
+    <div class="splash-copy"></div>
+  </div>
+
+  <script type="module">
+    import { start } from './js/app.js';
+    start().catch((err) => {
+      console.error(err);
+      document.getElementById('splash')?.remove();
+      const screen = document.getElementById('screen');
+      screen.innerHTML =
+        '<div class="state-block"><h3>Remote Terminal could not start</h3>' +
+        '<p></p></div>';
+      screen.querySelector('p').textContent = String(err?.message || err);
+    });
+  </script>
+</body>
+</html>

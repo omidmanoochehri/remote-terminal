@@ -1,0 +1,13 @@
+{
+  "name": "remote-terminal-desktop",
+  "version": "0.8.0",
+  "private": true,
+  "description": "Remote Terminal for the desktop: the frontend, and the tests that keep it in step with the Android app.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"test/**/*.test.js\"",
+    "build": "cargo build --release --manifest-path src-tauri/Cargo.toml",
+    "dev": "cargo run --manifest-path src-tauri/Cargo.toml"
+  },
+  "license": "UNLICENSED"
+}

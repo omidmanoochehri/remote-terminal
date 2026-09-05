@@ -1,6 +1,6 @@
 {
   "name": "remote-terminal-agent",
-  "version": "0.7.2",
+  "version": "0.8.0",
   "private": true,
   "description": "Cross-platform (Windows / Linux) agent that hosts persistent terminal sessions (PTY) for the Remote Terminal relay, protocol v3.",
   "main": "index.js",

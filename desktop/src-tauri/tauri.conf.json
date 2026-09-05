@@ -1,0 +1,37 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Remote Terminal",
+  "version": "0.8.0",
+  "identifier": "com.cactus.remoteterminal.desktop",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "Remote Terminal",
+        "width": 1180,
+        "height": 780,
+        "minWidth": 420,
+        "minHeight": 420,
+        "resizable": true,
+        "center": true,
+        "decorations": true,
+        "theme": "Dark",
+        "backgroundColor": "#030811"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi"],
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"],
+    "copyright": "© Cactus Software Group",
+    "shortDescription": "Real terminals on your machines",
+    "longDescription": "Remote Terminal opens real PTY sessions on your Windows and Linux machines through a relay you host yourself."
+  }
+}

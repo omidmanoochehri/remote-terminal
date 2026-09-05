@@ -1,12 +1,12 @@
 # Remote Terminal
 
-**Real terminals on your Windows and Linux machines, from an Android phone**,
-relayed through a small server you host yourself.
+**Real terminals on your Windows and Linux machines, from an Android phone or a
+Windows desktop**, relayed through a small server you host yourself.
 
-One phone, many machines, many terminals. Each terminal is a real PTY — ConPTY
-on Windows, `forkpty` on Linux — that keeps running on the machine while your
-phone sleeps, changes networks or loses signal, and picks up exactly where it
-left off when you come back.
+One account, many machines, many terminals. Each terminal is a real PTY —
+ConPTY on Windows, `forkpty` on Linux — that keeps running on the machine while
+your phone sleeps, your laptop closes, the network changes or the signal goes,
+and picks up exactly where it left off when you come back.
 
 ```
                          Remote Terminal Relay  (server/, Node)
@@ -25,14 +25,16 @@ left off when you come back.
        └─ Ubuntu (WSL)             └─ zsh
                                         ▲
                                         │ wss (bearer device token)
-                    ┌───────────────────┴────────────────────┐
-                    │               Android app              │
-                    │ Home · Machines · Terminals · Settings │
-                    │  VT/xterm emulator + terminal keyboard │
-                    └────────────────────────────────────────┘
+                 ┌──────────────────────┴──────────────────────┐
+                 ▼                                             ▼
+  ┌────────────────────────────────────────┐  ┌────────────────────────────────┐
+  │               Android app              │  │          Desktop app           │
+  │ Home · Machines · Terminals · Settings │  │  the same four destinations    │
+  │  VT/xterm emulator + terminal keyboard │  │  the same emulator, ported     │
+  └────────────────────────────────────────┘  └────────────────────────────────┘
 ```
 
-Version **0.7.2**, wire protocol **v3** — see [`PROTOCOL.md`](./PROTOCOL.md)
+Version **0.8.0**, wire protocol **v3** — see [`PROTOCOL.md`](./PROTOCOL.md)
 for the complete wire format.
 
 ---
@@ -43,6 +45,7 @@ for the complete wire format.
 - [What's in this repository](#whats-in-this-repository)
 - [Quick start](#quick-start)
 - [Using the app](#using-the-app)
+- [The desktop app](#the-desktop-app)
 - [How terminals survive](#how-terminals-survive)
 - [How it works](#how-it-works)
 - [Configuration](#configuration)
@@ -50,7 +53,7 @@ for the complete wire format.
 - [Security](#security)
 - [Operating the relay](#operating-the-relay)
 - [Troubleshooting](#troubleshooting)
-- [Building the Android app](#building-the-android-app)
+- [Building the apps](#building-the-apps)
 - [Tests](#tests)
 - [Versioning and releases](#versioning-and-releases)
 - [Upgrading from 0.2 (protocol v2)](#upgrading-from-02-protocol-v2)
@@ -77,11 +80,16 @@ for the complete wire format.
   and offered by name.
 - **Self-hosted and small.** The relay and the agent depend on `ws` (plus a
   prebuilt PTY binding on the agent) and nothing else. The Android app brings
-  its own WebSocket client and its own terminal emulator, both unit tested.
+  its own WebSocket client and its own terminal emulator, both unit tested; the
+  desktop app's frontend has no dependencies at all.
 - **Built for a phone, not shrunk to fit one.** A terminal keyboard with sticky
   modifiers, symbol and F-key rows, saved presets, per-terminal themes, tabs
   with unread counts, selection with handles, scrollback search, pinch zoom, and
   live CPU / memory / disk / uptime for every machine.
+- **And a desktop app that is the same app.** Every screen, setting and
+  confirmation ported to a window, with the emulator, the protocol and the test
+  suite carried over rather than rewritten — so what a sequence does on the
+  phone is what it does on the desktop.
 
 ---
 
@@ -91,7 +99,8 @@ for the complete wire format.
 |---|---|
 | `server/` | The relay: HTTPS identity endpoints (enrol, pair), WebSocket routing between phones and agents, presence, limits, backpressure, structured JSON logs, `/health` and `/stats`. Node; only dependency is `ws`. |
 | `agent/` | The cross-platform agent (Windows 10/11, Ubuntu 22.04/24.04, other Linux, macOS): hosts many PTY sessions, discovers shells, keeps replay buffers, publishes system metrics, receives pasted files. Ships a systemd unit and installers for Linux and Windows. |
-| `android/` | The app (Kotlin, Material 3): Home, Machines, Terminals and Settings, a full VT/xterm emulator, a hand-written RFC 6455 WebSocket client, and no third-party networking or terminal libraries. |
+| `android/` | The phone app (Kotlin, Material 3): Home, Machines, Terminals and Settings, a full VT/xterm emulator, a hand-written RFC 6455 WebSocket client, and no third-party networking or terminal libraries. |
+| `desktop/` | The desktop app (Tauri): a Rust shell for the socket, the pairing calls, the sealed token and the clipboard, over a frontend of plain ES modules with no framework, no bundler and no dependencies. See [`desktop/README.md`](./desktop/README.md). |
 | `tools/e2e-linux.js` | End-to-end check: a real relay, a real Linux agent and a scripted phone, in one process. |
 | `PROTOCOL.md` | The complete v3 protocol: identifiers, endpoints, messages, replay, lifecycle, errors, limits. |
 | `CLAUDE.md` | Repository conventions: versioning, release builds, test commands. |
@@ -101,8 +110,9 @@ for the complete wire format.
 ## Quick start
 
 **Prerequisites** — Node.js 18+ on the relay host and on every machine you want
-to reach; Android 7.0 (API 24) or newer for the app; JDK 17 and the Android SDK
-if you build the app yourself.
+to reach; Android 7.0 (API 24) or newer for the phone app; Windows 10/11 with
+the WebView2 runtime for the desktop app. Building them yourself needs JDK 17
+and the Android SDK, or Rust with the MSVC build tools.
 
 ### 1. Run the relay
 
@@ -198,15 +208,17 @@ node index.js --reset         delete the local identity file
 --allow-root                  allow running as root on Linux (not recommended)
 ```
 
-### 3. Pair the phone
+### 3. Pair a phone or a desktop
 
-Install the app, open it, and either **scan the QR code** or type the **relay
-URL** and the **6-digit pairing code** printed by any agent. An already-paired
-phone can issue a code for the next one: *Settings → Paired phones → Add phone*.
+Install the app, open it, and either **scan the QR code** (phone) or **paste the
+pairing link** (desktop), or type the **relay URL** and the **6-digit pairing
+code** printed by any agent. An already-paired device can issue a code for the
+next one: *Settings → Paired devices → Add device*.
 
-The phone receives a long-lived device token, encrypted with a non-exportable
-Android Keystore key. From then on it sees every machine on the account — no
-codes, no rooms, nothing per-machine to configure.
+The device receives a long-lived device token — encrypted with a non-exportable
+Android Keystore key on the phone, sealed with DPAPI under your Windows account
+on the desktop. From then on it sees every machine on the account: no codes, no
+rooms, nothing per-machine to configure.
 
 ---
 
@@ -328,6 +340,39 @@ Reconnects are automatic — exponential backoff, and an immediate retry when th
 network comes back. Terminals are re-attached at their last stream position, so
 nothing is duplicated or lost; a machine that comes back online re-attaches its
 tabs by itself.
+
+---
+
+## The desktop app
+
+`desktop/` is the same app in a window: the same four destinations, the same
+machine cards and metric tiles, the same terminal with its tabs, themes, search,
+selection, presets and key rows, the same settings with the same keys and
+defaults, and the same wording throughout. It talks to the same relay with the
+same protocol, so a machine paired to one client is paired to the other.
+
+It is a **port, not a rewrite**. The terminal emulator, the wire protocol, the
+attach/replay stream and the key encoder are line-for-line ports of the Kotlin
+ones, and the Kotlin unit tests came with them — so a control sequence that
+renders one way on the phone renders that way on the desktop, and a test proves
+it. Only the shell around them is new: a small Rust process owning the socket
+(the protocol needs an `Authorization` header a web view cannot send), the
+HTTPS pairing calls, a DPAPI-sealed credential store, the clipboard and the app
+lock. Above that everything is plain ES modules — no framework, no bundler, no
+dependencies at all.
+
+Where a desktop is genuinely not a phone, the affordance changes and the feature
+does not: the floating bottom bar becomes a navigation rail; scanning a QR code
+becomes pasting a `remoteterminal://pair` link; swiping between tabs becomes
+`Ctrl+Tab` or Shift + wheel; pinch-zoom becomes `Ctrl` + wheel; long-press
+selection becomes drag, double-click and triple-click; the bell rings instead of
+buzzing; the app lock asks Windows Hello. [`desktop/README.md`](./desktop/README.md)
+lists every one of them, and the shortcuts.
+
+```bash
+cd desktop/src-tauri && cargo build --release
+# → target/release/remote-terminal-desktop.exe
+```
 
 ---
 
@@ -547,9 +592,17 @@ Remote shell access deserves a careful setup.
   ciphertext; backups are disabled (`allowBackup=false`); an optional app lock
   covers the content until the device credential prompt succeeds. QR frames are
   decoded on-device and never stored or sent anywhere.
+- **On the desktop.** The device token is sealed with DPAPI under the current
+  Windows account, so `credentials.json` holds only ciphertext and no other
+  account on the machine can read it; an optional app lock asks Windows Hello
+  before anything is shown, and turns itself off where Hello is not configured
+  rather than pretending to protect. The renderer never holds the token: the
+  socket, and the `Authorization` header it needs, live in the Rust process.
+  Nothing is loaded from the network — the whole frontend ships in the binary,
+  behind a content-security policy that allows no remote origin.
 - **Never commit** (all gitignored): `server/config.json`, `agent/config.json`,
   `server/data/`, `agent/state.json`, `android/keystore.properties`,
-  `android/keystore/`.
+  `android/keystore/`, `desktop/src-tauri/target/`.
 
 ---
 
@@ -591,7 +644,9 @@ Remote shell access deserves a careful setup.
 
 ---
 
-## Building the Android app
+## Building the apps
+
+### Android
 
 ```bash
 cd android
@@ -624,7 +679,7 @@ APKs and AABs are gitignored — never commit build output. Confirm a build with
 `app/build/outputs/apk/release/output-metadata.json`, which should show the
 expected `versionCode` and `versionName`.
 
-### Dependencies
+### Android dependencies
 
 Deliberately few, and all small and mature: AndroidX
 core / appcompat / activity / fragment / lifecycle / recyclerview /
@@ -638,29 +693,59 @@ dependency-free and unit tested. Do not add a library to solve something they
 already cover. The server and agent depend on `ws` — plus the agent's prebuilt
 PTY binding — and nothing else. Keep it that way.
 
+### Desktop
+
+Needs Rust (MSVC toolchain), the Visual Studio Build Tools with the Windows SDK,
+and the Edge WebView2 runtime (already present on Windows 11).
+
+```bash
+cd desktop/src-tauri
+cargo build --release      # → target/release/remote-terminal-desktop.exe
+cargo run                  # debug run, with the web inspector
+```
+
+Installers need the Tauri CLI (`cargo install tauri-cli --version "^2"`, then
+`cargo tauri build` from `desktop/`). The frontend has no build step: `cargo
+build` takes `desktop/ui/` as it is, so editing a screen and re-running is the
+whole loop. Build output is gitignored — never commit it.
+
+The frontend's dependency list is empty, and `desktop/package.json` exists only
+for `npm test` and the version number; `npm install` is never needed.
+
 ---
 
 ## Tests
 
 ```bash
-cd server && npm test              # relay: identity, pairing, auth, routing, isolation, revocation, limits, legacy mode
-cd agent  && npm test              # agent: ring buffer, env, shells (Windows + Linux), sessions, metrics, uploads, relay client, a real bash PTY
+cd server  && npm test             # relay: identity, pairing, auth, routing, isolation, revocation, limits, legacy mode
+cd agent   && npm test             # agent: ring buffer, env, shells (Windows + Linux), sessions, metrics, uploads, relay client, a real bash PTY
+cd desktop && npm test             # desktop: the Kotlin unit tests, ported — emulator, keys, protocol, presets, pairing
 node tools/e2e-linux.js            # real relay + real Linux agent + scripted phone
+node desktop/tools/e2e-desktop.mjs # real relay + real agent + the desktop client's own modules
 cd android && ./gradlew testDebugUnitTest   # emulator, key encoder, framing, protocol, presets
 ```
 
-`tools/e2e-linux.js` is the honest one: it enrols an agent, pairs a phone,
-opens two bash terminals, and checks routing, ANSI colours, Ctrl+C, resize,
-phone reconnect with `since` (same shell process, no duplicates), full replay,
-closing one terminal, exit codes, agent restart (new instance id) and
-revocation.
+The two end-to-end scripts are the honest ones.
+
+`tools/e2e-linux.js` enrols an agent, pairs a phone, opens two bash terminals,
+and checks routing, ANSI colours, Ctrl+C, resize, phone reconnect with `since`
+(same shell process, no duplicates), full replay, closing one terminal, exit
+codes, agent restart (new instance id) and revocation.
+
+`desktop/tools/e2e-desktop.mjs` starts a relay and an agent, pairs a device over
+HTTPS, then drives the desktop app's **own** `RelayClient`, `AgentRepository`,
+`SessionRepository` and `TerminalEmulator` — unmodified shipping code, with only
+the Rust bridge swapped for a Node one — through creating a terminal, running a
+command and reading the result off the emulator, resizing, dropping the socket
+and re-attaching at `since` without duplicating output, receiving metrics, and
+terminating the session.
 
 ---
 
 ## Versioning and releases
 
 The project has **one version number**, shared by the server, the agent and the
-Android app — currently **0.7.2** — bumped by semver according to what the work
+Android app and the desktop app — currently **0.8.0** — bumped by semver according to what the work
 did. The Android `versionCode` is a plain integer that must strictly increase on
 every release. The wire protocol version (`v3`) is independent and changes only
 for an actual breaking wire change.
