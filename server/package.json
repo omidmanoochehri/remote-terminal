@@ -1,6 +1,6 @@
 {
   "name": "remote-terminal-server",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "private": true,
   "description": "Relay for Remote Terminal (protocol v3): enrolment, pairing, device tokens, multi-agent session routing, presence, limits.",
   "main": "index.js",

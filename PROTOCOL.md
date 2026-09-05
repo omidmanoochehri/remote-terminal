@@ -49,7 +49,7 @@ In routed messages the routing keys are the short names `agent`, `session`,
 // AgentInfo (relay → phone)
 { "agentId": "a_…", "name": "Production Server", "hostname": "prod-01",
   "platform": "linux",            // "win32" | "linux" | "darwin"
-  "os": "Ubuntu 24.04", "arch": "x64", "agentVersion": "0.7.0", "protocol": 3,
+  "os": "Ubuntu 24.04", "arch": "x64", "agentVersion": "0.7.1", "protocol": 3,
   "shells": [ { "id": "bash", "label": "bash", "default": true }, { "id": "sh", "label": "sh" } ],
   "caps": ["sessions", "replay", "resize", "ping", "files", "metrics"],
   "online": true, "lastSeen": 1725264000000,   // ms since epoch
@@ -161,7 +161,7 @@ and terminates sockets that miss a pong.
   "instanceId": "…",                  // random per process start
   "name": "…",                        // used only if the relay has no name for this agent yet
   "hostname": "prod-01", "platform": "linux", "os": "Ubuntu 24.04", "arch": "x64",
-  "agentVersion": "0.7.0", "protocol": 3,
+  "agentVersion": "0.7.1", "protocol": 3,
   "shells": [ { "id": "bash", "label": "bash", "default": true } ],
   "caps": ["sessions", "replay", "resize", "ping", "files", "metrics"],
   "metrics": { /* MachineMetrics, optional */ },
