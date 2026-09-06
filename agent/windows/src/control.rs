@@ -107,6 +107,13 @@ fn open_with_retry(pipe: &str) -> Result<std::fs::File, ControlError> {
             Ok(f) => return Ok(f),
             Err(e) => match e.kind() {
                 std::io::ErrorKind::NotFound => return Err(ControlError::NotRunning),
+                // The pipe is there but this account may not open it — the
+                // agent belongs to the service. That is emphatically not
+                // "not running", and reporting it as such is what made the
+                // tray claim a healthy machine was down.
+                std::io::ErrorKind::PermissionDenied => {
+                    return Err(ControlError::Io("the agent is running under another account".into()))
+                }
                 _ => std::thread::sleep(Duration::from_millis(40 * (attempt + 1))),
             },
         }
@@ -114,8 +121,34 @@ fn open_with_retry(pipe: &str) -> Result<std::fs::File, ControlError> {
     Err(ControlError::NotRunning)
 }
 
+/// Ask the agent directly if we may, and through the supervisor's public pipe
+/// if we may not.
+///
+/// A tray running as the signed-in user cannot open a pipe that Node created
+/// as LocalSystem — the answer is ERROR_ACCESS_DENIED, not "no such pipe" — so
+/// "the agent's own pipe is unreachable" must not be read as "no agent". The
+/// order matters the other way round too: run the agent in a console for
+/// development and there is no supervisor, so the direct pipe is all there is.
+pub fn request_either(cmd: &str, key: Option<&str>) -> Result<String, ControlError> {
+    match request(crate::PIPE_NAME, cmd, key) {
+        Err(ControlError::NotRunning) | Err(ControlError::Io(_)) => {
+            request(crate::BROKER_PIPE, cmd, key)
+        }
+        other => other,
+    }
+}
+
 pub fn status(pipe: &str) -> Result<Status, ControlError> {
     let raw = request(pipe, "status", None)?;
+    parse_status(&raw)
+}
+
+/// Status from whichever channel answers.
+pub fn status_either() -> Result<Status, ControlError> {
+    parse_status(&request_either("status", None)?)
+}
+
+fn parse_status(raw: &str) -> Result<Status, ControlError> {
     Ok(Status {
         version: json::str_of(&raw, "version").unwrap_or_default(),
         name: json::str_of(&raw, "name").unwrap_or_default(),
@@ -147,6 +180,11 @@ pub fn pair(pipe: &str, key: &str) -> Result<PairCode, ControlError> {
 
 pub fn reconnect(pipe: &str) -> Result<(), ControlError> {
     request(pipe, "reconnect", None).map(|_| ())
+}
+
+/// Reconnect over whichever channel answers.
+pub fn reconnect_either() -> Result<(), ControlError> {
+    request_either("reconnect", None).map(|_| ())
 }
 
 /// Ask the agent to close its sessions and exit. Used by the service for a

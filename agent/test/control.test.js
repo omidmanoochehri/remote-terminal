@@ -5,6 +5,7 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const net = require('node:net');
 const control = require('../lib/control');
 
 const quiet = { info() {}, warn() {}, error() {}, debug() {} };
@@ -55,6 +56,38 @@ test('status is public, privileged commands need the key', async () => {
   }
 });
 
+test('shutdown is gated but reconnect is not', async () => {
+  const { dir, pipeName } = fixture();
+  const called = [];
+  const server = control.createControlServer({
+    dataDir: dir,
+    pipeName,
+    log: quiet,
+    handlers: {
+      shutdown: () => { called.push('shutdown'); return { stopping: true }; },
+      reconnect: () => { called.push('reconnect'); return { reconnecting: true }; },
+    },
+  });
+  await server.start();
+  try {
+    // Anyone on the machine could otherwise take it off the air.
+    const denied = await control.request(dir, 'shutdown', {}, { pipeName });
+    assert.strictEqual(denied.ok, false);
+    assert.strictEqual(denied.needsKey, true);
+    assert.deepStrictEqual(called, [], 'a refused command must not reach its handler');
+
+    const allowed = await control.request(dir, 'shutdown', { key: control.readKey(dir) }, { pipeName });
+    assert.deepStrictEqual(allowed, { ok: true, stopping: true });
+
+    // Open on purpose: idempotent, and what a non-administrator's tray needs.
+    const reconnect = await control.request(dir, 'reconnect', {}, { pipeName });
+    assert.deepStrictEqual(reconnect, { ok: true, reconnecting: true });
+    assert.deepStrictEqual(called, ['shutdown', 'reconnect']);
+  } finally {
+    server.stop();
+  }
+});
+
 test('the key file is created once, is 0600, and survives a restart', () => {
   const { dir } = fixture();
   const first = control.ensureKey(dir);
@@ -86,6 +119,28 @@ test('a second agent is refused while the first is alive', async () => {
   } finally {
     second.stop();
     first.stop();
+  }
+});
+
+test('an address held by something that will not answer fails fast', async () => {
+  const { dir, pipeName } = fixture();
+  // A server on the address that never replies — which is what a live agent
+  // under another account looks like on Windows, where the pipe cannot be
+  // opened at all. The old code retried listen() forever and the agent hung
+  // silently, holding the process open with nothing running in it.
+  const accepted = [];
+  const squatter = net.createServer((conn) => accepted.push(conn)); // accept, say nothing
+  await new Promise((resolve) => squatter.listen(control.controlPath(dir, pipeName), resolve));
+
+  const server = control.createControlServer({ dataDir: dir, pipeName, log: quiet, handlers: {} });
+  try {
+    const started = Date.now();
+    await assert.rejects(() => server.start(), (err) => err.code === 'ERUNNING');
+    assert.ok(Date.now() - started < 8000, 'it gives up rather than retrying for ever');
+  } finally {
+    server.stop();
+    for (const conn of accepted) conn.destroy(); // close() waits for these
+    await new Promise((resolve) => squatter.close(resolve));
   }
 });
 

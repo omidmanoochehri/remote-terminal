@@ -22,13 +22,17 @@ function slug(s) {
 
 /** Locate an executable on PATH (with PATHEXT on Windows). */
 function which(cmd, { platform = process.platform, env = process.env, exists = fs.existsSync } = {}) {
-  if (path.isAbsolute(cmd)) return exists(cmd) ? cmd : null;
+  // Join with the rules of the platform being asked about, not the host's.
+  // They are the same thing at run time; they differ when a test asks what a
+  // Linux agent would resolve while running on Windows.
+  const p = platform === 'win32' ? path.win32 : path.posix;
+  if (p.isAbsolute(cmd)) return exists(cmd) ? cmd : null;
   const dirs = String(env.PATH || env.Path || '').split(platform === 'win32' ? ';' : ':').filter(Boolean);
   const exts = platform === 'win32' ? String(env.PATHEXT || '.EXE;.CMD;.BAT').split(';').filter(Boolean) : [''];
   for (const dir of dirs) {
     for (const ext of exts) {
-      const p = path.join(dir, cmd + (platform === 'win32' && !cmd.toLowerCase().endsWith(ext.toLowerCase()) ? ext : ''));
-      if (exists(p)) return p;
+      const full = p.join(dir, cmd + (platform === 'win32' && !cmd.toLowerCase().endsWith(ext.toLowerCase()) ? ext : ''));
+      if (exists(full)) return full;
     }
   }
   return null;

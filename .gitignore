@@ -44,3 +44,6 @@ agent/control.key
 agent/logs/
 # Windows service/tray build output
 agent/windows/target/
+
+# Built .deb packages
+agent/dist/

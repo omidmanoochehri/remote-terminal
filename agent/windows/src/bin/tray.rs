@@ -160,7 +160,7 @@ fn main() {
             return;
         }
 
-        let status = control::status(PIPE_NAME);
+        let status = control::status_either();
         let health = Health::of(&status);
         let icon = make_icon(health.colour());
         TRAY = Some(Box::new(Tray {
@@ -277,7 +277,7 @@ fn remove_icon() {
 /// state change worth interrupting someone for.
 fn refresh(announce: bool) {
     let Some(t) = tray() else { return };
-    let status = control::status(PIPE_NAME);
+    let status = control::status_either();
     let health = Health::of(&status);
     let changed = health != t.health;
 
@@ -495,7 +495,7 @@ fn on_command(id: usize) {
                 None => elevate_self("--pair"),
             }
         }
-        ID_RECONNECT => match control::reconnect(PIPE_NAME) {
+        ID_RECONNECT => match control::reconnect_either() {
             Ok(()) => balloon("Reconnecting", "Asked the agent to reconnect to the relay."),
             Err(e) => message(&format!("Could not reach the agent.\n\n{e}"), "Reconnect", MB_ICONWARNING),
         },
@@ -616,21 +616,44 @@ fn service_command(verb: &str) {
             w(&exe).as_ptr(),
             w(verb).as_ptr(),
             std::ptr::null(),
+            // Hidden: the service binary prints to a console nobody is looking
+            // at. Which means nothing it says reaches the user, so whether it
+            // worked has to be decided here, from the agent itself.
             SW_HIDE as i32,
         );
     }
-    // The service takes a moment; poll sooner than the timer would.
-    let deadline = Instant::now() + Duration::from_secs(6);
+
+    let want_running = verb != "stop";
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let mut reached = false;
     while Instant::now() < deadline {
         std::thread::sleep(Duration::from_millis(400));
-        if control::status(PIPE_NAME).is_ok() != (verb == "stop") {
+        if control::status_either().is_ok() == want_running {
+            reached = true;
             break;
         }
     }
+
     if let Some(t) = tray() {
         t.announced = false; // the change was asked for; do not announce it
     }
     refresh(false);
+
+    if !reached {
+        // Either the consent prompt was declined, or the service is not
+        // installed, or the agent is failing to start. Only the log can say
+        // which, so point at it rather than guess.
+        let log = tray()
+            .and_then(|t| t.settings.as_ref().map(|s| s.agent_log().display().to_string()))
+            .unwrap_or_else(|| "the service log".into());
+        message(
+            &format!(
+                "The service did not {verb}.\n\nEither the administrator prompt was declined, or it is failing to start.\n\n{log}"
+            ),
+            DISPLAY_NAME,
+            MB_ICONWARNING,
+        );
+    }
 }
 
 fn open_path(path: Option<PathBuf>) {

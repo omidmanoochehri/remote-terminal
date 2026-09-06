@@ -63,10 +63,16 @@ function timingSafeEqual(a, b) {
 /* -------------------------------- server ---------------------------------- */
 
 /**
- * @param handlers  { [cmd]: async (req) => object }   `privileged: true` on a
- *                  handler means the request must carry the control token.
+ * @param handlers    { [cmd]: async (req) => object }
+ * @param privileged  the commands that require the control token.
+ *
+ * `pair` mints a code that would hand a stranger a shell; `shutdown` would let
+ * any local user take this machine off the air. `status` and `ping` carry no
+ * credential and change nothing. `reconnect` is deliberately open: it is
+ * idempotent, the agent would reconnect on its own anyway, and it is the one
+ * thing a signed-in non-administrator has a real reason to do from the tray.
  */
-function createControlServer({ dataDir, log, handlers, pipeName, privileged = new Set(['pair']) }) {
+function createControlServer({ dataDir, log, handlers, pipeName, privileged = new Set(['pair', 'shutdown']) }) {
   const socket = controlPath(dataDir, pipeName);
   const key = ensureKey(dataDir);
   let server = null;
@@ -112,19 +118,47 @@ function createControlServer({ dataDir, log, handlers, pipeName, privileged = ne
     start() {
       return new Promise((resolve, reject) => {
         server = net.createServer(onConnection);
-        server.on('error', async (err) => {
-          if (err.code !== 'EADDRINUSE') return reject(err);
-          // Either a live agent, or the leftovers of one that was killed.
-          const alive = await ping(dataDir, { pipeName }).catch(() => null);
-          if (alive) return reject(Object.assign(new Error('another agent is already running'), { code: 'ERUNNING', pid: alive.pid }));
-          if (process.platform !== 'win32') { try { fs.unlinkSync(socket); } catch (_) { /* ignore */ } }
-          server.listen(socket, () => resolve(socket));
-          return undefined;
-        });
-        server.listen(socket, () => {
+
+        // Every listen() attempt registers its own 'listening' callback, and a
+        // rejected promise does not stop a server that is still retrying — so
+        // settle exactly once, and attempt at most twice.
+        let settled = false;
+        const succeed = () => {
+          if (settled) return;
+          settled = true;
           if (process.platform !== 'win32') { try { fs.chmodSync(socket, 0o600); } catch (_) { /* best effort */ } }
           resolve(socket);
+        };
+        const failWith = (err) => {
+          if (settled) return;
+          settled = true;
+          try { server.close(); } catch (_) { /* ignore */ }
+          reject(err);
+        };
+        const inUse = (pid) => Object.assign(
+          new Error(pid
+            ? `another agent is already running (pid ${pid})`
+            : `another process is already listening on ${socket}`),
+          { code: 'ERUNNING', pid },
+        );
+
+        server.once('error', async (err) => {
+          if (err.code !== 'EADDRINUSE') return failWith(err);
+
+          // Someone holds the address. Asking who is only a courtesy for the
+          // message: on Windows the answer may be "access denied" because the
+          // holder is the service account and we are not, and a pipe cannot be
+          // unlinked from under it either way. Taking over is a POSIX-only
+          // move, and only for a socket file with nothing behind it.
+          const alive = await ping(dataDir, { pipeName }).catch(() => null);
+          if (alive || process.platform === 'win32') return failWith(inUse(alive && alive.pid));
+
+          try { fs.unlinkSync(socket); } catch (e) { if (e.code !== 'ENOENT') return failWith(inUse(null)); }
+          server.once('error', () => failWith(inUse(null)));
+          server.listen(socket, succeed);
+          return undefined;
         });
+        server.listen(socket, succeed);
       });
     },
     stop() {

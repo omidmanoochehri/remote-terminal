@@ -33,7 +33,7 @@ use std::time::{Duration, Instant};
 use rt_windows::logfile::LogFile;
 use rt_windows::settings::{default_data_dir, exe_dir, exe_path, Settings};
 use rt_windows::wide::w;
-use rt_windows::{control, DISPLAY_NAME, PIPE_NAME, SERVICE_NAME, VERSION};
+use rt_windows::{broker, control, BROKER_PIPE, DISPLAY_NAME, PIPE_NAME, SERVICE_NAME, VERSION};
 
 use windows_sys::Win32::Foundation::{CloseHandle, ERROR_ACCESS_DENIED, ERROR_SERVICE_SPECIFIC_ERROR, HANDLE, NO_ERROR};
 use windows_sys::Win32::System::JobObjects::{
@@ -341,7 +341,7 @@ fn cmd_status() -> i32 {
         }
         Err(e) => println!("  Settings:     {e}"),
     }
-    match control::status(PIPE_NAME) {
+    match control::status_either() {
         Ok(s) => {
             println!("  Agent:        running (pid {}, version {})", s.pid, s.version);
             println!("  Machine name: {}", if s.name.is_empty() { "-" } else { &s.name });
@@ -395,6 +395,7 @@ fn human_duration(sec: i64) -> String {
 fn supervise(settings: &Settings, log: &Arc<LogFile>, stop: &AtomicBool, report: &mut dyn FnMut(u32)) -> i32 {
     let job = Job::create();
     let mut backoff = BACKOFF_START;
+    let _broker = start_broker(log);
 
     log.info(
         "service starting",
@@ -471,6 +472,44 @@ fn supervise(settings: &Settings, log: &Arc<LogFile>, stop: &AtomicBool, report:
 
     log.info("service stopped", &[]);
     0
+}
+
+/// The public control pipe, on its own thread for the life of the supervisor.
+///
+/// It has to outlive individual agent processes: a tray asking "why is nothing
+/// working" during a restart backoff is exactly when an answer is worth most.
+/// Dropping the returned guard stops it.
+fn start_broker(log: &Arc<LogFile>) -> BrokerGuard {
+    let stop = Arc::new(AtomicBool::new(false));
+    let flag = stop.clone();
+    let log = Arc::clone(log);
+    let handle = std::thread::spawn(move || {
+        log.info("public control pipe open", &[("pipe", BROKER_PIPE.to_string())]);
+        broker::serve(BROKER_PIPE, flag, |request| {
+            broker::dispatch(request, |cmd| {
+                control::request(PIPE_NAME, cmd, None).map_err(|e| e.to_string())
+            })
+        });
+    });
+    BrokerGuard { stop, handle: Some(handle) }
+}
+
+struct BrokerGuard {
+    stop: Arc<AtomicBool>,
+    handle: Option<std::thread::JoinHandle<()>>,
+}
+
+impl Drop for BrokerGuard {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::SeqCst);
+        // The thread is parked in ConnectNamedPipe. Knocking on the pipe wakes
+        // it, it sees the flag, and returns; joining it would otherwise hang
+        // until some client happened along.
+        let _ = std::fs::OpenOptions::new().read(true).write(true).open(BROKER_PIPE);
+        if let Some(handle) = self.handle.take() {
+            let _ = handle.join();
+        }
+    }
 }
 
 fn fatal_hint(exit: i32) -> &'static str {
@@ -938,7 +977,7 @@ fn wait_registered(timeout: Duration) -> Option<control::Status> {
     let deadline = Instant::now() + timeout;
     let mut last = None;
     while Instant::now() < deadline {
-        if let Ok(s) = control::status(PIPE_NAME) {
+        if let Ok(s) = control::status_either() {
             if s.registered {
                 return Some(s);
             }

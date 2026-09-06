@@ -98,7 +98,9 @@ for the complete wire format.
 | Path | What it is |
 |---|---|
 | `server/` | The relay: HTTPS identity endpoints (enrol, pair), WebSocket routing between phones and agents, presence, limits, backpressure, structured JSON logs, `/health` and `/stats`. Node; only dependency is `ws`. |
-| `agent/` | The cross-platform agent (Windows 10/11, Ubuntu 22.04/24.04, other Linux, macOS): hosts many PTY sessions, discovers shells, keeps replay buffers, publishes system metrics, receives pasted files. Ships a systemd unit and installers for Linux and Windows. |
+| `agent/` | The cross-platform agent (Windows 10/11, Ubuntu 22.04/24.04, other Linux, macOS): hosts many PTY sessions, discovers shells, keeps replay buffers, publishes system metrics, receives pasted files. |
+| `agent/windows/` | The Windows service host and tray icon (Rust, `windows-sys` only). Two small executables that supervise the agent and show its state; neither hosts a terminal. |
+| `agent/packaging/` | The Debian package: systemd unit, maintainer scripts, man page, logrotate rule and `build-deb.sh`. |
 | `android/` | The phone app (Kotlin, Material 3): Home, Machines, Terminals and Settings, a full VT/xterm emulator, a hand-written RFC 6455 WebSocket client, and no third-party networking or terminal libraries. |
 | `desktop/` | The desktop app (Tauri): a Rust shell for the socket, the pairing calls, the sealed token and the clipboard, over a frontend of plain ES modules with no framework, no bundler and no dependencies. See [`desktop/README.md`](./desktop/README.md). |
 | `tools/e2e-linux.js` | End-to-end check: a real relay, a real Linux agent and a scripted phone, in one process. |
@@ -138,7 +140,44 @@ Use TLS in production (`wss://`) — see [TLS and reverse proxies](#tls-and-reve
 
 ### 2. Install an agent on each machine
 
-**Ubuntu / Linux (systemd)**
+**Ubuntu / Debian (a .deb)**
+
+```bash
+cd agent
+./packaging/build-deb.sh                       # -> dist/remote-terminal-agent_0.9.0_amd64.deb
+sudo apt install ./dist/remote-terminal-agent_0.9.0_amd64.deb
+
+sudo remote-terminal-agent configure \
+  --server wss://relay.example.com \
+  --enroll-token '<ENROLL_TOKEN>' --name "Production Server"
+sudo systemctl start remote-terminal-agent
+sudo remote-terminal-agent pair
+```
+
+The package installs the program under `/usr/lib/remote-terminal-agent`, a
+`remote-terminal-agent` command in `/usr/bin`, a systemd unit, a man page and a
+logrotate rule; creates the unprivileged `remote-terminal` user that the agent
+**and every terminal it opens** runs as; and leaves the service stopped until
+you have pointed it at a relay. Removing it keeps the machine's identity so a
+reinstall does not need re-pairing; `apt purge` deletes that too.
+
+Day to day:
+
+```bash
+sudo remote-terminal-agent pair      # a fresh pairing code
+remote-terminal-agent status         # service state, identity, relay status
+remote-terminal-agent doctor         # PTY support, shells, effective configuration
+remote-terminal-agent logs -f        # the journal, or the log file if one is configured
+man remote-terminal-agent
+```
+
+Build the package with the same major Node.js version the target machine runs:
+the bundled `node-pty` is compiled for one Node ABI and one architecture, and a
+mismatch silently costs the PTY (no resize, no `vim`, no `htop`). The build
+script checks this and refuses rather than shipping a package that fails
+quietly.
+
+**Other systemd distributions**
 
 ```bash
 cd agent
@@ -152,7 +191,7 @@ The script creates a system user `remote-terminal` (choose another with
 `--user someone` — that user is who every terminal runs as), installs the agent
 under `/opt/remote-terminal-agent`, writes
 `/etc/remote-terminal-agent/config.json`, enables the `remote-terminal-agent`
-service, waits for enrolment and prints:
+service, waits for the agent to register with the relay and prints:
 
 ```
 Remote Terminal Agent
@@ -178,17 +217,58 @@ journalctl -u remote-terminal-agent -f
 
 **Windows 10/11**
 
+From an **elevated** PowerShell:
+
 ```powershell
 cd agent
-npm install
 powershell -ExecutionPolicy Bypass -File install-windows.ps1 -Install `
   -Server wss://relay.example.com -EnrollToken <ENROLL_TOKEN> -Name "Office PC"
 ```
 
-This registers a hidden per-user **logon task** — a Windows Service runs in
-session 0 and cannot own an interactive ConPTY — starts it, waits for enrolment
-and prints the pairing code. Later: `-Pair`, `-Status`, `-Name "…"`,
-`-Uninstall`.
+This installs a real **Windows service** (`RemoteTerminalAgent`) plus a tray
+icon, into `C:\Program Files\Remote Terminal Agent`, with configuration,
+identity and logs under `C:\ProgramData\RemoteTerminal` — locked down to SYSTEM
+and administrators, because that directory holds the enrolment token and the
+control key. It starts the service, waits for it to register and prints a
+pairing code. Later: `-Status`, `-Name "…"`, `-Uninstall` (add `-Purge` to
+delete the identity and logs too), `-NoTray` to skip the tray icon.
+
+Two small executables do the Windows-specific work (Rust, ~300 KB and ~190 KB,
+one dependency between them):
+
+```
+remote-terminal-service.exe install | uninstall | start | stop | restart | status | run
+remote-terminal-tray.exe            the notification-area icon
+```
+
+`remote-terminal-service.exe` is both the service and its own installer. It
+does not host terminals itself: it supervises `node index.js`, restarts it with
+backoff, funnels its output into one rotating log, and stops it **over the
+agent's control pipe** so open terminals are closed properly instead of being
+terminated. The tray icon shows the same state and offers a pairing code, a
+forced reconnect, the log, and start/stop of the service; closing it does not
+stop anything.
+
+The tray cannot read the agent's own pipe: Node gives no way to set a security
+descriptor on it, so a pipe the agent creates as LocalSystem is reachable by
+SYSTEM and administrators only, and a signed-in user's tray would get
+`ERROR_ACCESS_DENIED` on every poll. The supervisor therefore opens a second
+pipe with an explicit DACL — SYSTEM and Administrators in full, authenticated
+users read/write — and forwards exactly `ping`, `status` and `reconnect` to the
+agent. `pair` and `shutdown` are never forwarded; the tray elevates for a
+pairing code, and stopping the service goes through the SCM.
+
+Upgrading from 0.8 or earlier replaces the old per-user **logon task** with the
+service, and moves `config.json` and `state.json` out of the agent directory —
+where any local user could read the enrolment token — into ProgramData.
+
+The trade this makes: a service starts at boot, before anyone signs in, and
+keeps running after they sign out, which is what "reach this machine from my
+phone" has to mean. The cost is that terminals then run as **LocalSystem**, so
+anyone who can pair a phone has administrative access to that machine, exactly
+as with an SSH server. `-Account <user>` (with `-Password`) runs the service as
+a named account instead, and its terminals get that account's rights and no
+more.
 
 **Anywhere, by hand**
 
@@ -201,12 +281,35 @@ node index.js                 run the agent (enrols on first run)
 node index.js --pair          print a pairing code for a phone
 node index.js --status        local identity and relay-side status
 node index.js --doctor        check PTY support, discovered shells, configuration
+node index.js --logs [--follow] [--lines N]
+                              the rotating log file this agent writes
 node index.js --name "Name"   rename this machine (relay + local)
+node index.js --configure --server … --enroll-token … [--data-dir <dir>]
+                              write config.json without starting anything
+node index.js --wait-online 45
+                              block until the running agent is registered
 node index.js --enroll        enrol explicitly (replaces the current identity)
 node index.js --reset         delete the local identity file
 --config <path>               use this config.json (default: $CONFIG or ./config.json)
+--json                        machine-readable --status / --pair
 --allow-root                  allow running as root on Linux (not recommended)
 ```
+
+Only one agent may run per machine — two would fight over the same identity and
+the relay would evict whichever registered first — so a second one exits
+immediately with code 5. `--pair` and `--status` notice a running agent and ask
+*it*, over a local control socket (a unix socket at `<data-dir>/agent.sock`, a
+named pipe on Windows), rather than opening a second relay connection. Anything
+that would grant access to the machine — minting a pairing code, asking the
+agent to stop — needs the key in `<data-dir>/control.key`, which only the
+agent's own account and administrators can read; `status` and `ping` are open,
+since they carry no credential.
+
+Exit codes tell a service manager whether restarting would help: **2** not
+enrolled or revoked, **3** refused to run as root, **5** another agent is
+already running — the units list all three in `RestartPreventExitStatus`.
+Everything else, including **9** (the watchdog found the event loop wedged), is
+worth another try.
 
 ### 3. Pair a phone or a desktop
 
@@ -574,13 +677,27 @@ Remote shell access deserves a careful setup.
   socket with `4401`; the agent stops, marks its identity invalid and refuses to
   re-enrol automatically (`--enroll` is explicit). Unpairing a phone wipes the
   Keystore-wrapped token.
-- **Blast radius.** By default the agent runs as an unprivileged user — the
-  installer creates one and refuses root unless `--allow-root` / `ALLOW_ROOT=1`,
-  which makes every terminal a root shell. Shells get a minimal environment.
-  `install-linux.sh` puts the program under root-owned `/opt` and the identity
-  under the service user alone. Optional systemd hardening lines
-  (`NoNewPrivileges`, `ProtectSystem`) are in the unit file — they also forbid
-  `sudo` inside terminals, so enable them consciously.
+- **Blast radius.** On Linux the agent runs as an unprivileged user — the
+  package and the installer create one and refuse root unless `--allow-root` /
+  `ALLOW_ROOT=1`, which makes every terminal a root shell. Shells get a minimal
+  environment. On Windows the service runs as LocalSystem by default, so its
+  terminals are administrative, exactly as an SSH server's would be; install
+  with `-Account <user>` where that is not wanted.
+- **Hardening you can turn up.** The systemd units ship with the protections
+  that cost a terminal nothing (`ProtectSystem=full`, the `ProtectKernel*`
+  family, `RestrictSUIDSGID`, an empty `CapabilityBoundingSet`). The stricter
+  ones are listed in the unit as comments, each with what it breaks, because
+  every line applies to the shells too: `NoNewPrivileges` forbids `sudo`,
+  `PrivateTmp` hides `/tmp` from the rest of the machine, `RestrictNamespaces`
+  forbids `docker` and `podman`, `RestrictAddressFamilies` takes away `ip` and
+  `ping`. Enable them with `systemctl edit remote-terminal-agent`. Never
+  `PrivateDevices=true` — it takes `/dev/ptmx`, so there are no terminals at
+  all.
+- **Credentials at rest.** `config.json` (the enrolment token) and `state.json`
+  (the identity the relay issued) are 0640 root:remote-terminal and 0600 on
+  Linux, and under a ProgramData directory restricted to SYSTEM and
+  administrators on Windows. The control socket is 0600 and its key gates every
+  command that would grant access to the machine.
 - **Abuse controls.** Connection caps, per-connection message budgets, frame
   size limits, session and identity caps, pairing and enrolment limiters, and
   backpressure for slow phones.
@@ -620,6 +737,19 @@ Remote shell access deserves a careful setup.
   terminals.
 - **Logs.** `LOG_LEVEL=info` by default, JSON lines to stdout; run it under
   systemd (or your process manager of choice) and let the journal collect them.
+  The *agent* writes the same JSON lines, and where nothing else is collecting
+  them it keeps its own rotating `agent.log` (5 MB × 5) beside its state —
+  `node index.js --logs -f` reads it. Under systemd it does not, because
+  journald already has stdout: `LOG_TO_FILE=1` in
+  `/etc/default/remote-terminal-agent` turns the file back on where the journal
+  is not persistent. On Windows the service supervisor owns that file, so its
+  own lines about starts, exits and restarts are interleaved with the agent's
+  in one place.
+- **Liveness.** The agent checks its own event loop every 50 seconds and logs a
+  heartbeat (connected, sessions, RSS) every six checks. Three consecutive
+  stalls mean it is wedged, and it exits with code 9 so systemd or the Windows
+  supervisor restarts it — but only when something *is* supervising it, since a
+  hand-started agent exiting would leave nothing behind.
 - **Capacity.** The defaults are sized for a personal or small-team relay: 1000
   connections, 20 per IP, 50 machines and 20 phones per account, 64 live
   terminals per account. Raise them deliberately — every live terminal is a real
@@ -634,6 +764,11 @@ Remote shell access deserves a careful setup.
 | Agent will not enrol | `node index.js --status`. Wrong or missing `ENROLL_TOKEN`, or the relay is unreachable. Enrolment is per-IP rate-limited (10/min). |
 | Agent connects, then stops with "unauthorized" | Its token was revoked (the machine was removed in the app). Re-enrol explicitly: `node index.js --enroll`. |
 | Agent keeps getting closed with `4409` | Another instance of the same agent is running — the newest connection wins. Stop the duplicate. |
+| Agent exits immediately with code 5 | One is already running on this machine and holds the control socket. `--status` names its pid. |
+| Windows service runs but no terminals appear | `remote-terminal-service.exe status`: it reports the SCM state *and* what the agent says. If the service is running while the agent is not, the agent is failing and being restarted with backoff — the reason is in `%ProgramData%\RemoteTerminal\logs\agent.log`. |
+| `remote-terminal-agent pair` says only an administrator may | The control key is readable by the agent's account and administrators only, because a pairing code is enough to get a shell. Use `sudo`, or an elevated prompt on Windows. |
+| Terminals cannot resize, `vim` and `htop` misbehave | `node index.js --doctor` — the PTY backend line will say "pipe fallback". A `node-pty` built for another Node ABI is the usual cause; rebuild it, or build the `.deb` with the Node the target runs. |
+| systemd will not restart the agent | It exited 2, 3 or 5, which `RestartPreventExitStatus` deliberately treats as unfixable by restarting. `systemctl status` shows which. |
 | No shells offered, or terminals fail to start | `node index.js --doctor`: it checks the PTY backend, lists discovered shells and reports configuration problems. |
 | Pairing code rejected | Codes last five minutes and are single-use. Too many wrong attempts from one IP triggers a 15-minute lockout. |
 | Phone connects but sees no machines | The phone and the agents must share an account, i.e. the same enrolment token. Check `/stats` for `agentsOnline`. |

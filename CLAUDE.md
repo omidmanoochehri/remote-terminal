@@ -11,6 +11,8 @@ Android phone, relayed through a self-hosted Node server.
 |---|---|
 | `server/` | The relay (Node, `ws` only): enrolment, pairing, device tokens, session routing, presence, limits. |
 | `agent/` | Cross-platform agent (Node): hosts PTY sessions, shell discovery, replay buffers. |
+| `agent/windows/` | Windows service host + tray icon (Rust, `windows-sys` only). Supervises the Node agent; hosts nothing itself. |
+| `agent/packaging/` | The `.deb`: systemd unit, maintainer scripts, man page, logrotate, `build-deb.sh`. |
 | `android/` | The phone app (Kotlin, Material 3): machines list, terminal tabs, VT/xterm emulator. |
 | `desktop/` | The desktop app (Tauri: Rust shell + a dependency-free web frontend). The same screens and the same emulator, ported. |
 | `tools/e2e-linux.js` | Real relay + real Linux agent + scripted phone, end to end. |
@@ -55,6 +57,7 @@ A bump means editing **all** of these, in one commit:
 | `desktop/src-tauri/Cargo.toml` | `version` (the `[package]` one) |
 | `desktop/src-tauri/tauri.conf.json` | `"version"` |
 | `desktop/ui/js/version.js` | `APP_VERSION` |
+| `agent/windows/Cargo.toml` | `version` (and `Cargo.lock`, which `cargo build` updates) |
 | `README.md` | the `Version **x.y.z**, wire protocol **vN**` line |
 | `PROTOCOL.md` | the `"agentVersion": "x.y.z"` values in the example payloads |
 
@@ -130,15 +133,57 @@ Notes:
   and then `cargo tauri build`; a plain `cargo build --release` is enough for
   the executable. Build output is gitignored — never commit it.
 
+## Windows service and tray
+
+**Whenever `agent/windows/` changes, run its tests and build it before
+reporting the work done.**
+
+```bash
+cd agent/windows && cargo test --offline
+cd agent/windows && cargo build --release   # -> target/release/remote-terminal-{service,tray}.exe
+```
+
+Notes:
+
+- `windows-sys` is the **only** dependency, and it is there for the Win32 calls
+  a service and a tray icon cannot avoid. No service framework, no tray crate,
+  no JSON crate — `src/json.rs` reads the flat objects the agent's control
+  channel answers with, and is unit tested. Keep it that way.
+- The release profile is `opt-level="s"` + LTO, so a release build takes a few
+  minutes; the binaries land at roughly 300 KB and 190 KB.
+- `remote-terminal-service.exe` is also its own installer (`install`,
+  `uninstall`, `start`, `stop`, `status`, `run`). `run` supervises in the
+  console and is the fastest way to test a change without touching the SCM.
+- Installing, removing, starting and stopping the service need an elevated
+  prompt; `status` does not.
+
+## Debian package
+
+**Whenever `agent/packaging/` changes, syntax-check the shell scripts.** The
+package itself can only be built on Debian or Ubuntu:
+
+```bash
+bash -n agent/packaging/build-deb.sh agent/packaging/bin/remote-terminal-agent \
+        agent/packaging/debian/{postinst,prerm,postrm}
+./agent/packaging/build-deb.sh          # on Debian/Ubuntu -> agent/dist/*.deb
+```
+
+Build it with the same major Node.js version the target runs: the bundled
+`node-pty` is compiled for one Node ABI, and a mismatch costs the PTY silently.
+
 ## Tests
 
 ```bash
 cd server  && npm test             # relay: identity, pairing, auth, routing, limits
-cd agent   && npm test             # agent: ring buffer, env, shells, sessions, real bash PTY
+cd agent   && npm test             # agent: ring buffer, env, shells, sessions, control, log, watchdog
 cd desktop && npm test             # desktop: emulator, protocol, keys, presets, pairing
+cd agent/windows && cargo test --offline    # service supervisor, tray helpers, JSON, logs
 node tools/e2e-linux.js            # full end-to-end scenario
 cd android && ./gradlew testDebugUnitTest
 ```
+
+The four skipped agent tests are Linux-only (a real bash PTY, unix-socket
+behaviour); everything else passes on both platforms.
 
 ## Conventions
 
