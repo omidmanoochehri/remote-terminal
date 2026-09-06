@@ -3,7 +3,7 @@ Upstream-Name: remote-terminal-agent
 Source: https://github.com/cactus-software-group/remote-terminal
 
 Files: *
-Copyright: Cactus Software Group
+Copyright: 2026 Cactus Software Group
 License: MIT
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal

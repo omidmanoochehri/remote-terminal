@@ -70,22 +70,55 @@ echo "Installing dependencies…"
     npm install --omit=dev --no-audit --no-fund --loglevel=error
   fi )
 
-# A package that ships a broken native module is worse than one that fails to
-# build, because the failure only shows up as a terminal that cannot resize.
-if ! "$NODE_BIN" -e "require('$BUILD/$LIB/node_modules/@homebridge/node-pty-prebuilt-multiarch')" 2>/dev/null; then
-  echo "error: node-pty does not load under $("$NODE_BIN" -v) after install." >&2
-  echo "       Install build tools (build-essential python3) and try again." >&2
-  exit 1
+# Trim only what is unambiguously development noise.
+#
+# Nothing here may touch build/Release: that is where node-pty's compiled
+# pty.node lives, and deleting it produced a package that installed cleanly,
+# started cleanly, and gave every terminal a pipe instead of a PTY. The few
+# hundred kilobytes such pruning saves are not worth that class of bug, so the
+# rule is: if in doubt, ship it — and the load check below is what makes any
+# pruning safe to do at all.
+find "$BUILD/$LIB/node_modules" -type d -name '.github' -prune -exec rm -rf {} + 2>/dev/null || true
+find "$BUILD/$LIB/node_modules" -maxdepth 3 -type f \
+     \( -name '.npmignore' -o -name '.editorconfig' -o -name '.eslintrc*' \) \
+     -delete 2>/dev/null || true
+rm -f "$BUILD/$LIB/node_modules/.package-lock.json"
+
+# node-gyp leaves absolute symlinks to the build host's python behind. They are
+# build scaffolding, they point outside the package, and dpkg rightly objects.
+rm -rf "$BUILD/$LIB/node_modules"/*/*/build/node_gyp_bins "$BUILD/$LIB/node_modules"/*/build/node_gyp_bins
+
+# node-pty ships prebuilt binaries for every architecture and Node ABI it
+# supports. In an amd64 package the arm and ia32 ones are dead weight that dpkg
+# and lintian both flag; keep only the ones this package could ever load.
+case "$ARCH" in
+  amd64) KEEP_PREBUILD=linux-x64 ;;
+  arm64) KEEP_PREBUILD=linux-arm64 ;;
+  armhf) KEEP_PREBUILD=linux-arm ;;
+  i386)  KEEP_PREBUILD=linux-ia32 ;;
+  *)     KEEP_PREBUILD="" ;;
+esac
+# musl builds cannot load on a glibc system, which is every machine this
+# package can be installed on.
+find "$BUILD/$LIB/node_modules" -name '*.musl.node' -delete 2>/dev/null || true
+
+if [[ -n "$KEEP_PREBUILD" ]]; then
+  for dir in "$BUILD/$LIB/node_modules"/*/*/prebuilds/*/ "$BUILD/$LIB/node_modules"/*/prebuilds/*/; do
+    [[ -d "$dir" ]] || continue
+    [[ "$(basename "$dir")" == "$KEEP_PREBUILD" ]] || rm -rf "$dir"
+  done
 fi
 
-# npm leaves absolute paths and build noise behind; a .deb should have neither.
-find "$BUILD/$LIB/node_modules" -type d \
-     \( -name test -o -name tests -o -name .github -o -name build -prune \) \
-     -exec rm -rf {} + 2>/dev/null || true
-find "$BUILD/$LIB/node_modules" -type f \
-     \( -name '*.md' -o -name '*.ts' -o -name '.npmignore' -o -name '.eslintrc*' \) \
-     -delete 2>/dev/null || true
-rm -rf "$BUILD/$LIB/node_modules/.bin" "$BUILD/$LIB/node_modules/.package-lock.json"
+# Verify the tree that is about to be packaged, not the one npm produced a
+# moment ago: this check earns its keep only if the pruning above runs first.
+# A package that ships a broken native module is worse than one that fails to
+# build, because the failure shows up later, as terminals that cannot resize.
+if ! "$NODE_BIN" -e "require('$BUILD/$LIB/node_modules/@homebridge/node-pty-prebuilt-multiarch')" 2>/dev/null; then
+  echo "error: node-pty does not load from the staged tree under $("$NODE_BIN" -v)." >&2
+  echo "       Terminals would silently fall back to pipes. Install build tools" >&2
+  echo "       (build-essential python3) and try again." >&2
+  exit 1
+fi
 
 # ------------------------------------------------------------- other files ---
 install -D -m 0755 "$HERE/bin/$PKG"                     "$BUILD/usr/bin/$PKG"
@@ -102,8 +135,8 @@ gzip -9n "$BUILD/usr/share/man/man8/$PKG.8"
   echo "  * Remote Terminal agent $VERSION."
   echo
   echo " -- Cactus Software Group <cactus.team.dev@gmail.com>  $(date -R)"
-} > "$BUILD/usr/share/doc/$PKG/changelog.Debian"
-gzip -9n "$BUILD/usr/share/doc/$PKG/changelog.Debian"
+} > "$BUILD/usr/share/doc/$PKG/changelog"
+gzip -9n "$BUILD/usr/share/doc/$PKG/changelog"
 
 # ------------------------------------------------------------------ control ---
 INSTALLED_KB="$(du -sk "$BUILD" | cut -f1)"
@@ -115,7 +148,7 @@ Section: admin
 Priority: optional
 Architecture: $ARCH
 Maintainer: Cactus Software Group <cactus.team.dev@gmail.com>
-Depends: nodejs (>= 18), adduser, systemd
+Depends: nodejs (>= 18), adduser, systemd, libc6
 Recommends: logrotate
 Suggests: build-essential, python3
 Installed-Size: $INSTALLED_KB
@@ -147,16 +180,31 @@ cat > "$BUILD/DEBIAN/conffiles" <<EOF
 /etc/default/$PKG
 EOF
 
-# md5sums let `dpkg -V` and `debsums` report tampering.
-( cd "$BUILD" && find . -type f ! -path './DEBIAN/*' -printf '%P\0' \
-  | xargs -0 md5sum > DEBIAN/md5sums )
-
 # --------------------------------------------------------------- assemble ---
 find "$BUILD" -type d -exec chmod 0755 {} +
-chmod 0755 "$BUILD/usr/bin/$PKG" "$BUILD/DEBIAN"/post* "$BUILD/DEBIAN/prerm"
 find "$BUILD/$LIB" -type f -exec chmod 0644 {} +
-find "$BUILD/$LIB" -name '*.node' -exec chmod 0755 {} +
-[[ -x "$BUILD/$LIB/index.js" ]] || chmod 0644 "$BUILD/$LIB/index.js"
+chmod 0755 "$BUILD/usr/bin/$PKG" "$BUILD/DEBIAN"/post* "$BUILD/DEBIAN/prerm"
+# index.js carries a shebang, so it has to be executable to match it.
+chmod 0755 "$BUILD/$LIB/index.js"
+# A .node is dlopen'd, never executed: 0644 is correct, and 0755 makes dpkg
+# treat it as a program.
+find "$BUILD/$LIB" -name '*.node' -exec chmod 0644 {} +
+if command -v strip >/dev/null; then
+  find "$BUILD/$LIB" -name '*.node' -exec strip --strip-unneeded {} + 2>/dev/null || true
+fi
+
+# One more load check, against the stripped and re-permissioned tree that is
+# about to be wrapped up. Stripping a shared object is routine, but "routine"
+# is not "verified".
+if ! "$NODE_BIN" -e "require('$BUILD/$LIB/node_modules/@homebridge/node-pty-prebuilt-multiarch')" 2>/dev/null; then
+  echo "error: node-pty stopped loading after stripping; refusing to ship it." >&2
+  exit 1
+fi
+
+# md5sums let `dpkg -V` and `debsums` report tampering, so they must be taken
+# after the last thing that touches a file — stripping very much included.
+( cd "$BUILD" && find . -type f ! -path './DEBIAN/*' -printf '%P\0' \
+  | xargs -0 md5sum > DEBIAN/md5sums )
 
 install -d "$OUT_DIR"
 DEB="$OUT_DIR/${PKG}_${VERSION}_${ARCH}.deb"
