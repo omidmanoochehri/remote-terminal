@@ -37,3 +37,10 @@ agent/state.json
 
 # Claude Code worktrees / local session files
 .claude/
+
+# Agent control-channel key (grants privileged control ops, e.g. minting pairing codes)
+agent/control.key
+# Agent runtime logs
+agent/logs/
+# Windows service/tray build output
+agent/windows/target/

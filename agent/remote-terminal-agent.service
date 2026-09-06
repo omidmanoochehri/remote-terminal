@@ -1,7 +1,11 @@
-# systemd unit for the Remote Terminal agent. install-linux.sh fills in the
-# __PLACEHOLDERS__ and installs this as /etc/systemd/system/remote-terminal-agent.service.
+# systemd unit for a source install of the Remote Terminal agent.
+# install-linux.sh fills in the __PLACEHOLDERS__ and writes this to
+# /etc/systemd/system/remote-terminal-agent.service.
 #
-# The service runs as an unprivileged user; every terminal it opens runs as
+# On Debian and Ubuntu, prefer the package (agent/packaging/build-deb.sh): it
+# ships this unit with fixed paths, a man page, logrotate and clean removal.
+#
+# The service runs as an unprivileged user, and every terminal it opens runs as
 # that user too. Pick the user deliberately (install-linux.sh --user).
 
 [Unit]
@@ -13,22 +17,60 @@ Wants=network-online.target
 Type=simple
 User=__USER__
 Group=__GROUP__
-Environment=CONFIG=__CONFIG_DIR__/config.json
+WorkingDirectory=__STATE_DIR__
+
 Environment=NODE_ENV=production
-WorkingDirectory=__INSTALL_DIR__
+Environment=CONFIG=__CONFIG_DIR__/config.json
+Environment=DATA_DIR=__STATE_DIR__
+Environment=LOG_DIR=__STATE_DIR__/logs
+# journald already keeps stdout; set LOG_TO_FILE=1 where it is not persistent.
+Environment=LOG_TO_FILE=0
+
 ExecStart=__NODE__ __INSTALL_DIR__/index.js
+
+# The agent closes each session on SIGTERM before exiting; KillMode=mixed lets
+# it do that in order, and only the final KILL reaches the whole group.
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
 Restart=always
 RestartSec=5
-KillMode=control-group
-TimeoutStopSec=15
-LimitNOFILE=65536
+StartLimitIntervalSec=300
+StartLimitBurst=5
+# 2 = not enrolled or revoked, 3 = refused to run as root, 5 = a second agent
+# is already running. Restarting cannot fix any of the three.
+RestartPreventExitStatus=2 3 5
 
-# Optional hardening for locked-down machines. These also apply to the shells
-# the agent spawns, so they forbid sudo (NoNewPrivileges) and system-wide
-# writes (ProtectSystem) inside remote terminals. Enable them consciously.
-#NoNewPrivileges=true
-#ProtectSystem=full
-#PrivateTmp=true
+# Someone is typing in these terminals: do not reap them first under pressure.
+OOMPolicy=continue
+OOMScoreAdjust=-100
+LimitNOFILE=65536
+TasksMax=4096
+
+# Hardening that costs a remote terminal nothing.
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# Stricter settings, each of which breaks something a person may reasonably
+# type into a terminal — enable them consciously with `systemctl edit`:
+#   NoNewPrivileges=true       no sudo and no setuid binary, ever
+#   PrivateTmp=true            /tmp becomes private to the agent
+#   ProtectHome=read-only      home directories become read-only
+#   RestrictNamespaces=true    no docker, podman or unshare
+#   SystemCallFilter=@system-service
+# Never PrivateDevices=true (it takes /dev/ptmx, so no terminals at all) or
+# PrivateNetwork=true (the relay becomes unreachable).
 
 [Install]
 WantedBy=multi-user.target

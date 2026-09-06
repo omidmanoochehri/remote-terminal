@@ -68,6 +68,17 @@ class RelayClient extends EventEmitter {
     if (this.ws) { try { this.ws.close(1000, 'agent shutting down'); } catch (_) { /* ignore */ } }
   }
 
+  /** Drop the backoff and try again now (the tray's "Reconnect", a resumed laptop). */
+  reconnectNow() {
+    if (this.stopped || this.fatal) return false;
+    if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; }
+    this.attempt = 0;
+    if (this.connected) { try { this.ws.close(1012, 'reconnect requested'); } catch (_) { /* ignore */ } return true; }
+    if (this.ws) { try { this.ws.terminate(); } catch (_) { /* ignore */ } this.ws = null; }
+    this.connect();
+    return true;
+  }
+
   url() { return `${this.cfg.server}/?v=${PROTOCOL_VERSION}&role=agent`; }
 
   connect() {

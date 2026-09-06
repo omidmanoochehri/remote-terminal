@@ -1,0 +1,99 @@
+# Remote Terminal agent, as installed by the .deb.
+#
+# Local changes belong in an override, not in this file — the package replaces
+# it on upgrade:   sudo systemctl edit remote-terminal-agent
+# Relay URL, token and limits belong in /etc/remote-terminal-agent/config.json.
+
+[Unit]
+Description=Remote Terminal agent (hosts terminal sessions for the Remote Terminal app)
+Documentation=man:remote-terminal-agent(8)
+After=network-online.target
+Wants=network-online.target
+# Nothing to do until the machine has been pointed at a relay.
+ConditionPathExists=/etc/remote-terminal-agent/config.json
+
+[Service]
+Type=simple
+User=remote-terminal
+Group=remote-terminal
+WorkingDirectory=/var/lib/remote-terminal-agent
+
+Environment=NODE_ENV=production
+Environment=CONFIG=/etc/remote-terminal-agent/config.json
+Environment=DATA_DIR=/var/lib/remote-terminal-agent
+Environment=LOG_DIR=/var/log/remote-terminal-agent
+# journald already keeps stdout, so the agent's own file sink is off here. Turn
+# it on (LOG_TO_FILE=1, in /etc/default) where the journal is not persistent.
+Environment=LOG_TO_FILE=0
+EnvironmentFile=-/etc/default/remote-terminal-agent
+
+ExecStart=/usr/bin/node /usr/lib/remote-terminal-agent/index.js
+
+# The agent closes every session on SIGTERM and then exits; 20s is generous.
+# KillMode=mixed sends TERM to the agent alone, so it can shut its terminals
+# down in order, and only the final KILL reaches the whole group.
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
+# Always come back, but never in a tight loop: five starts in five minutes is
+# a broken machine, not a blip, and systemd should stop and say so.
+Restart=always
+RestartSec=5
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+# The agent's exit codes for "restarting will not help": 2 = not enrolled or
+# revoked by the relay, 3 = refused to run as root, 5 = a second agent is
+# already running here. Everything else — including 9, a wedged event loop —
+# is worth another try.
+RestartPreventExitStatus=2 3 5
+
+# Someone is typing in these terminals: do not reap them first under pressure.
+OOMPolicy=continue
+OOMScoreAdjust=-100
+LimitNOFILE=65536
+TasksMax=4096
+
+# --- Hardening -------------------------------------------------------------
+# Everything here applies to the shells the agent opens as well, which is the
+# whole difficulty: a setting that would be obviously right for a daemon can
+# quietly break a legitimate command someone types. What is on by default costs
+# a remote terminal nothing.
+ProtectSystem=full            # /usr and /boot read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+SystemCallArchitectures=native
+CapabilityBoundingSet=        # an unprivileged user has none; make that explicit
+AmbientCapabilities=
+
+# Not on by default, because each one breaks something a person may reasonably
+# type into a terminal. Enable the ones that suit the machine with
+# `systemctl edit remote-terminal-agent`:
+#
+#   NoNewPrivileges=true       no sudo, and no setuid binary, ever
+#   PrivateTmp=true            /tmp is the agent's own — invisible to the rest
+#                              of the machine, and to other sessions' tools
+#   ProtectHome=read-only      home directories become read-only
+#   ProtectHome=true           home directories disappear entirely
+#   ProtectProc=invisible      only this user's processes show in ps
+#   RestrictNamespaces=true    no podman, docker, unshare, bubblewrap
+#   RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+#                              no AF_NETLINK, so no `ip`, `ss` or `ping`
+#   SystemCallFilter=@system-service
+#                              blocks @mount, @swap and container tooling
+#   DevicePolicy=closed        no serial ports, no USB devices, no block devices
+#                              (needs DeviceAllow=/dev/ptmx rw and char-pts rw
+#                               or there are no terminals at all)
+#
+# Never enable PrivateDevices=true (it takes /dev/ptmx, so no PTY can be
+# opened) or PrivateNetwork=true (the relay becomes unreachable).
+
+[Install]
+WantedBy=multi-user.target

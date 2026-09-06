@@ -1,0 +1,90 @@
+.TH REMOTE-TERMINAL-AGENT 8 "2026" "Remote Terminal" "System Manager's Manual"
+.SH NAME
+remote\-terminal\-agent \- host terminal sessions for the Remote Terminal app
+.SH SYNOPSIS
+.B remote\-terminal\-agent
+.I command
+.RI [ options ]
+.SH DESCRIPTION
+The Remote Terminal agent hosts real PTY sessions on this machine and connects
+outward to a self\-hosted relay, so that a paired phone or desktop can open
+terminals on it without this machine accepting any inbound connection.
+.PP
+It runs under systemd as the unprivileged
+.B remote\-terminal
+user, and every terminal it opens runs as that user too. Choosing what that
+account may do is how you choose what a paired phone may do.
+.SH COMMANDS
+.TP
+.B configure \-\-server \fIwss://relay\fR \-\-enroll\-token \fItoken\fR [\-\-name \fIname\fR]
+Point this machine at a relay. Writes
+.IR /etc/remote\-terminal\-agent/config.json .
+Needs root.
+.TP
+.B pair
+Print a single\-use pairing code for the app. Needs root.
+.TP
+.B status
+Show the service state, this machine's identity and whether it is registered
+with the relay.
+.TP
+.B doctor
+Check that a real PTY is available, list the shells that were discovered, and
+show the effective configuration. The first thing to run when something is
+wrong.
+.TP
+.B logs \fR[\fB\-f\fR]
+Show the journal for the service, or the log file where one is configured.
+.TP
+.B name \fIname\fR
+Rename this machine, on the relay and locally.
+.TP
+.B start | stop | restart | enable | disable
+Act on
+.IR remote\-terminal\-agent.service .
+.TP
+.B reset
+Forget this machine's identity. The relay still lists it until it is removed in
+the app.
+.SH FILES
+.TP
+.I /etc/remote-terminal-agent/config.json
+Relay URL, enrolment token, limits. Mode 0640, root:remote\-terminal, because it
+holds a credential.
+.TP
+.I /etc/default/remote-terminal-agent
+Environment overrides for the unit, such as
+.BR LOG_TO_FILE=1 .
+.TP
+.I /var/lib/remote-terminal-agent/state.json
+The identity the relay issued at enrolment. Mode 0600.
+.TP
+.I /var/lib/remote-terminal-agent/agent.sock
+The control socket the CLI and the installers use to reach a running agent.
+Mode 0600; the key beside it,
+.IR control.key ,
+gates the commands that would grant access to this machine.
+.TP
+.I /var/log/remote-terminal-agent/agent.log
+Only written when
+.B LOG_TO_FILE=1
+is set; the journal has it otherwise.
+.SH SECURITY
+A pairing code is enough to open a shell on this machine as the
+.B remote\-terminal
+user. Codes are single\-use and expire in minutes, but treat one like a
+password while it is valid.
+.PP
+The unit ships with the hardening that costs a terminal nothing. The stricter
+settings, and what each of them breaks, are listed as comments in
+.IR /lib/systemd/system/remote\-terminal\-agent.service ;
+enable them with
+.BR "systemctl edit remote-terminal-agent" .
+.SH DIAGNOSTICS
+Exit status 2 means the agent is not enrolled or the relay revoked it, 3 that it
+refused to run as root, and 5 that another agent is already running on this
+machine. systemd will not restart the service for any of the three, because
+restarting cannot fix them.
+.SH SEE ALSO
+.BR systemctl (1),
+.BR journalctl (1)

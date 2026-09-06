@@ -1,0 +1,20 @@
+# The packaged agent logs to the journal, so this file is normally rotating
+# nothing. It matters on machines where the journal is volatile and someone has
+# set LOG_TO_FILE=1 in /etc/default/remote-terminal-agent.
+#
+# copytruncate is deliberate: the agent holds the file open and appends to it
+# for months at a time, and has no reopen signal. Truncating in place costs a
+# few lines written during the copy, which is the right trade for a log that
+# nothing depends on being complete.
+/var/log/remote-terminal-agent/*.log {
+    weekly
+    rotate 8
+    size 5M
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+    su remote-terminal remote-terminal
+    create 0640 remote-terminal remote-terminal
+}

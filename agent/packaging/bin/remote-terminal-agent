@@ -1,0 +1,99 @@
+#!/bin/sh
+# Remote Terminal agent — command-line front end for the packaged install.
+#
+# The agent itself is a Node program that runs as an unprivileged user under
+# systemd. This wrapper exists so that an administrator never has to remember
+# which user to become, which config file to point at, or where the state
+# lives — and so that the two halves of "manage the service" and "ask the
+# agent" are one command.
+set -eu
+
+LIB_DIR=/usr/lib/remote-terminal-agent
+CONF=/etc/remote-terminal-agent/config.json
+DATA_DIR=/var/lib/remote-terminal-agent
+LOG_DIR=/var/log/remote-terminal-agent
+RUN_USER=remote-terminal
+SERVICE=remote-terminal-agent.service
+
+die() { echo "remote-terminal-agent: $*" >&2; exit 1; }
+
+need_root() {
+  [ "$(id -u)" = 0 ] || die "'$1' needs root. Try: sudo remote-terminal-agent $1 ..."
+}
+
+# Run the agent CLI as the service user, which is the only account that can
+# read the identity and reach the control socket. Root gets there by dropping
+# privileges; the service user itself is already there; anyone else is told so.
+agent() {
+  if [ "$(id -u)" = 0 ]; then
+    runuser -u "$RUN_USER" -- env CONFIG="$CONF" DATA_DIR="$DATA_DIR" LOG_DIR="$LOG_DIR" \
+      node "$LIB_DIR/index.js" "$@"
+  elif [ "$(id -un)" = "$RUN_USER" ]; then
+    CONFIG="$CONF" DATA_DIR="$DATA_DIR" LOG_DIR="$LOG_DIR" node "$LIB_DIR/index.js" "$@"
+  else
+    die "this needs root or the $RUN_USER account. Try: sudo remote-terminal-agent $*"
+  fi
+}
+
+usage() {
+  cat <<EOF
+Remote Terminal agent
+
+  remote-terminal-agent configure --server wss://relay --enroll-token <token> [--name "Name"]
+                              point this machine at a relay (writes $CONF)
+  remote-terminal-agent pair          print a pairing code for a phone
+  remote-terminal-agent status        service state, identity and relay status
+  remote-terminal-agent doctor        check PTY support, shells and configuration
+  remote-terminal-agent logs [-f]     show the journal (or the log file)
+  remote-terminal-agent name "Name"   rename this machine
+  remote-terminal-agent start | stop | restart | enable | disable
+  remote-terminal-agent reset         forget this machine's identity
+  remote-terminal-agent version
+
+Configuration: $CONF   Identity: $DATA_DIR/state.json
+EOF
+}
+
+cmd=${1:-help}
+[ $# -gt 0 ] && shift || true
+
+case "$cmd" in
+  configure)
+    need_root configure
+    # The agent writes its own config file, so there is one writer of it, and
+    # then the ownership is put back the way the package expects.
+    env CONFIG="$CONF" DATA_DIR="$DATA_DIR" node "$LIB_DIR/index.js" --configure "$@"
+    chown root:"$RUN_USER" "$CONF"
+    chmod 0640 "$CONF"
+    echo "Now run: sudo systemctl restart $SERVICE && sudo remote-terminal-agent pair"
+    ;;
+  pair)     agent --pair "$@" ;;
+  status)
+    if [ -d /run/systemd/system ]; then
+      systemctl --no-pager --lines=0 status "$SERVICE" || true
+      echo
+    fi
+    agent --status "$@"
+    ;;
+  doctor)   agent --doctor "$@" ;;
+  name)     need_root name; agent --name "$@" ;;
+  reset)    need_root reset; agent --reset "$@" ;;
+  version)  agent --version ;;
+  logs)
+    if [ -d /run/systemd/system ] && [ ! -s "$LOG_DIR/agent.log" ]; then
+      # journald is where the packaged unit's output goes by default.
+      case "${1:-}" in
+        -f|--follow) exec journalctl -u "$SERVICE" -f ;;
+        *) exec journalctl -u "$SERVICE" -n "${1:-100}" --no-pager ;;
+      esac
+    fi
+    agent --logs "$@"
+    ;;
+  start|stop|restart|enable|disable)
+    need_root "$cmd"
+    systemctl "$cmd" "$SERVICE"
+    [ "$cmd" = start ] || [ "$cmd" = restart ] && systemctl --no-pager --lines=0 status "$SERVICE" || true
+    ;;
+  help|--help|-h) usage ;;
+  *) usage; exit 2 ;;
+esac

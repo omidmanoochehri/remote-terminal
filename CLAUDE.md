@@ -20,7 +20,7 @@ See `README.md` for the full tour and `PROTOCOL.md` for the wire protocol.
 ## Versioning
 
 The project has **one version number**, shared by the server, the agent, the
-Android app and the desktop app. It is currently **0.8.1**.
+Android app and the desktop app. It is currently **0.9.0**.
 
 **Bump it automatically — do not wait to be asked.** Any piece of work that
 changes shipped behaviour ends with a version bump, in the same commit as the
@@ -71,7 +71,7 @@ everywhere at once.
 Verify a bump with:
 
 ```bash
-grep -rn "0\.8\.0" --include="*.json" --include="*.gradle" --include="*.md" . \
+grep -rn "0\.8\.1" --include="*.json" --include="*.gradle" --include="*.md" . \
   | grep -v node_modules | grep -v /build/
 ```
 

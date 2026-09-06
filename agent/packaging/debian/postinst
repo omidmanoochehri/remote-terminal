@@ -1,0 +1,88 @@
+#!/bin/sh
+# Remote Terminal agent — post-installation.
+#
+# Creates the unprivileged account the agent and every terminal it opens will
+# run as, prepares the directories it owns, and enables the unit. It never
+# starts an agent that has not been told which relay to talk to: the unit's
+# ConditionPathExists takes care of that, and `remote-terminal-agent configure`
+# is what a person runs next.
+set -e
+
+USER_NAME=remote-terminal
+HOME_DIR=/var/lib/remote-terminal-agent
+LOG_DIR=/var/log/remote-terminal-agent
+CONF_DIR=/etc/remote-terminal-agent
+LIB_DIR=/usr/lib/remote-terminal-agent
+
+case "$1" in
+  configure)
+    if ! getent passwd "$USER_NAME" >/dev/null; then
+      adduser --system --group --quiet \
+              --home "$HOME_DIR" --no-create-home \
+              --shell /bin/bash \
+              --gecos "Remote Terminal agent" "$USER_NAME"
+    fi
+
+    # 0700: the identity, the control socket and its key live here, and the key
+    # is worth as much as a shell on this machine.
+    install -d -o "$USER_NAME" -g "$USER_NAME" -m 0700 "$HOME_DIR"
+    install -d -o "$USER_NAME" -g "$USER_NAME" -m 0750 "$LOG_DIR"
+    install -d -o root -g "$USER_NAME" -m 0750 "$CONF_DIR"
+
+    # config.json holds the enrolment token: readable by the agent, writable
+    # only by root. It is not a dpkg conffile — it is created here and then
+    # owned by the administrator, so an upgrade never prompts about it.
+    if [ ! -e "$CONF_DIR/config.json" ] && [ -e "$LIB_DIR/config.example.json" ]; then
+      cp "$LIB_DIR/config.example.json" "$CONF_DIR/config.json.example"
+      chown root:"$USER_NAME" "$CONF_DIR/config.json.example"
+      chmod 0640 "$CONF_DIR/config.json.example"
+    fi
+    if [ -e "$CONF_DIR/config.json" ]; then
+      chown root:"$USER_NAME" "$CONF_DIR/config.json"
+      chmod 0640 "$CONF_DIR/config.json"
+    fi
+
+    # node-pty is a native module: one built for another Node ABI loads as a
+    # pipe instead of a PTY, which costs resize and every full-screen program.
+    # Say so at install time rather than leaving it to be discovered.
+    if command -v node >/dev/null 2>&1; then
+      if ! su -s /bin/sh -c "node -e \"require('$LIB_DIR/node_modules/@homebridge/node-pty-prebuilt-multiarch')\"" "$USER_NAME" >/dev/null 2>&1; then
+        echo "remote-terminal-agent: warning — node-pty does not load under $(node -v)." >&2
+        echo "  Terminals will fall back to pipes (no resize, no vim, no htop)." >&2
+        echo "  Fix with:  sudo apt install -y build-essential python3 && \\" >&2
+        echo "             sudo npm rebuild --prefix $LIB_DIR @homebridge/node-pty-prebuilt-multiarch --build-from-source" >&2
+      fi
+    else
+      echo "remote-terminal-agent: warning — no 'node' on PATH; install Node.js 18 or newer." >&2
+    fi
+    ;;
+
+  abort-upgrade|abort-remove|abort-deconfigure) ;;
+  *) echo "postinst called with unknown argument '$1'" >&2; exit 1 ;;
+esac
+
+#DEBHELPER#
+
+if [ "$1" = configure ] && [ -d /run/systemd/system ]; then
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  systemctl enable remote-terminal-agent.service >/dev/null 2>&1 || true
+  if [ -e "$CONF_DIR/config.json" ]; then
+    # Already configured: this is an upgrade, so pick up the new code.
+    systemctl restart remote-terminal-agent.service >/dev/null 2>&1 || true
+  else
+    cat <<'EOF'
+
+Remote Terminal agent installed. Point it at your relay:
+
+  sudo remote-terminal-agent configure --server wss://relay.example.com \
+       --enroll-token <ENROLL_TOKEN> --name "This Server"
+  sudo systemctl start remote-terminal-agent
+  sudo remote-terminal-agent pair
+
+Logs:  journalctl -u remote-terminal-agent -f
+
+EOF
+  fi
+fi
+
+exit 0

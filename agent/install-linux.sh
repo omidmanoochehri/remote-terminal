@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 #
-# Remote Terminal agent — Linux installer (Ubuntu 22.04/24.04, Debian, any
-# systemd distribution). Installs the agent under /opt, runs it as a dedicated
-# unprivileged user via systemd, enrols it with the relay and prints a pairing
-# code for the phone.
+# Remote Terminal agent — Linux installer for any systemd distribution.
+# Installs the agent under /opt, runs it as a dedicated unprivileged user via
+# systemd, enrols it with the relay and prints a pairing code for the phone.
+#
+# ON DEBIAN AND UBUNTU, PREFER THE PACKAGE:
+#   ./packaging/build-deb.sh && sudo apt install ./dist/remote-terminal-agent_*.deb
+# It ships the same unit with fixed paths, plus a man page, logrotate, a
+# /usr/bin/remote-terminal-agent front end and clean removal. This script is
+# for the distributions that have no .deb.
 #
 #   sudo ./install-linux.sh --server wss://relay.example.com --enroll-token <TOKEN> [--name "Prod Server"]
 #   sudo ./install-linux.sh --pair          # print a new pairing code
@@ -89,7 +94,7 @@ select_node() {
   exit 1
 }
 
-run_as_agent() { sudo -u "$RUN_USER" env CONFIG="$CONFIG_DIR/config.json" "$NODE_BIN" "$INSTALL_DIR/index.js" "$@"; }
+run_as_agent() { sudo -u "$RUN_USER" env CONFIG="$CONFIG_DIR/config.json" DATA_DIR="$STATE_DIR" LOG_DIR="$STATE_DIR/logs" "$NODE_BIN" "$INSTALL_DIR/index.js" "$@"; }
 
 # For status/pair/uninstall, use whatever user the installed service actually runs as.
 if [[ "$ACTION" != "install" ]]; then
@@ -167,25 +172,20 @@ fi
 mkdir -p "$CONFIG_DIR" "$STATE_DIR"
 chown "$RUN_USER:$RUN_GROUP" "$STATE_DIR"; chmod 700 "$STATE_DIR"
 if [[ -n "$SERVER" ]]; then
-  # Write config.json (readable by root and the service user only).
-  "$NODE_BIN" - "$CONFIG_DIR/config.json" "$SERVER" "$ENROLL_TOKEN" "$NAME" "$STATE_DIR/state.json" "$ALLOW_ROOT" <<'EOF'
-const fs = require('fs');
-const [file, server, token, name, stateFile, allowRoot] = process.argv.slice(2);
-let cfg = {};
-try { cfg = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (_) {}
-cfg.server = server;
-if (token) cfg.enrollToken = token;
-if (name) cfg.name = name;
-cfg.stateFile = stateFile;
-cfg.allowRoot = allowRoot === '1';
-if (!cfg.logLevel) cfg.logLevel = 'info';
-fs.writeFileSync(file, JSON.stringify(cfg, null, 2) + '\n', { mode: 0o640 });
-EOF
+  args=(--configure --server "$SERVER" --data-dir "$STATE_DIR")
+  [[ -n "$ENROLL_TOKEN" ]] && args+=(--enroll-token "$ENROLL_TOKEN")
+  [[ -n "$NAME" ]] && args+=(--name "$NAME")
+  [[ $ALLOW_ROOT -eq 1 ]] && args+=(--allow-root)
+  CONFIG="$CONFIG_DIR/config.json" "$NODE_BIN" "$INSTALL_DIR/index.js" "${args[@]}" >/dev/null
   chown "root:$RUN_GROUP" "$CONFIG_DIR/config.json"; chmod 640 "$CONFIG_DIR/config.json"
 fi
 
+mkdir -p "$STATE_DIR/logs"
+chown "$RUN_USER:$RUN_GROUP" "$STATE_DIR/logs"; chmod 750 "$STATE_DIR/logs"
+
 sed -e "s|__USER__|$RUN_USER|g" -e "s|__GROUP__|$RUN_GROUP|g" -e "s|__CONFIG_DIR__|$CONFIG_DIR|g" \
     -e "s|__INSTALL_DIR__|$INSTALL_DIR|g" -e "s|__NODE__|$NODE_BIN|g" \
+    -e "s|__STATE_DIR__|$STATE_DIR|g" \
     "$SRC_DIR/remote-terminal-agent.service" > "/etc/systemd/system/$SERVICE.service"
 systemctl daemon-reload
 systemctl enable "$SERVICE" >/dev/null
@@ -193,14 +193,9 @@ systemctl enable "$SERVICE" >/dev/null
 if [[ $START -eq 0 ]]; then echo "Installed. Start with: sudo systemctl start $SERVICE"; exit 0; fi
 systemctl restart "$SERVICE"
 
-echo -n "Waiting for the agent to enrol with the relay"
-for _ in $(seq 1 30); do
-  if [[ -s "$STATE_DIR/state.json" ]] && grep -q '"agentId": "a_' "$STATE_DIR/state.json"; then break; fi
-  echo -n "."; sleep 1
-done
-echo
-if ! grep -q '"agentId": "a_' "$STATE_DIR/state.json" 2>/dev/null; then
-  echo "The agent has not enrolled yet. Check: journalctl -u $SERVICE -n 50" >&2
+echo "Waiting for the agent to register with the relay..."
+if ! run_as_agent --wait-online 45; then
+  echo "Check: journalctl -u $SERVICE -n 50" >&2
   exit 1
 fi
 
@@ -209,4 +204,8 @@ echo "Remote Terminal Agent"
 run_as_agent --status | sed 's/^/  /'
 echo
 run_as_agent --pair
-echo "Later: sudo $0 --pair   (new code)   |   journalctl -u $SERVICE -f   (logs)"
+echo "Later:"
+echo "  sudo $0 --pair                      a new pairing code"
+echo "  sudo $0 --status                    service and relay status"
+echo "  journalctl -u $SERVICE -f           logs"
+echo "  sudo -u $RUN_USER env CONFIG=$CONFIG_DIR/config.json $NODE_BIN $INSTALL_DIR/index.js --doctor"

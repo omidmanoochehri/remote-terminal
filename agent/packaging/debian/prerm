@@ -1,0 +1,18 @@
+#!/bin/sh
+# Stop the agent before the files it runs from are removed. Open terminals get
+# a clean shutdown this way; leaving it to dpkg would not.
+set -e
+
+case "$1" in
+  remove|deconfigure)
+    if [ -d /run/systemd/system ]; then
+      systemctl stop remote-terminal-agent.service >/dev/null 2>&1 || true
+    fi
+    ;;
+  upgrade|failed-upgrade) ;;
+  *) echo "prerm called with unknown argument '$1'" >&2; exit 1 ;;
+esac
+
+#DEBHELPER#
+
+exit 0

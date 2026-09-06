@@ -1,0 +1,43 @@
+#!/bin/sh
+# On remove, take the unit away but keep the machine's identity and its logs —
+# a reinstall should not need re-pairing. On purge, remove everything, and say
+# what the administrator still has to do by hand: the relay does not know the
+# package is gone, so the machine must also be removed in the app.
+set -e
+
+CONF_DIR=/etc/remote-terminal-agent
+DATA_DIR=/var/lib/remote-terminal-agent
+LOG_DIR=/var/log/remote-terminal-agent
+USER_NAME=remote-terminal
+
+case "$1" in
+  remove)
+    if [ -d /run/systemd/system ]; then
+      systemctl disable remote-terminal-agent.service >/dev/null 2>&1 || true
+      systemctl daemon-reload >/dev/null 2>&1 || true
+    fi
+    ;;
+
+  purge)
+    if [ -d /run/systemd/system ]; then
+      systemctl disable remote-terminal-agent.service >/dev/null 2>&1 || true
+      systemctl daemon-reload >/dev/null 2>&1 || true
+    fi
+    had_identity=no
+    [ -e "$DATA_DIR/state.json" ] && had_identity=yes
+    rm -rf "$CONF_DIR" "$DATA_DIR" "$LOG_DIR"
+    if getent passwd "$USER_NAME" >/dev/null; then
+      deluser --quiet --system "$USER_NAME" >/dev/null 2>&1 || true
+    fi
+    if [ "$had_identity" = yes ]; then
+      echo "remote-terminal-agent: this machine's identity was deleted. Remove it in the app too (Machines -> machine -> Remove) so its token is revoked." >&2
+    fi
+    ;;
+
+  upgrade|failed-upgrade|abort-install|abort-upgrade|disappear) ;;
+  *) echo "postrm called with unknown argument '$1'" >&2; exit 1 ;;
+esac
+
+#DEBHELPER#
+
+exit 0

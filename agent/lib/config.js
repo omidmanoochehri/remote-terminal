@@ -35,6 +35,7 @@ function loadConfig(env = process.env, overrides = {}) {
   return {
     configPath,
     fileError,
+    dataDir,
     server: String(s(env.SERVER, file.server, 'ws://127.0.0.1:8080')).replace(/\/+$/, ''),
     // ENROLL_TOKEN is the account's enrolment secret. TOKEN / "token" remain as v2 aliases.
     enrollToken: s(env.ENROLL_TOKEN, s(env.TOKEN, s(file.enrollToken, file.token, '')), ''),
@@ -61,6 +62,15 @@ function loadConfig(env = process.env, overrides = {}) {
     inheritEnv: b(env.INHERIT_ENV, file.inheritEnv, false),
     allowRoot: b(env.ALLOW_ROOT, file.allowRoot, false),
     logLevel: s(env.LOG_LEVEL, file.logLevel, 'info'),
+    // Unattended machines need a log that outlives the console they were
+    // started from. Under systemd journald already has stdout, so the file
+    // sink is off by default there (see index.js); everywhere else it is on.
+    logDir: s(env.LOG_DIR, file.logDir, path.join(dataDir, 'logs')),
+    logToFile: b(env.LOG_TO_FILE, file.logToFile, true),
+    logMaxBytes: n(env.LOG_MAX_BYTES, file.logMaxBytes, 5 * 1024 * 1024),
+    logMaxFiles: n(env.LOG_MAX_FILES, file.logMaxFiles, 5),
+    // Liveness check; 0 disables it. See lib/watchdog.js.
+    watchdogIntervalMs: n(env.WATCHDOG_INTERVAL_MS, file.watchdogIntervalMs, 50000),
     baseBackoffMs: n(env.BASE_BACKOFF_MS, file.baseBackoffMs, 1000),
     maxBackoffMs: n(env.MAX_BACKOFF_MS, file.maxBackoffMs, 30000),
     coalesceMs: n(env.COALESCE_MS, file.coalesceMs, 16),

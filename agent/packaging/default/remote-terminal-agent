@@ -1,0 +1,23 @@
+# Environment for remote-terminal-agent.service. Read after the unit's own
+# Environment= lines, so anything set here wins.
+#
+# This file is for the machine, not for the agent's behaviour: relay URL,
+# token, limits and shells all live in /etc/remote-terminal-agent/config.json.
+
+# Write a rotating agent.log under /var/log/remote-terminal-agent as well as
+# the journal. Worth doing where the journal is volatile (Storage=volatile) or
+# small, since a month-old disconnect is exactly what you want to look up.
+#LOG_TO_FILE=1
+#LOG_MAX_BYTES=5242880
+#LOG_MAX_FILES=5
+
+# error | warn | info | debug. debug logs every relay message type and every
+# session lifecycle event; it never logs terminal contents or tokens.
+#LOG_LEVEL=info
+
+# Where terminals start. Defaults to the service user's home.
+#SHELL_CWD=/var/lib/remote-terminal-agent
+
+# Set to 1 to pass this unit's whole environment to the shells it opens.
+# Off by default: a shell should not inherit a service manager's environment.
+#INHERIT_ENV=0

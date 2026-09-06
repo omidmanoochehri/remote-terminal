@@ -1,0 +1,53 @@
+[package]
+name = "remote-terminal-agent-windows"
+version = "0.9.0"
+description = "Remote Terminal agent for Windows — service supervisor and tray icon"
+authors = ["Cactus Software Group"]
+edition = "2021"
+rust-version = "1.77"
+publish = false
+
+[lib]
+name = "rt_windows"
+path = "src/lib.rs"
+
+# The service host. Registered with the SCM as "RemoteTerminalAgent"; also its
+# own installer (`remote-terminal-service install`), so no extra tooling is
+# needed on the target machine.
+[[bin]]
+name = "remote-terminal-service"
+path = "src/bin/service.rs"
+
+# The tray icon. Runs in the interactive session, talks to the agent over its
+# control pipe, and never hosts a terminal itself.
+[[bin]]
+name = "remote-terminal-tray"
+path = "src/bin/tray.rs"
+
+[dependencies]
+# The only dependency, and only for the Win32 calls a service and a tray icon
+# cannot avoid: no service framework, no tray crate, no JSON crate.
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Com",
+    "Win32_System_Console",
+    "Win32_System_DataExchange",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_JobObjects",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Memory",
+    "Win32_System_Services",
+    "Win32_System_Threading",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[profile.release]
+opt-level = "s"
+codegen-units = 1
+lto = true
+strip = true
+panic = "abort"
