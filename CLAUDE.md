@@ -12,6 +12,7 @@ Android phone, relayed through a self-hosted Node server.
 | `server/` | The relay (Node, `ws` only): enrolment, pairing, device tokens, session routing, presence, limits. |
 | `agent/` | Cross-platform agent (Node): hosts PTY sessions, shell discovery, replay buffers. |
 | `agent/windows/` | Windows service host + tray icon (Rust, `windows-sys` only). Supervises the Node agent; hosts nothing itself. |
+| `agent/windows/installer/` | The NSIS installer: `build-installer.ps1` stages everything and packs `RemoteTerminalAgentSetup-<version>.exe`. |
 | `agent/packaging/` | The `.deb`: systemd unit, maintainer scripts, man page, logrotate, `build-deb.sh`. |
 | `android/` | The phone app (Kotlin, Material 3): machines list, terminal tabs, VT/xterm emulator. |
 | `desktop/` | The desktop app (Tauri: Rust shell + a dependency-free web frontend). The same screens and the same emulator, ported. |
@@ -156,6 +157,27 @@ Notes:
   console and is the fastest way to test a change without touching the SCM.
 - Installing, removing, starting and stopping the service need an elevated
   prompt; `status` does not.
+- The tray reaches the agent through the supervisor's **public** pipe, not the
+  agent's own. Node cannot set a DACL on the pipe it creates, so a LocalSystem
+  agent's pipe is SYSTEM-and-Administrators only; `src/broker.rs` explains it.
+  Only `ping`, `status` and `reconnect` are forwarded — never `pair`.
+
+**Whenever `agent/windows/installer/` changes, rebuild the installer:**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File agent/windows/installer/build-installer.ps1
+# add -SkipCargo to reuse an existing target/release build
+```
+
+Notes:
+
+- The installer packs a staged tree (both executables, the agent, its
+  production `node_modules`) so that it runs no npm and makes no network
+  request at install time. Build it with the Node the target machine runs.
+- `makensis` is found automatically under Program Files; the desktop app's
+  `icon.ico` is reused so the family is recognisable in Add/Remove Programs.
+- Testing it end to end needs a UAC approval that cannot be automated: the
+  prompt is on the secure desktop.
 
 ## Debian package
 

@@ -83,6 +83,7 @@ fn main() {
             cmd_start()
         }
         "status" => cmd_status(),
+        "pair" => cmd_pair(rest),
         "run" => cmd_run(),
         "--version" | "-v" => {
             println!("{VERSION}");
@@ -118,6 +119,7 @@ fn usage() {
   remote-terminal-service uninstall           stop and remove the service
   remote-terminal-service start | stop | restart
   remote-terminal-service status              service state and what the agent reports
+  remote-terminal-service pair [--code-only]  a single-use pairing code for a phone
   remote-terminal-service run                 supervise in this console (debugging)
 
 Installing, removing, starting and stopping need an elevated prompt."
@@ -323,6 +325,33 @@ fn cmd_stop() -> i32 {
             0
         }
         Err(e) => fail(&e),
+    }
+}
+
+/// Just a pairing code, and nothing else on stdout with `--code-only`.
+///
+/// The installer reads this: parsing a code out of the full status dump means
+/// a wording change in an unrelated line can break the last page of an install.
+fn cmd_pair(args: &[String]) -> i32 {
+    let settings = match Settings::load() {
+        Ok(s) => s,
+        Err(e) => return fail(&e),
+    };
+    let Some(key) = control::read_key(&settings.data) else {
+        return fail("only an administrator can create a pairing code; run this from an elevated prompt.");
+    };
+    match control::pair(PIPE_NAME, &key) {
+        Ok(p) => {
+            if has(args, "--code-only") {
+                println!("{}", p.code);
+            } else {
+                println!("Relay URL:    {}", p.relay_url);
+                println!("Pairing code: {}", p.code);
+                println!("Valid for:    {} minutes (single use)", (p.ttl_sec / 60).max(1));
+            }
+            0
+        }
+        Err(e) => fail(&format!("could not get a pairing code: {e}")),
     }
 }
 

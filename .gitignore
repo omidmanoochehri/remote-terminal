@@ -47,3 +47,7 @@ agent/windows/target/
 
 # Built .deb packages
 agent/dist/
+
+# NSIS installer staging and output
+agent/windows/installer/stage/
+agent/windows/installer/*.exe

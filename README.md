@@ -215,9 +215,30 @@ sudo ./install-linux.sh --uninstall  # remove service and program
 journalctl -u remote-terminal-agent -f
 ```
 
-**Windows 10/11**
+**Windows 10/11 (an installer)**
 
-From an **elevated** PowerShell:
+```powershell
+cd agent\windows\installer
+powershell -ExecutionPolicy Bypass -File build-installer.ps1
+# -> RemoteTerminalAgentSetup-0.9.0.exe   (~4.6 MB)
+```
+
+Double-click it. It asks for the relay URL, the enrolment token and a name for
+the machine, installs the service, starts it, and shows a pairing code on its
+last page — the machine is reachable from the phone before the wizard closes.
+It appears in Add/Remove Programs, and its uninstaller offers to keep the
+machine's identity so that reinstalling does not mean re-pairing every phone.
+
+Everything it installs is packed in at build time, so it runs no npm and makes
+no network request of its own. Node.js is the exception — a 60 MB dependency
+most machines already have — so it checks for 18+ up front and says what to do
+if it is missing. Build it with the Node.js version the target machine runs:
+the bundled `node-pty` is compiled for one Node ABI, and a mismatch silently
+costs the PTY.
+
+**Windows 10/11 (from a source checkout)**
+
+The same thing without building an installer, from an **elevated** PowerShell:
 
 ```powershell
 cd agent
@@ -237,7 +258,8 @@ Two small executables do the Windows-specific work (Rust, ~300 KB and ~190 KB,
 one dependency between them):
 
 ```
-remote-terminal-service.exe install | uninstall | start | stop | restart | status | run
+remote-terminal-service.exe install | uninstall | start | stop | restart
+remote-terminal-service.exe status | pair [--code-only] | run
 remote-terminal-tray.exe            the notification-area icon
 ```
 
