@@ -59,6 +59,7 @@ export const system = {
   clipboardReadImage: () => invoke('clipboard_read_image'),
   clipboardWriteText: (text) => invoke('clipboard_write_text', { text }),
   setKeepAwake: (enabled) => invoke('set_keep_awake', { enabled }),
+  setCloseToTray: (enabled) => invoke('set_close_to_tray', { enabled }),
   appLockAvailable: () => invoke('app_lock_available'),
   appLockPrompt: (message) => invoke('app_lock_prompt', { message }),
 };

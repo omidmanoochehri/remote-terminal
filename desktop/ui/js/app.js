@@ -255,8 +255,12 @@ export async function start() {
   settings.on('changed', () => {
     app.applyTheme();
     system.setKeepAwake(settings.keepAwake && app.sessions.sessions.size > 0).catch(() => {});
+    // The close button is handled in Rust, before the page hears about it, so
+    // the setting has to be pushed down rather than read up.
+    system.setCloseToTray(settings.closeToTray).catch(() => {});
     app.current?.onSettingsChanged?.();
   });
+  system.setCloseToTray(settings.closeToTray).catch(() => {});
 
   // The phone's foreground/background maps to the window being *visible*, not
   // focused: on a desktop another window takes focus constantly, and dropping

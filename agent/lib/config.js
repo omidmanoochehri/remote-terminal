@@ -60,6 +60,13 @@ function loadConfig(env = process.env, overrides = {}) {
     maxUploads: n(env.MAX_UPLOADS, file.maxUploads, 3),
     uploadTimeoutSec: n(env.UPLOAD_TIMEOUT_SEC, file.uploadTimeoutSec, 120),
     inheritEnv: b(env.INHERIT_ENV, file.inheritEnv, false),
+    // Windows only. Under the service the agent is LocalSystem, and a shell it
+    // starts gets SYSTEM's profile rather than anybody's. "auto" routes those
+    // through remote-terminal-shell.exe so a terminal belongs to whoever is
+    // signed in; "always" refuses to hand out a SYSTEM shell at all; "never"
+    // keeps the old behaviour. See lib/win-user-pty.js.
+    runAsUser: runAsUser(s(env.RUN_AS_USER, file.runAsUser, 'auto')),
+    shellLauncher: s(env.SHELL_LAUNCHER, file.shellLauncher, ''),
     allowRoot: b(env.ALLOW_ROOT, file.allowRoot, false),
     logLevel: s(env.LOG_LEVEL, file.logLevel, 'info'),
     // Unattended machines need a log that outlives the console they were
@@ -78,6 +85,11 @@ function loadConfig(env = process.env, overrides = {}) {
     backpressureHighBytes: n(env.BACKPRESSURE_HIGH_BYTES, file.backpressureHighBytes, 2 * 1024 * 1024),
     backpressureLowBytes: n(env.BACKPRESSURE_LOW_BYTES, file.backpressureLowBytes, 256 * 1024),
   };
+}
+
+function runAsUser(value) {
+  const v = String(value).toLowerCase();
+  return v === 'always' || v === 'never' ? v : 'auto';
 }
 
 function metricsInterval(ms) {

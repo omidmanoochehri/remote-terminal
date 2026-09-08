@@ -17,7 +17,7 @@
 import { Screen } from './base.js';
 import { el, clear, svgIcon, header, switchEl } from '../dom.js';
 import { S } from '../strings.js';
-import { shellQuote } from '../../core/shell.js';
+import { changeDirectoryInput } from '../../core/shell.js';
 import { menu, toast, promptDialog } from '../overlays.js';
 import { presence, machineIcon } from '../../core/format.js';
 import { makePreset, newPresetId } from '../../core/preset.js';
@@ -334,7 +334,7 @@ export function newTerminalScreen(app, { agentId: initialAgentId = null, presetI
     if (directory) {
       app.settings.noteDirectory(a.agentId, directory);
       session.noteDirectory(directory);
-      startup += `cd ${shellQuote(directory)}\r`;
+      startup += changeDirectoryInput(directory, { platform: a.platform, shellId: shell?.id ?? '' });
     }
     if (command) {
       app.settings.noteCommand(command);

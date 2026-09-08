@@ -9,7 +9,7 @@ unread counts; the VT/xterm emulator with search, selection, themes and
 scrollback; presets; command history; the extra-keys bar; file and image
 upload into a session; pairing; paired devices; notifications; the app lock.
 
-Version **0.9.0**, wire protocol **v3** — the same numbers the rest of the
+Version **0.11.0**, wire protocol **v3** — the same numbers the rest of the
 project carries.
 
 ---
@@ -120,7 +120,14 @@ finger, this app uses a keyboard and a mouse:
 | App lock: the device credential prompt | App lock: Windows Hello, and the setting disables itself where Hello is not set up |
 | Foreground / background | Window focus, with the same 90-second grace period before the socket is dropped |
 
-Two things the desktop does that the phone does not, because a desktop can:
+Three things the desktop does that the phone does not, because a desktop can:
+
+- **The close button hides the window.** Terminals are things you leave
+  running, and a window closed out of habit should not drop them, so the app
+  goes to the notification area instead. Its icon opens the window again and
+  its menu is the only way to actually quit. *Close to the notification area*
+  in Settings turns that off.
+
 
 - **Terminal query replies are answered.** DSR and DA requests from programs
   are sent back to the shell (muted while replayed output is being applied, as
@@ -128,6 +135,17 @@ Two things the desktop does that the phone does not, because a desktop can:
   wires the reply.
 - **Scrollback keys.** `Shift+PageUp` / `Shift+PageDown` / `Shift+Home` /
   `Shift+End` move through the scrollback, as on a real console.
+
+A tab whose shell finishes cleanly closes itself, the way a terminal emulator's
+does; one whose shell failed stays, because the message that explains the code
+is on the screen behind it. *Close the tab when the shell exits* in Settings
+turns that off.
+
+A working directory is typed into the new shell as a `cd`, which on Windows is
+not enough on its own: `cd E:\work` from the C: drive sets E:'s directory and
+leaves the shell where it was. The drive letter goes first, so a directory on
+another drive is reached rather than merely remembered, and a UNC path gets
+`pushd`, which is the only thing that reaches one from Command Prompt.
 
 Everything else — the wording, the confirmations, the defaults, the settings
 keys, the colour schemes, the key rows — is the same, on purpose.
@@ -150,6 +168,7 @@ because `Ctrl+4` is a real control code.
 | `Ctrl+Tab`, `Ctrl+Shift+Tab` | Next / previous terminal tab |
 | `Ctrl+Shift+F` | Find in the scrollback |
 | `Ctrl+Shift+C`, `Ctrl+Shift+V` | Copy the selection, paste |
+| `Ctrl+V` (Windows only) | Paste — what the keyboard says and what Windows Terminal does. Elsewhere `Ctrl+V` belongs to the shell, where readline reads it as "take the next key literally" |
 | `Ctrl+C` with a selection | Copy (with no selection it goes to the shell, as it should) |
 | `Ctrl` + wheel | Font size |
 | `Shift` + wheel | Previous / next tab (when the setting is on) |

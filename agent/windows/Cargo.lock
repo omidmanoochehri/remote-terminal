@@ -4,7 +4,7 @@ version = 3
 
 [[package]]
 name = "remote-terminal-agent-windows"
-version = "0.9.0"
+version = "0.11.0"
 dependencies = [
  "windows-sys",
 ]

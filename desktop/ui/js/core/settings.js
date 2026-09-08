@@ -67,6 +67,8 @@ const KEYS = {
   pinnedTerminals: 'pinned_terminals',
   commandHistory: 'command_history',
   wheelTabs: 'wheel_switch_tabs',
+  closeTabOnExit: 'close_tab_on_exit',
+  closeToTray: 'close_to_tray',
   presets: 'terminal_presets',
 };
 
@@ -180,6 +182,22 @@ export class Settings extends Emitter {
   /** A horizontal wheel gesture (or Ctrl+Tab) moves to the next/previous tab. */
   get wheelSwitchTabs() { return this.get(KEYS.wheelTabs, true); }
   set wheelSwitchTabs(v) { this.set(KEYS.wheelTabs, !!v); }
+
+  /**
+   * Whether a tab closes itself when its shell finishes. Only a clean exit
+   * closes one: a shell that died with a code left a reason on the screen, and
+   * taking the tab away would take the reason with it.
+   */
+  get closeTabOnExit() { return this.get(KEYS.closeTabOnExit, true); }
+  set closeTabOnExit(v) { this.set(KEYS.closeTabOnExit, !!v); }
+
+  /**
+   * Whether the window's close button hides to the notification area. Off
+   * makes it quit, taking every open terminal's connection with it. The tray
+   * menu's Quit always quits either way.
+   */
+  get closeToTray() { return this.get(KEYS.closeToTray, true); }
+  set closeToTray(v) { this.set(KEYS.closeToTray, !!v); }
 
   get commandBar() { return this.get(KEYS.commandBar, true); }
   set commandBar(v) { this.set(KEYS.commandBar, !!v); }

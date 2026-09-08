@@ -381,6 +381,11 @@ export class SessionRepository extends Emitter {
         s.notifyOutput();
         s.bump();
         this.onSessionExited?.(s);
+        // A shell that finished cleanly has nothing left to say, so its tab
+        // goes with it rather than sitting there needing a second click. One
+        // that failed keeps its tab: the message that explains the code is on
+        // the screen behind it.
+        if (this.settings.closeTabOnExit && (event.code ?? 0) === 0) this.closeTab(s, false);
         break;
       }
       case 'sessionClosed': {

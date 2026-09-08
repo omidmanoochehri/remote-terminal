@@ -2,13 +2,15 @@
 //!
 //! The Rust side owns exactly what a web view cannot do for itself: the relay
 //! socket (which needs an `Authorization` header), the HTTPS pairing calls,
-//! the credential store, the clipboard and the app lock. Everything above that
+//! the credential store, the clipboard, the tray icon and the app lock.
+//! Everything above that
 //! — the protocol state machine, the terminal emulator, the screens — lives in
 //! `ui/` and is a port of the Android app, so the two clients stay in step.
 
 mod http;
 mod store;
 mod sys;
+mod tray;
 mod ws;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -17,6 +19,12 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .manage(ws::WsState::default())
+        .manage(tray::TrayState::default())
+        .setup(|app| {
+            tray::build(app.handle())?;
+            Ok(())
+        })
+        .on_window_event(tray::on_window_event)
         .invoke_handler(tauri::generate_handler![
             ws::ws_connect,
             ws::ws_send,
@@ -37,6 +45,7 @@ pub fn run() {
             sys::set_keep_awake,
             sys::app_lock_available,
             sys::app_lock_prompt,
+            tray::set_close_to_tray,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Remote Terminal");

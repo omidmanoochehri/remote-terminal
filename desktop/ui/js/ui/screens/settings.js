@@ -76,13 +76,17 @@ export function settingsScreen(app) {
         () => choose(S.settingTheme, CHOICES.appTheme, s.appTheme, (v) => { s.appTheme = v; app.applyTheme(); }))
       .row('font', '--accent', S.settingTerminalFont,
         S.settingTerminalFontValue(labelFor(CHOICES.fontFamily, s.terminalFontFamily), trimFloat(s.fontSize)),
-        null, () => app.openTerminalFont());
+        null, () => app.openTerminalFont())
+      .toggle('monitor', '--purple', S.settingCloseToTray, S.settingCloseToTrayDesc,
+        s.closeToTray, (v) => { s.closeToTray = v; });
 
     b.section(S.groupTerminal)
       .row('bookmark', '--primary', S.presetsTitle, S.presetsSubtitle,
         String(s.terminalPresets.length), () => app.openPresets())
       .toggle('swipe', '--accent', S.settingWheelTabs, S.settingWheelTabsDesc,
         s.wheelSwitchTabs, (v) => { s.wheelSwitchTabs = v; })
+      .toggle('close', '--amber', S.settingCloseTabOnExit, S.settingCloseTabOnExitDesc,
+        s.closeTabOnExit, (v) => { s.closeTabOnExit = v; })
       .toggle('keyboard', '--primary', S.settingExtraKeys, S.settingExtraKeysDesc,
         s.showExtraKeys, (v) => { s.showExtraKeys = v; })
       .toggle('bell', '--amber', S.settingCommandNotifications, S.settingCommandNotificationsDesc,

@@ -1,6 +1,6 @@
 [package]
 name = "remote-terminal-agent-windows"
-version = "0.9.0"
+version = "0.11.0"
 description = "Remote Terminal agent for Windows — service supervisor and tray icon"
 authors = ["Cactus Software Group"]
 edition = "2021"
@@ -24,9 +24,17 @@ path = "src/bin/service.rs"
 name = "remote-terminal-tray"
 path = "src/bin/tray.rs"
 
+# The shell launcher. One per terminal: borrows the signed-in user's token so
+# that a terminal opened from the phone has that person's profile and not
+# LocalSystem's. Started by the agent, never by a human.
+[[bin]]
+name = "remote-terminal-shell"
+path = "src/bin/shell.rs"
+
 [dependencies]
-# The only dependency, and only for the Win32 calls a service and a tray icon
-# cannot avoid: no service framework, no tray crate, no JSON crate.
+# The only dependency, and only for the Win32 calls a service, a tray icon and
+# a pseudoconsole cannot avoid: no service framework, no tray crate, no JSON
+# crate, no pty crate.
 windows-sys = { version = "0.59", features = [
     "Win32_Foundation",
     "Win32_Graphics_Gdi",
@@ -37,11 +45,13 @@ windows-sys = { version = "0.59", features = [
     "Win32_System_Console",
     "Win32_System_DataExchange",
     "Win32_System_Diagnostics_Debug",
+    "Win32_System_Environment",
     "Win32_System_IO",
     "Win32_System_JobObjects",
     "Win32_System_LibraryLoader",
     "Win32_System_Memory",
     "Win32_System_Pipes",
+    "Win32_System_RemoteDesktop",
     "Win32_System_Services",
     "Win32_System_Threading",
     "Win32_UI_Shell",

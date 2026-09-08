@@ -32,6 +32,14 @@ import {
 const WIDTH_SAMPLE = ['i', 'l', 'W', '@', '1', ' ', 'm'];
 const BLINK_MS = 530;
 
+/**
+ * Which desktop this window is on, for the two shortcuts whose meaning differs
+ * by platform. Windows expects Ctrl+V to paste; on Linux and macOS Ctrl+V
+ * belongs to the shell (readline reads it as "take the next key literally").
+ */
+export const WINDOWS = /win/i.test(globalThis.navigator?.userAgentData?.platform ?? '')
+  || /windows/i.test(globalThis.navigator?.userAgent ?? '');
+
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
 export class TerminalView {
@@ -865,6 +873,17 @@ export class TerminalView {
       if (key === 'c') { const t = this.selectedText(); if (t) this.onCopy?.(t); e.preventDefault(); return; }
       if (key === 'v') { this.onPasteRequest?.(); e.preventDefault(); return; }
       if (key === 'a') { this.selectAll(); e.preventDefault(); return; }
+    }
+    // On Windows, Ctrl+V is paste — that is what Windows Terminal does and what
+    // the keyboard says. It has to be handled here rather than left to the
+    // textarea's own `paste` event, because the Ctrl-combination branch at the
+    // bottom of this function calls preventDefault and the browser then never
+    // raises one. Going through onPasteRequest also gets the file and image
+    // clipboard, which a plain paste event cannot see.
+    if (WINDOWS && e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'v') {
+      this.onPasteRequest?.();
+      e.preventDefault();
+      return;
     }
     if (e.ctrlKey && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'c' && this.hasSelection()) {
       const t = this.selectedText();

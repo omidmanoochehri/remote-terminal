@@ -35,6 +35,7 @@ const { discoverShells, advertise } = require('./lib/shells');
 const { Metrics } = require('./lib/metrics');
 const { spawnPty, ptyAvailable } = require('./lib/pty');
 const { SessionManager } = require('./lib/sessions');
+const { chooseSpawner } = require('./lib/win-user-pty');
 const { UploadManager } = require('./lib/uploads');
 const { RelayClient } = require('./lib/relay-client');
 const relayHttp = require('./lib/http');
@@ -195,6 +196,7 @@ async function cmdDoctor(cfg, state, log) {
   console.log(`  Running:      ${live ? `yes (pid ${live.pid}, agent ${live.version})` : 'no'}`);
   console.log(`  PTY backend:  ${pty.available ? 'node-pty (real PTY)' : `pipe fallback (node-pty unavailable: ${pty.error})`}`);
   console.log(`  Env policy:   ${cfg.inheritEnv ? 'INHERIT_ENV=1 (full environment passed to shells!)' : 'minimal allowlist'}`);
+  console.log(`  Terminals as: ${await describeShellOwner(cfg, log)}`);
   console.log(`  Uploads:      ${cfg.uploadsDir || path.join(os.homedir(), 'RemoteTerminal')} (max ${Math.round(cfg.maxUploadBytes / (1024 * 1024))} MiB)`);
   console.log(`  Data dir:     ${cfg.dataDir}${writable(cfg.dataDir) ? '' : '  (NOT WRITABLE)'}`);
   console.log(`  Log file:     ${cfg.logToFile ? logFileFor(cfg) : '(file logging disabled)'}${underSystemd() ? '  — under systemd; use journalctl' : ''}`);
@@ -297,6 +299,25 @@ function formatDuration(sec) {
 }
 
 /**
+ * Who a terminal opened from a phone would belong to. Under the Windows
+ * service that is the difference between the operator's own shell and a
+ * SYSTEM one, so it is worth saying before a phone finds out.
+ */
+async function describeShellOwner(cfg, log) {
+  if (process.platform !== 'win32') return `this account (${os.userInfo().username})`;
+  let spawner;
+  try {
+    spawner = await chooseSpawner({ cfg, log: null, fallback: null });
+  } catch (err) {
+    return `NOT POSSIBLE — ${err.message} (runAsUser=${cfg.runAsUser})`;
+  }
+  const detail = spawner.detail;
+  if (!spawner.launcher) return `this account (${os.userInfo().username}), runAsUser=${cfg.runAsUser}`;
+  if (detail && detail.ok) return `${detail.user} — session ${detail.session}, home ${detail.cwd}`;
+  return `this account for now: ${detail ? detail.error : 'the launcher did not answer'}`;
+}
+
+/**
  * What the phone's machine screen will show, sampled twice so the CPU figure
  * (a delta between two readings) is real. This is the quickest way to see
  * whether a platform can answer every field.
@@ -355,11 +376,32 @@ async function runAgent(cfg, state, log, fileSink) {
   if (!shells.length) log.error('no shells available; configure "shells" in config.json');
   log.info('shells', { shells: advertise(shells).map((s) => s.id), pty: ptyAvailable().available ? 'node-pty' : 'pipe' });
 
-  const cwd = cfg.cwd || os.homedir();
-  const sessions = new SessionManager({ cfg, log, shells, spawn: spawnPty, cwd });
+  // Who the shells belong to. On Windows under the service this routes them
+  // through remote-terminal-shell.exe so they get the signed-in user's profile
+  // instead of LocalSystem's; everywhere else it is plain node-pty.
+  let spawner;
+  try {
+    spawner = await chooseSpawner({ cfg, log, fallback: spawnPty });
+  } catch (err) {
+    log.error(err.message, { runAsUser: cfg.runAsUser });
+    process.exit(EXIT.config);
+  }
+  log.info('terminals', { runAs: spawner.how, runAsUser: cfg.runAsUser, launcher: spawner.launcher || null });
+
+  // With the launcher in play the shell's directory is the *user's* home, not
+  // the agent's, and only the launcher knows which user that is; it reports
+  // back and the session corrects itself.
+  const cwd = cfg.cwd || (spawner.launcher ? '' : os.homedir());
+  const sessions = new SessionManager({ cfg, log, shells, spawn: spawner.spawn, cwd });
   sessions.startSweeper(cfg.sweepIntervalMs);
 
-  if (!cfg.uploadsDir) cfg.uploadsDir = path.join(os.homedir(), 'RemoteTerminal');
+  // Pasted files have to land where the shell can read them. Under the
+  // service that is not the agent's home — SYSTEM's profile is readable only
+  // by administrators — but the home of whoever the terminals belong to.
+  if (!cfg.uploadsDir) {
+    const home = (spawner.detail && spawner.detail.ok && spawner.detail.cwd) || os.homedir();
+    cfg.uploadsDir = path.join(home, 'RemoteTerminal');
+  }
   const uploads = new UploadManager({ cfg, log });
   uploads.startSweeper();
   log.info('uploads', { dir: cfg.uploadsDir, maxBytes: cfg.maxUploadBytes });
@@ -374,6 +416,9 @@ async function runAgent(cfg, state, log, fileSink) {
       version: VERSION, pid: process.pid, name: state.name || '', agentId: state.agentId || null,
       accountId: state.accountId || null, server: cfg.server, connected: client.connected, registered,
       sessions: sessions.sessions.size, uptimeSec: Math.round(process.uptime()),
+      // Worth a line of its own: "as SYSTEM" and "as the person at the
+      // keyboard" are very different machines to hand a phone.
+      runAs: spawner.how,
       stateFile: cfg.stateFile, logFile: logFileFor(cfg), lastError,
     }),
     pair: async () => {

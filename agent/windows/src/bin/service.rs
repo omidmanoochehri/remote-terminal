@@ -9,13 +9,20 @@
 //!   remote-terminal-service run                 supervise in the console (debugging)
 //!   remote-terminal-service --service           what the SCM invokes; not for humans
 //!
-//! WHY A SERVICE, AND WHAT IT COSTS. Earlier versions ran the agent as a logon
-//! scheduled task so that terminals belonged to the signed-in user. A service
-//! starts at boot, before and without any logon, and keeps running when the
-//! user signs out — which is the whole point of a remote terminal. The price is
-//! that terminals then run as LocalSystem, so anyone who can pair a phone gets
-//! administrative access to this machine, exactly as with an SSH server. Pass
-//! `--account` at install time to run as a named user instead.
+//! WHY A SERVICE. Earlier versions ran the agent as a logon scheduled task so
+//! that terminals belonged to the signed-in user. A service starts at boot,
+//! before and without any logon, and keeps running when the user signs out —
+//! which is the whole point of a remote terminal.
+//!
+//! That made the agent LocalSystem, and for one release it made every terminal
+//! LocalSystem too. `remote-terminal-shell.exe` is the answer to that: the
+//! agent starts each shell through it, and it borrows the signed-in user's
+//! token so a terminal is that person's, with their profile and their PATH.
+//! With nobody signed in there is no token to borrow and a terminal falls back
+//! to LocalSystem — which is administrative access for anyone who can pair a
+//! phone, exactly as with an SSH server. `runAsUser: "always"` in the agent's
+//! config.json refuses to hand one out; `--account` at install time runs the
+//! whole service as a named user instead.
 //!
 //! The service does NOT host terminals itself: it supervises `node index.js`,
 //! restarts it with backoff when it dies, funnels its output into one rotating
@@ -30,19 +37,15 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 
+use rt_windows::job::Job;
 use rt_windows::logfile::LogFile;
 use rt_windows::settings::{default_data_dir, exe_dir, exe_path, Settings};
 use rt_windows::wide::w;
-use rt_windows::{broker, control, BROKER_PIPE, DISPLAY_NAME, PIPE_NAME, SERVICE_NAME, VERSION};
+use rt_windows::{broker, control, BROKER_PIPE, DISPLAY_NAME, PIPE_NAME, SERVICE_NAME, SHELL_EXE, VERSION};
 
-use windows_sys::Win32::Foundation::{CloseHandle, ERROR_ACCESS_DENIED, ERROR_SERVICE_SPECIFIC_ERROR, HANDLE, NO_ERROR};
-use windows_sys::Win32::System::JobObjects::{
-    AssignProcessToJobObject, CreateJobObjectW, SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
-    JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, JobObjectExtendedLimitInformation,
-};
+use windows_sys::Win32::Foundation::{ERROR_ACCESS_DENIED, ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR};
 use windows_sys::Win32::System::Console::SetConsoleCtrlHandler;
 use windows_sys::Win32::System::Services::*;
-use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_SET_QUOTA, PROCESS_TERMINATE};
 
 /* --------------------------- supervisor policy ---------------------------- */
 
@@ -200,6 +203,17 @@ fn cmd_install(args: &[String]) -> i32 {
         eprintln!(
             "warning: {}\\node_modules is missing — run \"npm install --omit=dev\" there, or terminals will fall back to pipes.",
             agent.parent().unwrap_or(Path::new(".")).display()
+        );
+    }
+
+    // Without the launcher the agent still works, and every terminal is
+    // LocalSystem — the thing the launcher exists to prevent. Say so at
+    // install time rather than leaving it to be discovered from a phone.
+    let launcher = agent.parent().map(|p| p.join(SHELL_EXE));
+    if !launcher.as_ref().map(|p| p.is_file()).unwrap_or(false) {
+        eprintln!(
+            "warning: {} is missing — terminals will run as LocalSystem instead of as the signed-in user.",
+            launcher.unwrap_or_else(|| PathBuf::from(SHELL_EXE)).display()
         );
     }
 
@@ -375,6 +389,9 @@ fn cmd_status() -> i32 {
             println!("  Agent:        running (pid {}, version {})", s.pid, s.version);
             println!("  Machine name: {}", if s.name.is_empty() { "-" } else { &s.name });
             println!("  Relay:        {}", s.headline());
+            if let Some(run_as) = &s.run_as {
+                println!("  Terminals as: {run_as}");
+            }
             println!("  Uptime:       {}", human_duration(s.uptime_sec));
         }
         Err(e) => println!("  Agent:        {e}"),
@@ -639,53 +656,6 @@ fn sleep_watching(total: Duration, stop: &AtomicBool) -> bool {
         std::thread::sleep(Duration::from_millis(200));
     }
     !stop.load(Ordering::SeqCst)
-}
-
-/* -------------------------------- job object ------------------------------ */
-
-/// A job the agent is put into, so that terminating it also takes down every
-/// shell it opened. Without this, a killed agent leaves orphaned cmd.exe and
-/// pwsh.exe processes behind on every restart.
-struct Job(HANDLE);
-
-impl Job {
-    fn create() -> Job {
-        unsafe {
-            let handle = CreateJobObjectW(std::ptr::null(), std::ptr::null());
-            if !handle.is_null() {
-                let mut info: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = std::mem::zeroed();
-                info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-                SetInformationJobObject(
-                    handle,
-                    JobObjectExtendedLimitInformation,
-                    &info as *const _ as *const c_void,
-                    std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
-                );
-            }
-            Job(handle)
-        }
-    }
-
-    fn adopt(&self, pid: u32) {
-        if self.0.is_null() {
-            return;
-        }
-        unsafe {
-            let proc = OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, 0, pid);
-            if !proc.is_null() {
-                AssignProcessToJobObject(self.0, proc);
-                CloseHandle(proc);
-            }
-        }
-    }
-}
-
-impl Drop for Job {
-    fn drop(&mut self) {
-        if !self.0.is_null() {
-            unsafe { CloseHandle(self.0) };
-        }
-    }
 }
 
 /* --------------------------- SCM: the service side ------------------------ */

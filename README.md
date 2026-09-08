@@ -34,7 +34,7 @@ and picks up exactly where it left off when you come back.
   └────────────────────────────────────────┘  └────────────────────────────────┘
 ```
 
-Version **0.9.0**, wire protocol **v3** — see [`PROTOCOL.md`](./PROTOCOL.md)
+Version **0.11.0**, wire protocol **v3** — see [`PROTOCOL.md`](./PROTOCOL.md)
 for the complete wire format.
 
 ---
@@ -99,7 +99,7 @@ for the complete wire format.
 |---|---|
 | `server/` | The relay: HTTPS identity endpoints (enrol, pair), WebSocket routing between phones and agents, presence, limits, backpressure, structured JSON logs, `/health` and `/stats`. Node; only dependency is `ws`. |
 | `agent/` | The cross-platform agent (Windows 10/11, Ubuntu 22.04/24.04, other Linux, macOS): hosts many PTY sessions, discovers shells, keeps replay buffers, publishes system metrics, receives pasted files. |
-| `agent/windows/` | The Windows service host and tray icon (Rust, `windows-sys` only). Two small executables that supervise the agent and show its state; neither hosts a terminal. |
+| `agent/windows/` | The Windows service host, tray icon and shell launcher (Rust, `windows-sys` only). Three small executables: two supervise the agent and show its state, the third gives each terminal the signed-in user's session. |
 | `agent/packaging/` | The Debian package: systemd unit, maintainer scripts, man page, logrotate rule and `build-deb.sh`. |
 | `android/` | The phone app (Kotlin, Material 3): Home, Machines, Terminals and Settings, a full VT/xterm emulator, a hand-written RFC 6455 WebSocket client, and no third-party networking or terminal libraries. |
 | `desktop/` | The desktop app (Tauri): a Rust shell for the socket, the pairing calls, the sealed token and the clipboard, over a frontend of plain ES modules with no framework, no bundler and no dependencies. See [`desktop/README.md`](./desktop/README.md). |
@@ -144,8 +144,8 @@ Use TLS in production (`wss://`) — see [TLS and reverse proxies](#tls-and-reve
 
 ```bash
 cd agent
-./packaging/build-deb.sh                       # -> dist/remote-terminal-agent_0.9.0_amd64.deb
-sudo apt install ./dist/remote-terminal-agent_0.9.0_amd64.deb
+./packaging/build-deb.sh                       # -> dist/remote-terminal-agent_0.11.0_amd64.deb
+sudo apt install ./dist/remote-terminal-agent_0.11.0_amd64.deb
 
 sudo remote-terminal-agent configure \
   --server wss://relay.example.com \
@@ -220,7 +220,7 @@ journalctl -u remote-terminal-agent -f
 ```powershell
 cd agent\windows\installer
 powershell -ExecutionPolicy Bypass -File build-installer.ps1
-# -> RemoteTerminalAgentSetup-0.9.0.exe   (~4.6 MB)
+# -> RemoteTerminalAgentSetup-0.11.0.exe   (~4.6 MB)
 ```
 
 Double-click it. It asks for the relay URL, the enrolment token and a name for
@@ -254,13 +254,14 @@ control key. It starts the service, waits for it to register and prints a
 pairing code. Later: `-Status`, `-Name "…"`, `-Uninstall` (add `-Purge` to
 delete the identity and logs too), `-NoTray` to skip the tray icon.
 
-Two small executables do the Windows-specific work (Rust, ~300 KB and ~190 KB,
-one dependency between them):
+Three small executables do the Windows-specific work (Rust, one dependency
+between them):
 
 ```
 remote-terminal-service.exe install | uninstall | start | stop | restart
 remote-terminal-service.exe status | pair [--code-only] | run
 remote-terminal-tray.exe            the notification-area icon
+remote-terminal-shell.exe           one per terminal; started by the agent
 ```
 
 `remote-terminal-service.exe` is both the service and its own installer. It
@@ -284,13 +285,33 @@ Upgrading from 0.8 or earlier replaces the old per-user **logon task** with the
 service, and moves `config.json` and `state.json` out of the agent directory —
 where any local user could read the enrolment token — into ProgramData.
 
-The trade this makes: a service starts at boot, before anyone signs in, and
-keeps running after they sign out, which is what "reach this machine from my
-phone" has to mean. The cost is that terminals then run as **LocalSystem**, so
-anyone who can pair a phone has administrative access to that machine, exactly
-as with an SSH server. `-Account <user>` (with `-Password`) runs the service as
-a named account instead, and its terminals get that account's rights and no
-more.
+**Whose terminal is it?** A service starts at boot, before anyone signs in, and
+keeps running after they sign out — which is what "reach this machine from my
+phone" has to mean. It also means the agent is **LocalSystem**, and a shell it
+starts the obvious way gets SYSTEM's profile: `%USERPROFILE%` is
+`C:\Windows\system32\config\systemprofile`, `PATH` is the machine's, and none of
+your PowerShell profile, `.gitconfig`, npm, ssh keys or Documents is there.
+
+So the agent does not start shells itself. It runs `remote-terminal-shell.exe`,
+which borrows the token of whoever is signed in and builds the pseudoconsole in
+*their* session, and the terminal that reaches your phone is the one you would
+get by opening a console yourself — your profile, your `PATH`, your home
+directory, your drive mappings. Pasted files land in `%USERPROFILE%\RemoteTerminal`
+for the same reason.
+
+`runAsUser` in `config.json` decides what happens when nobody is signed in:
+
+| Value | What a terminal gets |
+|---|---|
+| `auto` (default) | the signed-in user, or LocalSystem when there is nobody to borrow from |
+| `always` | the signed-in user, or no terminal at all |
+| `never` | LocalSystem, as before 0.10 |
+
+A LocalSystem terminal is administrative access for anyone who can pair a
+phone, exactly as with an SSH server. `"runAsUser": "always"` refuses to hand
+one out; `-Account <user>` (with `-Password`) runs the whole service as a named
+account instead. `remote-terminal-service status` and `node index.js --doctor`
+both print which of these is in force.
 
 **Anywhere, by hand**
 
@@ -616,6 +637,8 @@ default next to `index.js`; the installers use
 | `REPLAY_BYTES_PER_SESSION` | 262144 | History kept per terminal |
 | `MAX_INPUT_BYTES` | 1 MiB | Largest accepted input message |
 | `INHERIT_ENV` | 0 | Pass the agent's **entire** environment to shells (not recommended) |
+| `RUN_AS_USER` | auto | Windows: `auto` / `always` / `never` — whether a terminal belongs to the signed-in user or to the account the agent runs as (see above) |
+| `SHELL_LAUNCHER` | next to `index.js` | Windows: path to `remote-terminal-shell.exe`, if it is not where the installer puts it |
 | `UPLOADS_DIR` | `<home>/RemoteTerminal` | Where files sent from a phone are written (dir 0700, files 0600) |
 | `MAX_UPLOAD_BYTES` / `MAX_UPLOADS` | 16 MiB / 3 | Largest file, and transfers in flight per phone |
 | `UPLOAD_TIMEOUT_SEC` | 120 | A stalled transfer is discarded after this |
@@ -702,9 +725,12 @@ Remote shell access deserves a careful setup.
 - **Blast radius.** On Linux the agent runs as an unprivileged user — the
   package and the installer create one and refuse root unless `--allow-root` /
   `ALLOW_ROOT=1`, which makes every terminal a root shell. Shells get a minimal
-  environment. On Windows the service runs as LocalSystem by default, so its
-  terminals are administrative, exactly as an SSH server's would be; install
-  with `-Account <user>` where that is not wanted.
+  environment. On Windows the service runs as LocalSystem, but a terminal does
+  not: it is started with the signed-in user's token and has their rights and
+  no more. With nobody signed in there is nobody to borrow from and a terminal
+  falls back to LocalSystem, which *is* administrative, exactly as an SSH
+  server's would be — set `"runAsUser": "always"` to refuse that, or install
+  with `-Account <user>` to run the whole service as one person.
 - **Hardening you can turn up.** The systemd units ship with the protections
   that cost a terminal nothing (`ProtectSystem=full`, the `ProtectKernel*`
   family, `RestrictSUIDSGID`, an empty `CapabilityBoundingSet`). The stricter
@@ -902,7 +928,7 @@ terminating the session.
 ## Versioning and releases
 
 The project has **one version number**, shared by the server, the agent and the
-Android app and the desktop app — currently **0.9.0** — bumped by semver according to what the work
+Android app and the desktop app — currently **0.11.0** — bumped by semver according to what the work
 did. The Android `versionCode` is a plain integer that must strictly increase on
 every release. The wire protocol version (`v3`) is independent and changes only
 for an actual breaking wire change.

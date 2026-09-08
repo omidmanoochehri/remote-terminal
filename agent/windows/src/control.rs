@@ -21,6 +21,8 @@ pub struct Status {
     pub sessions: i64,
     pub uptime_sec: i64,
     pub last_error: Option<String>,
+    /// Who the agent's terminals belong to. Absent from an older agent.
+    pub run_as: Option<String>,
 }
 
 impl Status {
@@ -158,6 +160,7 @@ fn parse_status(raw: &str) -> Result<Status, ControlError> {
         sessions: json::i64_of(&raw, "sessions").unwrap_or(0),
         uptime_sec: json::i64_of(&raw, "uptimeSec").unwrap_or(0),
         last_error: json::str_of(&raw, "lastError"),
+        run_as: json::str_of(&raw, "runAs"),
     })
 }
 

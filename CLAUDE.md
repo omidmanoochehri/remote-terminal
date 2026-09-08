@@ -11,7 +11,7 @@ Android phone, relayed through a self-hosted Node server.
 |---|---|
 | `server/` | The relay (Node, `ws` only): enrolment, pairing, device tokens, session routing, presence, limits. |
 | `agent/` | Cross-platform agent (Node): hosts PTY sessions, shell discovery, replay buffers. |
-| `agent/windows/` | Windows service host + tray icon (Rust, `windows-sys` only). Supervises the Node agent; hosts nothing itself. |
+| `agent/windows/` | Windows service host, tray icon and shell launcher (Rust, `windows-sys` only). Supervises the Node agent, and gives each terminal the signed-in user's token and pseudoconsole. |
 | `agent/windows/installer/` | The NSIS installer: `build-installer.ps1` stages everything and packs `RemoteTerminalAgentSetup-<version>.exe`. |
 | `agent/packaging/` | The `.deb`: systemd unit, maintainer scripts, man page, logrotate, `build-deb.sh`. |
 | `android/` | The phone app (Kotlin, Material 3): machines list, terminal tabs, VT/xterm emulator. |
@@ -23,7 +23,7 @@ See `README.md` for the full tour and `PROTOCOL.md` for the wire protocol.
 ## Versioning
 
 The project has **one version number**, shared by the server, the agent, the
-Android app and the desktop app. It is currently **0.9.0**.
+Android app and the desktop app. It is currently **0.11.0**.
 
 **Bump it automatically — do not wait to be asked.** Any piece of work that
 changes shipped behaviour ends with a version bump, in the same commit as the
@@ -141,7 +141,7 @@ reporting the work done.**
 
 ```bash
 cd agent/windows && cargo test --offline
-cd agent/windows && cargo build --release   # -> target/release/remote-terminal-{service,tray}.exe
+cd agent/windows && cargo build --release   # -> target/release/remote-terminal-{service,tray,shell}.exe
 ```
 
 Notes:
@@ -155,6 +155,18 @@ Notes:
 - `remote-terminal-service.exe` is also its own installer (`install`,
   `uninstall`, `start`, `stop`, `status`, `run`). `run` supervises in the
   console and is the fastest way to test a change without touching the SCM.
+- `remote-terminal-shell.exe` is one process per terminal. It borrows the
+  signed-in user's token (`WTSQueryUserToken`, LocalSystem only) and runs a
+  second copy of itself as that user, which builds the pseudoconsole — a
+  console SYSTEM created is not reachable by a user's shell. `--probe` reports
+  what it can do without starting anything; `--run-as self` hosts a console in
+  this account and is what `agent/test/win-user-pty.test.js` exercises. The
+  standard handles must be declared as three NULLs with `STARTF_USESTDHANDLES`
+  or the shell silently uses the launcher's pipes instead of its console, and
+  `lpDesktop` must be the **empty string** — `winsta0\default` works from a
+  console or a scheduled task and fails with a bare `ERROR_ACCESS_DENIED` from
+  inside the service, which is the only place it matters. Test changes to it
+  from a real service, not just from `--run-as self`.
 - Installing, removing, starting and stopping the service need an elevated
   prompt; `status` does not.
 - The tray reaches the agent through the supervisor's **public** pipe, not the
@@ -199,7 +211,7 @@ Build it with the same major Node.js version the target runs: the bundled
 cd server  && npm test             # relay: identity, pairing, auth, routing, limits
 cd agent   && npm test             # agent: ring buffer, env, shells, sessions, control, log, watchdog
 cd desktop && npm test             # desktop: emulator, protocol, keys, presets, pairing
-cd agent/windows && cargo test --offline    # service supervisor, tray helpers, JSON, logs
+cd agent/windows && cargo test --offline    # service supervisor, tray helpers, JSON, logs, framing, command lines
 node tools/e2e-linux.js            # full end-to-end scenario
 cd android && ./gradlew testDebugUnitTest
 ```

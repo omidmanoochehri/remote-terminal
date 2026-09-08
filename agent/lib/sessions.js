@@ -73,9 +73,24 @@ class Session extends EventEmitter {
 
     term.onData((data) => this.onData(data));
     term.onExit((code) => this.onExit(code));
+    // A shell started through the Windows launcher only learns where it is
+    // once the launcher has borrowed the signed-in user's token, which is
+    // after this constructor has run.
+    if (typeof term.onReady === 'function') term.onReady((info) => this.started(info));
   }
 
   get seq() { return this.ring.head; }
+
+  /**
+   * The shell is up and the terminal host has said where it actually landed —
+   * the signed-in user's home rather than the agent's, on Windows.
+   */
+  started(info) {
+    if (!info || !info.cwd || info.cwd === this.cwd) return false;
+    this.cwd = info.cwd;
+    this.emit('updated', { cwd: info.cwd });
+    return true;
+  }
 
   onData(data) {
     if (this.state !== 'running') return;

@@ -16,6 +16,7 @@
   "metricsIntervalMs": 20000,
 
   "inheritEnv": false,
+  "runAsUser": "auto",
   "allowRoot": false,
   "logLevel": "info",
   "baseBackoffMs": 1000,

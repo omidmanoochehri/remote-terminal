@@ -3,7 +3,7 @@
   Build RemoteTerminalAgentSetup-<version>.exe.
 
 .DESCRIPTION
-  Stages everything the installer ships — the two Rust executables, the Node
+  Stages everything the installer ships — the three Rust executables, the Node
   agent and its production node_modules — and then packs it with NSIS.
 
   Staging at build time rather than at install time is deliberate: the
@@ -72,7 +72,7 @@ if (-not $SkipCargo) {
   try { & cargo build --release; if ($LASTEXITCODE -ne 0) { throw "cargo build failed." } }
   finally { Pop-Location }
 }
-foreach ($exe in @("remote-terminal-service.exe", "remote-terminal-tray.exe")) {
+foreach ($exe in @("remote-terminal-service.exe", "remote-terminal-tray.exe", "remote-terminal-shell.exe")) {
   if (-not (Test-Path (Join-Path $release $exe))) {
     throw "$exe is missing from $release. Run without -SkipCargo."
   }
@@ -85,6 +85,9 @@ New-Item -ItemType Directory -Force -Path $stage | Out-Null
 
 Copy-Item (Join-Path $release "remote-terminal-service.exe") $stage
 Copy-Item (Join-Path $release "remote-terminal-tray.exe") $stage
+# The shell launcher has to sit next to index.js: that is where the agent
+# looks for it, and without it every terminal runs as LocalSystem.
+Copy-Item (Join-Path $release "remote-terminal-shell.exe") $stage
 Copy-Item (Join-Path $agentDir "index.js") $stage
 Copy-Item (Join-Path $agentDir "package.json") $stage
 Copy-Item (Join-Path $agentDir "config.example.json") $stage

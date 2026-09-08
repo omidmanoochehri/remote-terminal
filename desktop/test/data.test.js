@@ -12,7 +12,7 @@ import { makePreset, newPresetId, presetsFromJson, presetsToJson } from '../ui/j
 import { parsePairingPayload } from '../ui/js/core/pairingPayload.js';
 import { normalizeRelayUrl, isPrivateHost, hostOf } from '../ui/js/core/credentials.js';
 import { TerminalEmulator } from '../ui/js/terminal/emulator.js';
-import { shellQuote } from '../ui/js/core/shell.js';
+import { shellQuote, changeDirectoryInput } from '../ui/js/core/shell.js';
 
 /* ------------------------------- naming ---------------------------------- */
 // Copies of copies are the case that matters: a machine where every terminal is
@@ -242,4 +242,49 @@ test('paths are quoted only when they need it', () => {
   // Windows paths take double quotes: Command Prompt would take the POSIX
   // single quotes literally.
   assert.equal(shellQuote('C:\\Users\\Omid\\My Docs'), '"C:\\Users\\Omid\\My Docs"');
+});
+
+// Windows paths and JavaScript escapes do not mix, so the paths below are
+// String.raw and the carriage returns are spelled out.
+const CR = '\r';
+
+test('a working directory on another Windows drive switches drive first', () => {
+  const win = { platform: 'win32', shellId: 'cmd' };
+  // The bug this exists for: `cd E:\work` from C: sets E:'s current directory
+  // and leaves the shell on C:. The bare drive letter is what actually moves.
+  const work = String.raw`E:\work`;
+  assert.equal(changeDirectoryInput(work, win), `E:${CR}cd "${work}"${CR}`);
+
+  const spaced = String.raw`E:\my code`;
+  assert.equal(changeDirectoryInput(spaced, win), `E:${CR}cd "${spaced}"${CR}`);
+
+  // Already being on C: is not special; the shell may have started anywhere.
+  const home = String.raw`C:\Users\Omid`;
+  assert.equal(changeDirectoryInput(home, win), `C:${CR}cd "${home}"${CR}`);
+
+  // A path with no drive letter has nothing to switch to.
+  const rooted = String.raw`\Users\Omid`;
+  assert.equal(changeDirectoryInput(rooted, win), `cd "${rooted}"${CR}`);
+});
+
+test('UNC paths use pushd, the only thing that reaches them', () => {
+  // Command Prompt's `cd` refuses a UNC path outright; `pushd` maps a drive
+  // for it, and PowerShell takes it too.
+  const share = String.raw`\\build\share\out`;
+  assert.equal(
+    changeDirectoryInput(share, { platform: 'win32', shellId: 'powershell' }),
+    `pushd "${share}"${CR}`,
+  );
+});
+
+test('POSIX shells are left alone, including WSL on a Windows machine', () => {
+  assert.equal(changeDirectoryInput('/srv/api', { platform: 'linux' }), 'cd /srv/api\r');
+  assert.equal(changeDirectoryInput('/srv/my app', { platform: 'linux' }), "cd '/srv/my app'\r");
+  // A WSL distribution is reached through a Windows agent but is POSIX inside.
+  assert.equal(
+    changeDirectoryInput('/mnt/e/work', { platform: 'win32', shellId: 'wsl-ubuntu' }),
+    'cd /mnt/e/work\r',
+  );
+  // Nothing known about the machine: behave as before rather than guess.
+  assert.equal(changeDirectoryInput('/srv/api'), 'cd /srv/api\r');
 });

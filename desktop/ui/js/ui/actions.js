@@ -12,7 +12,7 @@ import { terminalTitle } from '../core/format.js';
 import { copyTitle } from '../core/naming.js';
 import { isRunning } from '../protocol/messages.js';
 import { Outgoing } from '../protocol/messages.js';
-import { shellQuote } from '../core/shell.js';
+import { changeDirectoryInput } from '../core/shell.js';
 
 export async function copyToClipboard(text) {
   if (!text) return;
@@ -171,7 +171,7 @@ export async function startTerminal(app, agent, { shellId, title, directory, com
     // The shell has not run yet, so the tab already knows where it is about to
     // be even on platforms that cannot report it.
     session.noteDirectory(directory);
-    startup += `cd ${shellQuote(directory)}\r`;
+    startup += changeDirectoryInput(directory, { platform: agent.platform, shellId });
   }
   if (command) {
     app.settings.noteCommand(command);
