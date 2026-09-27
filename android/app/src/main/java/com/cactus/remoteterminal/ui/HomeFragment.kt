@@ -56,7 +56,7 @@ class HomeFragment : Fragment(), RtScreen {
         binding.scroll.padForNavigationBar()
 
         binding.headerBar.bind(
-            title = getString(R.string.app_name),
+            title = getString(R.string.app_title),
             subtitle = getString(R.string.app_tagline),
             onSearch = { host.openMachines() },
             onRefresh = { refresh() },

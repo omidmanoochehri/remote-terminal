@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Top-level screen header: the app mark, a title with a supporting line, and up
+  Top-level screen header: the app logo, a title with a supporting line, and up
   to three trailing actions. Screens hide the actions they do not offer rather
-  than defining their own header, so the mark and baseline never move.
+  than defining their own header, so the logo and baseline never move. A long title
+  shrinks to fit before it is cut short.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -18,21 +19,12 @@
     android:paddingStart="@dimen/rt_gutter"
     android:paddingEnd="0dp">
 
-    <FrameLayout
+    <ImageView
         android:id="@+id/headerMark"
         android:layout_width="@dimen/rt_header_icon"
         android:layout_height="@dimen/rt_header_icon"
-        android:background="@drawable/rt_icon_tile">
-
-        <ImageView
-            android:id="@+id/headerMarkIcon"
-            android:layout_width="@dimen/rt_icon_xl"
-            android:layout_height="@dimen/rt_icon_xl"
-            android:layout_gravity="center"
-            android:src="@drawable/ic_rt_terminal_square"
-            android:importantForAccessibility="no"
-            app:tint="@color/rt_text" />
-    </FrameLayout>
+        android:src="@drawable/cactus_logo"
+        android:importantForAccessibility="no" />
 
     <LinearLayout
         android:layout_width="0dp"
@@ -46,9 +38,14 @@
             android:id="@+id/headerTitle"
             style="@style/RtText.ScreenTitle"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="26dp"
+            android:gravity="center_vertical|start"
             android:maxLines="1"
             android:ellipsize="end"
+            app:autoSizeTextType="uniform"
+            app:autoSizeMinTextSize="14sp"
+            app:autoSizeMaxTextSize="19sp"
+            app:autoSizeStepGranularity="0.5sp"
             tools:text="Remote Terminal" />
 
         <TextView

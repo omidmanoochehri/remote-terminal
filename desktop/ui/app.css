@@ -338,6 +338,8 @@ button { cursor: pointer; }
 
 .header-mark .icon { width: 26px; height: 26px; }
 
+.header-logo { width: 44px; height: 44px; flex: none; }
+
 .header-text { min-width: 0; flex: 1 1 auto; }
 
 .header-title {
@@ -1498,15 +1500,8 @@ textarea.plain:focus { border-color: var(--primary-edge); }
 .splash-mark {
   width: 92px;
   height: 92px;
-  display: grid;
-  place-items: center;
-  border-radius: 26px;
-  border: 1px solid var(--primary-edge);
-  background: var(--primary-soft);
-  color: var(--primary);
 }
 
-.splash-mark .icon { width: 48px; height: 48px; }
 .splash-title { font-size: 21px; font-weight: 700; }
 .splash-sub { font-size: 10.5px; color: var(--text-muted); }
 .splash-copy { position: fixed; bottom: 26px; font-size: 9px; color: var(--text-dim); }

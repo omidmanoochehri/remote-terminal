@@ -10,6 +10,7 @@
 
 export const S = {
   appName: 'Remote Terminal',
+  appTitle: 'Cactus Remote Terminal',
   appTagline: 'Secure. Fast. Everywhere.',
 
   // Navigation

@@ -31,7 +31,7 @@ export function homeScreen(app) {
 
   const root = el('div.screen', null,
     header({
-      title: S.appName,
+      title: S.appTitle,
       subtitle: S.appTagline,
       actions: [
         headerAction('search', S.search, () => app.openMachines()),

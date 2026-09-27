@@ -20,14 +20,12 @@ import com.cactus.remoteterminal.ui.Format
 fun ViewScreenHeaderBinding.bind(
     title: CharSequence,
     subtitle: CharSequence? = null,
-    @DrawableRes mark: Int = R.drawable.ic_rt_terminal_square,
     onSearch: (() -> Unit)? = null,
     onRefresh: (() -> Unit)? = null,
     onOverflow: ((View) -> Unit)? = null,
 ) {
     headerTitle.text = title
     headerSubtitle.setTextOrHide(subtitle)
-    headerMarkIcon.setImageResource(mark)
 
     headerSearch.visible = onSearch != null
     headerSearch.setOnClickListener { onSearch?.invoke() }

@@ -73,15 +73,17 @@ export function mount(container, ...children) {
 /* --------------------------- shared components -------------------------- */
 
 /**
- * The top-level screen header: the app mark, a title with a supporting line,
- * and up to three trailing actions. Actions with no handler are left out
+ * The top-level screen header: a mark (the app logo unless the screen names an
+ * icon), a title with a supporting line, and up to three trailing actions. Actions with no handler are left out
  * rather than shown disabled, exactly as the phone hides them.
  */
-export function header({ title, subtitle, mark = 'terminal_square', onBack, actions = [] }) {
+export function header({ title, subtitle, mark = null, onBack, actions = [] }) {
   return el('header.header', null,
     onBack
       ? el('button.icon-button', { onClick: onBack, title: 'Back', 'aria-label': 'Back' }, svgIcon('arrow_left'))
-      : el('div.header-mark', null, svgIcon(mark)),
+      : mark
+        ? el('div.header-mark', null, svgIcon(mark))
+        : el('img.header-logo', { src: 'img/logo.png', alt: '', 'aria-hidden': 'true' }),
     el('div.header-text', null,
       el('div.header-title', { text: title }),
       // Always present, even when empty: screens that fill the header in later

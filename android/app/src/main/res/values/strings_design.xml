@@ -20,6 +20,7 @@
     <string name="a11y_step_todo">not started</string>
 
     <!-- Home -->
+    <string name="app_title">Cactus Remote Terminal</string>
     <string name="app_tagline">Secure. Fast. Everywhere.</string>
     <string name="home_recent_terminals">Recent terminals</string>
     <string name="home_view_all">View all</string>

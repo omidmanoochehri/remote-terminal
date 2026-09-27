@@ -315,49 +315,26 @@ fn refresh(announce: bool) {
     unsafe { Shell_NotifyIconW(NIM_MODIFY, &data) };
 }
 
-/// A 32×32 terminal window with a status dot, drawn pixel by pixel.
+/// The app logo, 32×32, top-down BGRA with straight alpha (the byte order of a
+/// little-endian 0xAARRGGBB word). Generated from the app icon.
+const LOGO: &[u8; 32 * 32 * 4] = include_bytes!("tray-logo.bgra");
+
+/// The 32×32 app logo with a status dot drawn over it.
 ///
-/// Drawing it beats shipping four .ico files: the colour is the state, so the
-/// icon and the thing it reports can never disagree, and there is no resource
-/// compiler in the build.
+/// Drawing the dot beats shipping four .ico files: the colour is the state, so
+/// the icon and the thing it reports can never disagree, and there is no
+/// resource compiler in the build.
 fn make_icon(dot: u32) -> HICON {
     const N: i32 = 32;
-    let mut pixels = vec![0u32; (N * N) as usize];
+    let mut pixels: Vec<u32> = LOGO
+        .chunks_exact(4)
+        .map(|p| u32::from_le_bytes([p[0], p[1], p[2], p[3]]))
+        .collect();
     let px = |buf: &mut Vec<u32>, x: i32, y: i32, argb: u32| {
         if (0..N).contains(&x) && (0..N).contains(&y) {
             buf[(y * N + x) as usize] = argb;
         }
     };
-    let body = 0xFF_1E_1E_22u32;
-    let edge = 0xFF_53_53_5C;
-    let ink = 0xFF_F2_F2_F5;
-
-    // The terminal's body, with the corners knocked off.
-    for y in 3..28 {
-        for x in 2..30 {
-            let corner = (x == 2 || x == 29) && (y == 3 || y == 27);
-            if corner {
-                continue;
-            }
-            let border = x == 2 || x == 29 || y == 3 || y == 27;
-            px(&mut pixels, x, y, if border { edge } else { body });
-        }
-    }
-    // A title bar, so it reads as a window at 16px.
-    for x in 3..29 {
-        px(&mut pixels, x, 7, edge);
-    }
-    // The prompt: a chevron and an underscore, 2px thick.
-    for i in 0..5 {
-        for t in 0..2 {
-            px(&mut pixels, 8 + i + t, 12 + i, ink);
-            px(&mut pixels, 8 + i + t, 22 - i, ink);
-        }
-    }
-    for x in 16..24 {
-        px(&mut pixels, x, 21, ink);
-        px(&mut pixels, x, 22, ink);
-    }
     // The status dot, bottom-right, with a dark ring so it reads on any taskbar.
     let (cx, cy) = (24, 24);
     let colour = 0xFF00_0000 | dot;
