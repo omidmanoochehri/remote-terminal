@@ -48,6 +48,8 @@ class Settings(context: Context) {
     val pasteConfirmLines: Int get() = (prefs.getString(KEY_PASTE_CONFIRM, "3")?.toIntOrNull() ?: 3)
     /** A horizontal swipe across the grid moves to the next/previous tab. */
     val swipeSwitchTabs: Boolean get() = prefs.getBoolean(KEY_SWIPE_TABS, true)
+    /** Tapping a URL in terminal output offers to open or copy it. */
+    val clickableLinks: Boolean get() = prefs.getBoolean(KEY_CLICKABLE_LINKS, true)
     var commandBar: Boolean
         get() = prefs.getBoolean(KEY_COMMAND_BAR, true)
         set(v) { prefs.edit().putBoolean(KEY_COMMAND_BAR, v).apply() }
@@ -275,6 +277,7 @@ class Settings(context: Context) {
         const val KEY_PINNED_TERMINALS = "pinned_terminals"
         const val KEY_COMMAND_HISTORY = "command_history"
         const val KEY_SWIPE_TABS = "swipe_switch_tabs"
+        const val KEY_CLICKABLE_LINKS = "clickable_links"
         const val KEY_PRESETS = "terminal_presets"
 
         const val SORT_STATUS = "status"

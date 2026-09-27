@@ -134,6 +134,13 @@ async function connectPhone(deviceToken) {
     return m;
   };
   ws.type = (agent, session, data) => ws.sendJson({ type: 'input', agent, session, data });
+  /** An agent request (§6b): the result, or `{ error: code }`. */
+  ws.request = async (agent, method, params) => {
+    const reqId = 'q' + Math.random().toString(36).slice(2, 8);
+    ws.sendJson({ type: 'agent.request', reqId, agent, method, params });
+    const m = await ws.next((x) => (x.type === 'agent.response' || x.type === 'error') && x.reqId === reqId, 15000);
+    return m.type === 'error' ? { error: m.code, message: m.message } : m.result;
+  };
   /** Wait for the shell prompt: some output, then quiet. Typing before an interactive
    *  shell finishes its init scripts is discarded by readline's tty reset. */
   ws.prompt = async (sid) => { await waitFor(() => (ws.streams.get(sid) || { lastSeq: 0 }).lastSeq > 0, 15000, 50); return ws.settle(sid, 400); };
@@ -196,6 +203,29 @@ async function main() {
     check('session 1 output arrives', await phone.waitText(s1, 'hello-from-one\r\n'));
     check('session 2 ANSI colour output arrives', await phone.waitText(s2, '\x1b[32mgreen-two\x1b[0m'), JSON.stringify(phone.textOf(s2).slice(-160)));
     check('outputs are not cross-routed', !phone.textOf(s1).includes('green-two') && !phone.textOf(s2).includes('hello-from-one'));
+
+    // Agent requests: the file browser and the process manager (PROTOCOL §6b).
+    check('relay and agent advertise requests, fs and procs',
+      phone.welcome.caps.includes('requests') && !!a && a.caps.includes('fs') && a.caps.includes('procs'), a && a.caps.join(','));
+    const listing = await phone.request(agentId, 'fs.list', {});
+    check('fs.list answers with the home folder of the terminal account', !listing.error && listing.path === os.homedir() && listing.parent === null && Array.isArray(listing.entries), listing.error || listing.path);
+    const b64 = (s) => Buffer.from(s).toString('base64');
+    const up = await phone.request(agentId, 'fs.write', { path: 'rt-e2e-upload.txt', offset: 0, data: b64('uploaded from '), final: false });
+    const up2 = await phone.request(agentId, 'fs.write', { path: 'rt-e2e-upload.txt', offset: up.size, data: b64('the phone'), final: true });
+    const back = await phone.request(agentId, 'fs.read', { path: 'rt-e2e-upload.txt', offset: 0 });
+    check('fs.write in two slices, then fs.read, round-trips the file', up2.done === true && Buffer.from(back.data || '', 'base64').toString() === 'uploaded from the phone' && back.eof === true, JSON.stringify(up2.error || back.error || ''));
+    const escape = await phone.request(agentId, 'fs.read', { path: '/etc/passwd', offset: 0 });
+    check('fs.read outside the home folder is forbidden', escape.error === 'forbidden', escape.error || 'it was read');
+    const removed = await phone.request(agentId, 'fs.delete', { path: 'rt-e2e-upload.txt' });
+    check('fs.delete removes the file', !removed.error && !fs.existsSync(path.join(os.homedir(), 'rt-e2e-upload.txt')));
+    phone.type(agentId, s1, 'sleep 300 &\r');
+    await sleep(500);
+    const procs = await phone.request(agentId, 'proc.list', {});
+    const sleeper = !procs.error && procs.processes.find((p) => p.name === 'sleep' && /sleep 300/.test(p.cmd || ''));
+    check('proc.list shows the terminals\' processes with CPU and memory', !!sleeper && procs.processes.some((p) => p.name === 'bash') && typeof sleeper.mem === 'number', procs.error || `${procs.total} processes, killable=${procs.killable}`);
+    const killed = sleeper ? await phone.request(agentId, 'proc.kill', { pid: sleeper.pid }) : { error: 'no sleeper' };
+    check('proc.kill ends it', !killed.error && await waitFor(() => !fs.existsSync(`/proc/${sleeper.pid}`), 3000), killed.error);
+    await phone.settle(s1);
 
     // Ctrl+C interrupts a running command.
     // The typed line is echoed back verbatim, so use markers that only exist once executed.

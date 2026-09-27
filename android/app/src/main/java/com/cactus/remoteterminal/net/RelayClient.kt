@@ -8,10 +8,15 @@ import android.os.Looper
 import android.util.Log
 import com.cactus.remoteterminal.BuildConfig
 import com.cactus.remoteterminal.data.CredentialStore
+import com.cactus.remoteterminal.protocol.AgentReply
 import com.cactus.remoteterminal.protocol.Incoming
+import com.cactus.remoteterminal.protocol.Outgoing
 import com.cactus.remoteterminal.protocol.PROTOCOL_VERSION
 import com.cactus.remoteterminal.protocol.RelayEvent
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -19,6 +24,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.coroutines.resume
 import kotlin.math.min
 import kotlin.random.Random
 
@@ -56,6 +62,9 @@ class RelayClient(context: Context, private val credentials: CredentialStore) : 
     private val listeners = ArrayList<Listener>()
     private val pending = HashMap<String, CompletableDeferred<RelayEvent>>()
     private val reqCounter = AtomicInteger(0)
+    /** `agent.request`s in flight: files and processes (PROTOCOL.md §6b). */
+    private val agentRequests = PendingRequests<AgentReply>()
+    private var expiryRunnable: Runnable? = null
 
     private val _state = MutableStateFlow<ConnectionState>(if (credentials.isPaired) ConnectionState.Disconnected else ConnectionState.Unpaired)
     val state: StateFlow<ConnectionState> = _state
@@ -86,6 +95,8 @@ class RelayClient(context: Context, private val credentials: CredentialStore) : 
     var deviceId: String? = credentials.deviceId; private set
     var accountId: String? = credentials.accountId; private set
     var connId: String? = null; private set
+    /** What the relay said it can do in its last welcome (`requests` gates the machine tools). */
+    var relayCaps: List<String> = emptyList(); private set
 
     private var ws: MiniWebSocket? = null
     private var wanted = false
@@ -269,6 +280,45 @@ class RelayClient(context: Context, private val credentials: CredentialStore) : 
         }
     }
 
+    /**
+     * Ask a machine something (`fs.list`, `proc.kill` …) and get exactly one
+     * answer: the agent's result, its refusal, a timeout after [timeoutMs], or
+     * `disconnected` when the socket goes first. Main thread; so is [callback].
+     */
+    fun agentRequest(agentId: String, method: String, params: JSONObject, timeoutMs: Long = AGENT_REQUEST_TIMEOUT_MS, callback: (AgentReply) -> Unit) {
+        val reqId = "q" + reqCounter.incrementAndGet()
+        agentRequests.add(reqId, timeoutMs, callback)
+        if (!send(Outgoing.agentRequest(reqId, agentId, method, params))) {
+            agentRequests.complete(reqId, AgentReply.Failed("disconnected", "Not connected to the relay."))
+            return
+        }
+        scheduleExpiry()
+    }
+
+    /**
+     * [agentRequest] for coroutines, from any dispatcher: the bookkeeping is
+     * main-thread only, so the call hops there. Cancelling the caller simply
+     * drops the answer.
+     */
+    suspend fun agentCall(agentId: String, method: String, params: JSONObject = JSONObject(), timeoutMs: Long = AGENT_REQUEST_TIMEOUT_MS): AgentReply =
+        withContext(Dispatchers.Main.immediate) {
+            suspendCancellableCoroutine { cont ->
+                agentRequest(agentId, method, params, timeoutMs) { reply -> if (cont.isActive) cont.resume(reply) }
+            }
+        }
+
+    private fun scheduleExpiry() {
+        expiryRunnable?.let { main.removeCallbacks(it) }
+        val next = agentRequests.nextDeadline ?: run { expiryRunnable = null; return }
+        val run = Runnable {
+            expiryRunnable = null
+            agentRequests.expire { AgentReply.Failed("timeout", "The machine did not answer in time.") }
+            scheduleExpiry()
+        }
+        expiryRunnable = run
+        main.postDelayed(run, (next - System.currentTimeMillis()).coerceAtLeast(0L) + 5L)
+    }
+
     /* ------------------------------ receiving ----------------------------- */
 
     override fun onOpen() {
@@ -288,6 +338,7 @@ class RelayClient(context: Context, private val credentials: CredentialStore) : 
                 connId = event.connId
                 deviceId = event.deviceId
                 accountId = event.accountId
+                relayCaps = event.caps
                 setState(ConnectionState.Connected)
                 schedulePing(immediate = true)
             }
@@ -295,7 +346,9 @@ class RelayClient(context: Context, private val credentials: CredentialStore) : 
                 _latencyMs.value = (System.currentTimeMillis() - pingSentAt).toInt().coerceAtLeast(0)
                 pingSentAt = 0L
             }
+            is RelayEvent.AgentResponse -> { agentRequests.complete(event.reqId, AgentReply.Ok(event.result)); return }
             is RelayEvent.Error -> {
+                if (event.reqId != null && agentRequests.complete(event.reqId, AgentReply.Failed(event.code, event.message))) return
                 val d = event.reqId?.let { pending.remove(it) }
                 if (d != null) { d.complete(event); return }
                 _errors.tryEmit(event)
@@ -319,7 +372,7 @@ class RelayClient(context: Context, private val credentials: CredentialStore) : 
             pingRunnable = null
             if (!isConnected) return@Runnable
             pingSentAt = System.currentTimeMillis()
-            if (!send(com.cactus.remoteterminal.protocol.Outgoing.ping())) pingSentAt = 0L
+            if (!send(Outgoing.ping())) pingSentAt = 0L
             schedulePing()
         }
         pingRunnable = run
@@ -339,6 +392,7 @@ class RelayClient(context: Context, private val credentials: CredentialStore) : 
             _latencyMs.value = null
             for (d in pending.values) d.complete(RelayEvent.Error("disconnected", "Connection lost.", null, null, null))
             pending.clear()
+            agentRequests.failAll { AgentReply.Failed("disconnected", "Connection lost.") }
             when (code) {
                 4401 -> {
                     Log.w(TAG, "relay revoked this device")
@@ -367,6 +421,8 @@ class RelayClient(context: Context, private val credentials: CredentialStore) : 
         const val BACKGROUND_GRACE_MS = 90_000L
         /** Cheap enough to be a keepalive, slow enough not to matter on mobile data. */
         private const val PING_INTERVAL_MS = 20_000L
+        /** PROTOCOL.md §6b: clients give an agent request 30 s. */
+        const val AGENT_REQUEST_TIMEOUT_MS = 30_000L
         val APP_VERSION: String = BuildConfig.VERSION_NAME
     }
 }

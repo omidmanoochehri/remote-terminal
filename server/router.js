@@ -16,7 +16,7 @@
 const { RateLimiter } = require('./limits');
 const { PROTOCOL_VERSION, CLOSE, ERR, validatePhoneMessage, validateAgentMessage, cleanName } = require('./protocol');
 
-const RELAY_CAPS = ['sessions', 'replay', 'ping', 'pairing'];
+const RELAY_CAPS = ['sessions', 'replay', 'ping', 'pairing', 'requests'];
 
 function key(agentId, sessionId) { return `${agentId}|${sessionId}`; }
 
@@ -287,6 +287,17 @@ class Router {
         return this.send(rt.conn, fwd);
       }
 
+      // A question for the machine rather than a terminal: list a directory,
+      // read a file, list processes. The relay checks ownership and presence;
+      // what a method means is the agent's business, and an agent without it
+      // answers with an error (clients check AgentInfo.caps before asking).
+      case 'agent.request': {
+        const rt = this.onlineAgent(conn, m);
+        if (!rt) return;
+        conn.agentsTouched.add(rt.agentId);
+        return this.send(rt.conn, { type: 'agent.request', client: conn.id, reqId: m.reqId, method: m.method, params: m.params || {} });
+      }
+
       default:
         return this.error(conn, ERR.BAD_REQUEST, `unknown type "${m.type}"`);
     }
@@ -448,6 +459,12 @@ class Router {
         return this.send(client, {
           type: 'file.stored', reqId: m.reqId, agent: conn.agentId, session: m.session, path: m.path, size: m.size,
         });
+      }
+
+      case 'agent.response': {
+        const client = reg.connections.get(m.client);
+        if (!client || client.accountId !== conn.accountId) return undefined;
+        return this.send(client, { type: 'agent.response', reqId: m.reqId, agent: conn.agentId, result: m.result });
       }
 
       case 'error': {

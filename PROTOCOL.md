@@ -49,9 +49,9 @@ In routed messages the routing keys are the short names `agent`, `session`,
 // AgentInfo (relay → phone)
 { "agentId": "a_…", "name": "Production Server", "hostname": "prod-01",
   "platform": "linux",            // "win32" | "linux" | "darwin"
-  "os": "Ubuntu 24.04", "arch": "x64", "agentVersion": "0.11.2", "protocol": 3,
+  "os": "Ubuntu 24.04", "arch": "x64", "agentVersion": "0.12.0", "protocol": 3,
   "shells": [ { "id": "bash", "label": "bash", "default": true }, { "id": "sh", "label": "sh" } ],
-  "caps": ["sessions", "replay", "resize", "ping", "files", "metrics"],
+  "caps": ["sessions", "replay", "resize", "ping", "files", "metrics", "fs", "procs"],
   "online": true, "lastSeen": 1725264000000,   // ms since epoch
   "instanceId": "…",              // changes every time the agent process restarts
   "metrics": { /* MachineMetrics */ },  // present only while online, and only if the agent reports them
@@ -161,9 +161,9 @@ and terminates sockets that miss a pong.
   "instanceId": "…",                  // random per process start
   "name": "…",                        // used only if the relay has no name for this agent yet
   "hostname": "prod-01", "platform": "linux", "os": "Ubuntu 24.04", "arch": "x64",
-  "agentVersion": "0.11.2", "protocol": 3,
+  "agentVersion": "0.12.0", "protocol": 3,
   "shells": [ { "id": "bash", "label": "bash", "default": true } ],
-  "caps": ["sessions", "replay", "resize", "ping", "files", "metrics"],
+  "caps": ["sessions", "replay", "resize", "ping", "files", "metrics", "fs", "procs"],
   "metrics": { /* MachineMetrics, optional */ },
   "sessions": [ /* SessionInfo… (sessions that survived the disconnect) */ ] }
 
@@ -180,6 +180,7 @@ and terminates sockets that miss a pong.
 { "type": "output",         "session": "s_…", "seq": 48211, "data": "…" }               // live: fan-out to attached clients
 { "type": "output",         "session": "s_…", "seq": 47512, "data": "…", "client": "c_…" } // replay: unicast to one client
 { "type": "error", "reqId": "…", "client": "c_…", "code": "limit_reached", "message": "…" } // reply to a client request
+{ "type": "agent.response", "reqId": "q1", "client": "c_…", "result": { /* per method, §6b */ } }
 { "type": "ping" }
 ```
 
@@ -196,6 +197,7 @@ and terminates sockets that miss a pong.
 { "type": "session.rename", "session": "s_…", "title": "…" }
 { "type": "input",  "session": "s_…", "data": "ls\r" }
 { "type": "resize", "session": "s_…", "cols": 100, "rows": 40 }
+{ "type": "agent.request", "reqId": "q1", "client": "c_…", "method": "fs.list", "params": { "path": "…" } }  // §6b
 { "type": "pong" }
 { "type": "error", "code": "…", "message": "…" }
 ```
@@ -246,6 +248,7 @@ never sends any is fully conformant, and phones must render a missing field as
 { "type": "file.chunk", "reqId": "f1", "agent": "a_…", "session": "s_…", "seq": 0, "data": "<base64>" }
 { "type": "file.end",   "reqId": "f1", "agent": "a_…", "session": "s_…" }
 { "type": "file.abort", "reqId": "f1", "agent": "a_…", "session": "s_…" }
+{ "type": "agent.request", "reqId": "q1", "agent": "a_…", "method": "fs.list", "params": { "path": "…" } }  // §6b
 { "type": "ping" }
 ```
 
@@ -269,6 +272,7 @@ never sends any is fully conformant, and phones must render a missing field as
 { "type": "session.lag",      "agent": "a_…", "session": "s_…" }  // output was dropped for you: re-attach with `since`
 { "type": "output", "agent": "a_…", "session": "s_…", "seq": 48211, "data": "…" }
 { "type": "file.stored", "reqId": "f1", "agent": "a_…", "session": "s_…", "path": "/root/RemoteTerminal/screenshot-20260903-011500.png", "size": 123456 }
+{ "type": "agent.response", "reqId": "q1", "agent": "a_…", "result": { /* per method, §6b */ } }
 { "type": "error", "code": "…", "message": "…", "reqId": "…", "agent": "a_…", "session": "s_…" }
 { "type": "pong" }
 ```
@@ -358,6 +362,57 @@ agent   → file.stored { reqId, session, path, size }        or error { reqId, 
 - The capability is advertised by the agent as `files` in `AgentInfo.caps`;
   clients must not offer the feature to agents that lack it.
 
+### 6b. Agent requests: files and processes
+
+Some things a phone wants from a machine are not a terminal: the files in a
+folder, the processes that are running. They travel as a request and a single
+answer, correlated by `reqId` (required), and the relay treats them like
+`session.create` — the agent must be in the caller's account and online —
+without looking at what they mean.
+
+```
+phone   → agent.request  { reqId, agent, method, params }
+agent   ← agent.request  { reqId, client, method, params }       params defaults to {}
+agent   → agent.response { reqId, client, result }               or error { reqId, client, code, message }
+phone   ← agent.response { reqId, agent, result }                only the asking connection
+```
+
+`method` is `area.verb` (`^[a-z][a-z0-9]{0,15}.[a-z][a-zA-Z0-9]{0,15}$`);
+`params` and `result` are JSON objects. The relay advertises the channel as
+`requests` in `welcome.caps`, and each area is advertised by the agent in
+`AgentInfo.caps`; clients must not offer a feature the agent lacks. An agent
+that does not know a method answers `error {code:"unsupported"}`. Clients
+should time a request out after 30 s.
+
+**Files** (`fs`). Everything happens under one root: the home folder of the
+account terminals run as (on Windows under the service, whoever is signed in
+now), or the agent's `filesRoot`. Paths may be absolute or relative to the
+root; each is resolved with realpath, symlinks and junctions included, and
+refused with `forbidden` unless it lands inside the root. A new name must be a
+plain name — no separators, not `.` or `..`.
+
+| method | params | result |
+|---|---|---|
+| `fs.list` | `path?` (default: the root) | `{ path, root, parent, sep, entries, truncated }` — `parent` is `null` at the root; each entry is `{ name, type: "file"|"dir"|"link"|"other", size, mtime, hidden?, link?, broken? }`, at most 2000 |
+| `fs.read` | `path, offset, length?` | `{ path, offset, size, mtime, data, eof }` — `data` is base64, at most 192 KiB per call; download by reading at increasing offsets until `eof` |
+| `fs.write` | `path, offset, data, final?, overwrite?` | `{ path, size, done }` — upload by writing base64 slices in order from offset 0; the last has `final: true`. Slices go to a hidden `<name>.rtpart` that is renamed into place only by the final one. Without `overwrite` an existing file is refused with `exists`. |
+| `fs.mkdir` | `path` | `{ path }` |
+| `fs.rename` | `from, to` | `{ path }` — also moves, within the root; never replaces |
+| `fs.delete` | `path, recursive?` | `{ path }` — a symlink is removed, never followed; a non-empty folder needs `recursive` |
+
+**Processes** (`procs`).
+
+| method | params | result |
+|---|---|---|
+| `proc.list` | — | `{ processes, total, cpus, sampledAt, killable, owner? }` — each process is `{ pid, name, user, cpu, mem, ppid?, cmd? }`, busiest first, at most 1000. `cpu` is the share of the whole machine (0..1) since the previous sample, `null` for a process too new to have one; `mem` is resident bytes. `killable` is `"all"`, `"own"` (only processes of `owner`) or `"none"`. |
+| `proc.kill` | `pid, force?` | `{ pid, signal }` — SIGTERM, or SIGKILL with `force`; on Windows both terminate |
+
+The agent never ends itself or its supervisor. Under the Windows service the
+agent is LocalSystem, so it ends only processes of the signed-in user
+(`killable: "own"`): the process manager never hands a phone more of the
+machine than a terminal does. `processManager`, `allowProcessKill` and
+`fileBrowser` in the agent's configuration turn each part off.
+
 ### Backpressure
 
 The relay checks `bufferedAmount` of each phone socket before forwarding
@@ -411,6 +466,10 @@ to an offline agent gets `agent_offline`, a message for an unknown session gets
 | `limit_reached` | a configured cap was reached (sessions, agents, devices, connections) |
 | `unsupported_version` | protocol version mismatch |
 | `internal` | relay-side failure |
+| `unsupported` | the agent does not implement that request method (§6b) |
+| `exists` / `not_empty` | a file request would replace a file, or delete a folder with contents (§6b) |
+| `unavailable` | the agent cannot answer right now, e.g. nobody is signed in to own the files (§6b) |
+| `io_error` / `busy` | the machine refused a file or process operation (§6b) |
 
 WebSocket close codes used by the relay:
 
@@ -436,6 +495,9 @@ Advertised in `welcome.caps` (relay), `agent.register.caps` (agent, echoed in
 | `resize` | PTY resize is supported |
 | `ping` | app-level ping/pong |
 | `files` | the agent accepts files pushed into a session (§6a) |
+| `requests` | the relay routes `agent.request` / `agent.response` (§6b) |
+| `fs` | the agent answers `fs.*` requests: the file browser (§6b) |
+| `procs` | the agent answers `proc.*` requests: the process manager (§6b) |
 | `metrics` | the agent publishes CPU/memory/disk/uptime samples (§4a) |
 | `pairing` | the relay exposes the `/v3/pair/*` endpoints |
 | `color` | phone renders full SGR/ANSI (informational) |

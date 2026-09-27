@@ -1,7 +1,11 @@
 /**
- * One machine, with its terminals and its details behind a segmented control.
- * The third segment (Settings) is a page of its own, so it opens that screen
- * and the segment springs back.
+ * One machine, with its terminals, files, processes and details behind a
+ * segmented control. The last segment (Settings) is a page of its own, so it
+ * opens that screen and the segment springs back.
+ *
+ * Files and Processes are panels with state of their own (a folder, a filter,
+ * transfers, a refresh timer); they are built once and kept across redraws,
+ * so a metrics tick never throws away where you were.
  *
  * A port of `MachineFragment.kt`.
  */
@@ -17,13 +21,18 @@ import {
   relayHost,
 } from '../../core/format.js';
 import { runningSessions, metricsHaveAny, memoryFraction, storageFraction } from '../../protocol/messages.js';
+import { filesPanel } from './files.js';
+import { processesPanel } from './processes.js';
 
-export function machineScreen(app, { agentId, tab: initialTab = 'terminals' }) {
+export function machineScreen(app, { agentId, tab: initialTab = 'terminals', path = null, sessionKey = null }) {
   const screen = new Screen(app);
   let tab = initialTab;
+  const panels = { files: null, processes: null };
 
-  const bodyContent = el('div');
-  const body = el('div.screen-body.wide', null, bodyContent);
+  const heroSlot = el('div');
+  const segmentSlot = el('div');
+  let bodyContent = el('div');
+  const body = el('div.screen-body.wide', null, heroSlot, segmentSlot, bodyContent);
   // The title and the star are rewritten on every render (the segment decides
   // what the header says), so they are held rather than looked up again.
   const starButton = headerAction('star', S.actionFavourite, () => toggleFavourite());
@@ -76,15 +85,43 @@ export function machineScreen(app, { agentId, tab: initialTab = 'terminals' }) {
     starButton.classList.toggle('starred', favourite);
     starButton.title = favourite ? S.actionUnfavourite : S.actionFavourite;
 
-    clear(bodyContent);
-    bodyContent.append(heroCard(agent, state));
-    bodyContent.append(el('div.segmented', { role: 'tablist' },
+    clear(heroSlot);
+    heroSlot.append(heroCard(agent, state));
+    clear(segmentSlot);
+    segmentSlot.append(el('div.segmented', { role: 'tablist' },
       segment(S.tabTerminals, tab === 'terminals', () => selectTab('terminals')),
+      segment(S.tabFiles, tab === 'files', () => selectTab('files')),
+      segment(S.tabProcesses, tab === 'processes', () => selectTab('processes')),
       segment(S.tabDetails, tab === 'details', () => selectTab('details')),
       segment(S.tabSettings, false, () => app.openMachineSettings(agentId))));
 
+    if (tab === 'files' || tab === 'processes') {
+      const panel = panelFor(tab);
+      if (bodyContent !== panel.root) {
+        bodyContent.replaceWith(panel.root);
+        bodyContent = panel.root;
+        requestAnimationFrame(() => panel.focus());
+      }
+      panel.update();
+      return;
+    }
+    if (bodyContent.classList.contains('files-panel') || bodyContent.classList.contains('procs-panel')) {
+      const fresh = el('div');
+      bodyContent.replaceWith(fresh);
+      bodyContent = fresh;
+    }
+    clear(bodyContent);
     if (tab === 'terminals') renderTerminals(agent);
     else renderDetails(agent, state);
+  }
+
+  function panelFor(which) {
+    if (!panels[which]) {
+      panels[which] = which === 'files'
+        ? filesPanel(app, agentId, { path, sessionKey })
+        : processesPanel(app, agentId);
+    }
+    return panels[which];
   }
 
   function segment(label, active, onClick) {
@@ -233,6 +270,7 @@ export function machineScreen(app, { agentId, tab: initialTab = 'terminals' }) {
   screen.listen(app.client, 'state', render);
   screen.listen(app.client, 'latency', render);
   screen.every(30_000, render);
+  screen.track(() => { panels.files?.destroy(); panels.processes?.destroy(); });
 
   render();
 

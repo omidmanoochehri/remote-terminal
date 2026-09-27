@@ -175,4 +175,8 @@ export const Outgoing = {
     JSON.stringify({ type: 'file.chunk', reqId, agent, session, seq, data: dataBase64 }),
   fileEnd: (reqId, agent, session) => JSON.stringify({ type: 'file.end', reqId, agent, session }),
   fileAbort: (reqId, agent, session) => JSON.stringify({ type: 'file.abort', reqId, agent, session }),
+
+  // A question for the machine itself: files, processes (PROTOCOL.md §6b).
+  agentRequest: (reqId, agent, method, params) =>
+    JSON.stringify({ type: 'agent.request', reqId, agent, method, params: params ?? {} }),
 };

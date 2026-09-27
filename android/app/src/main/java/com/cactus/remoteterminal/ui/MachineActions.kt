@@ -11,6 +11,7 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import com.cactus.remoteterminal.App
 import com.cactus.remoteterminal.R
+import com.cactus.remoteterminal.protocol.AgentCaps
 import com.cactus.remoteterminal.protocol.AgentInfo
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
@@ -31,6 +32,8 @@ object MachineActions {
         menu.menu.add(0, ID_TERMINALS, 1, R.string.action_terminals)
         menu.menu.add(0, ID_NEW_TERMINAL, 2, R.string.new_terminal)
         menu.menu.add(0, ID_DETAILS, 3, R.string.action_details)
+        menu.menu.add(0, ID_FILES, 3, R.string.tool_files)
+        menu.menu.add(0, ID_PROCESSES, 3, R.string.tool_processes)
         menu.menu.add(0, ID_SETTINGS, 4, R.string.action_settings)
         menu.menu.add(0, ID_RENAME, 5, R.string.rename_machine)
         menu.menu.add(0, ID_COPY_HOST, 6, R.string.copy_hostname)
@@ -42,6 +45,8 @@ object MachineActions {
                 ID_TERMINALS -> host.openMachine(agent.agentId, MachineFragment.Tab.TERMINALS)
                 ID_NEW_TERMINAL -> host.openNewTerminal(agent.agentId)
                 ID_DETAILS -> host.openMachine(agent.agentId, MachineFragment.Tab.DETAILS)
+                ID_FILES -> openFiles(fragment, agent)
+                ID_PROCESSES -> openProcesses(fragment, agent)
                 ID_SETTINGS -> host.openMachineSettings(agent.agentId)
                 ID_RENAME -> rename(fragment, agent)
                 ID_COPY_HOST -> copy(context, agent.hostname.ifEmpty { agent.name })
@@ -50,6 +55,31 @@ object MachineActions {
             true
         }
         menu.show()
+    }
+
+    /**
+     * Why a machine tool cannot be opened right now — the machine is offline,
+     * or its agent (or the relay) predates it — or null when it can.
+     */
+    fun toolUnavailable(context: Context, relayCaps: List<String>, agent: AgentInfo, files: Boolean): String? = when {
+        !agent.online -> context.getString(R.string.tool_machine_offline, agent.name.ifEmpty { agent.hostname })
+        files && !AgentCaps.files(relayCaps, agent) -> context.getString(R.string.tool_files_unsupported)
+        !files && !AgentCaps.processes(relayCaps, agent) -> context.getString(R.string.tool_processes_unsupported)
+        else -> null
+    }
+
+    fun openFiles(fragment: Fragment, agent: AgentInfo, path: String? = null, sessionId: String? = null) {
+        val app = fragment.requireActivity().application as App
+        val why = toolUnavailable(fragment.requireContext(), app.client.relayCaps, agent, files = true)
+        if (why != null) { Toast.makeText(fragment.requireContext(), why, Toast.LENGTH_LONG).show(); return }
+        (fragment.requireActivity() as MainActivity).openFiles(agent.agentId, path, sessionId)
+    }
+
+    fun openProcesses(fragment: Fragment, agent: AgentInfo) {
+        val app = fragment.requireActivity().application as App
+        val why = toolUnavailable(fragment.requireContext(), app.client.relayCaps, agent, files = false)
+        if (why != null) { Toast.makeText(fragment.requireContext(), why, Toast.LENGTH_LONG).show(); return }
+        (fragment.requireActivity() as MainActivity).openProcesses(agent.agentId)
     }
 
     fun rename(fragment: Fragment, agent: AgentInfo) {
@@ -101,4 +131,6 @@ object MachineActions {
     private const val ID_RENAME = 6
     private const val ID_COPY_HOST = 7
     private const val ID_REMOVE = 8
+    private const val ID_FILES = 9
+    private const val ID_PROCESSES = 10
 }

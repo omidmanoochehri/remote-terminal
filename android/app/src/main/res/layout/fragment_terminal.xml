@@ -225,6 +225,57 @@
             app:tint="@color/rt_text_secondary" />
     </LinearLayout>
 
+    <!-- Broadcast input: shown while typing here also types into other tabs -->
+    <LinearLayout
+        android:id="@+id/broadcastBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="6dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="12dp"
+        android:paddingEnd="4dp"
+        android:minHeight="38dp"
+        android:background="@drawable/rt_badge"
+        android:backgroundTint="@color/rt_amber_soft"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <ImageView
+            android:layout_width="@dimen/rt_icon_md"
+            android:layout_height="@dimen/rt_icon_md"
+            android:src="@drawable/ic_rt_send"
+            android:importantForAccessibility="no"
+            app:tint="@color/rt_amber" />
+
+        <TextView
+            android:id="@+id/broadcastText"
+            style="@style/RtText.RowTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:textColor="@color/rt_amber"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="Broadcasting to 3 terminals" />
+
+        <TextView
+            android:id="@+id/broadcastStop"
+            style="@style/RtText.RowTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:background="?attr/selectableItemBackground"
+            android:textColor="@color/rt_amber"
+            android:text="@string/broadcast_stop" />
+    </LinearLayout>
+
     <!-- The terminal grid inside its well, with the status banner over it -->
     <FrameLayout
         android:id="@+id/terminalFrame"

@@ -1,5 +1,7 @@
 package com.cactus.remoteterminal.data
 
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.cactus.remoteterminal.net.RelayClient
 import com.cactus.remoteterminal.protocol.Outgoing
@@ -46,6 +48,25 @@ class TerminalSession(val agentId: String, val sessionId: String, scrollback: In
     /** When this tab was opened on this phone; used until the relay reports createdAt. */
     val openedAt: Long = System.currentTimeMillis()
 
+    /**
+     * Stream position the agent had reached when the last attach was
+     * acknowledged. Output at or before it is replay — history this phone is
+     * catching up on — and must never set off a watch.
+     */
+    var replayUntil: Long = Long.MAX_VALUE
+
+    /** "Watch for text…", while armed. */
+    var watch: OutputWatch? = null
+    /** "Notify when output stops", while armed; [quietSawOutput] once output arrived after arming. */
+    var quietAlert: Boolean = false
+    var quietSawOutput: Boolean = false
+
+    /**
+     * "Broadcast input…": keys of the other tabs that receive a copy of every
+     * input typed here. In memory only, like the tabs' own state on screen.
+     */
+    val broadcastTo = LinkedHashSet<String>()
+
     /** Bumped on every metadata/stream change so views can re-render cheaply. */
     private val _version = MutableStateFlow(0)
     val version: StateFlow<Int> = _version
@@ -85,6 +106,8 @@ class SessionRepository(
 ) : RelayClient.Listener {
 
     private val sessions = LinkedHashMap<String, TerminalSession>()
+    private val main = Handler(Looper.getMainLooper())
+    private val quietTimers = HashMap<String, Runnable>()
     private val tabsByAgent = HashMap<String, MutableStateFlow<List<TerminalSession>>>()
     private val instanceIds = HashMap<String, String?>()
 
@@ -93,6 +116,10 @@ class SessionRepository(
     var onBell: ((TerminalSession) -> Unit)? = null
     /** A program set the clipboard via OSC 52 (the host decides whether to honour it). */
     var onClipboard: ((TerminalSession, String) -> Unit)? = null
+    /** A watched text appeared in live output (the notifier tells the user). */
+    var onWatchMatched: ((TerminalSession, String) -> Unit)? = null
+    /** A terminal with "Notify when output stops" armed went quiet. */
+    var onQuiet: ((TerminalSession) -> Unit)? = null
 
     init {
         client.addListener(this)
@@ -104,6 +131,9 @@ class SessionRepository(
         tabsByAgent.getOrPut(agentId) { MutableStateFlow(sessions.values.filter { it.agentId == agentId }) }
 
     fun find(agentId: String, sessionId: String): TerminalSession? = sessions["$agentId|$sessionId"]
+
+    /** Every open tab on this phone, on every machine, in the order they were opened. */
+    fun allTabs(): List<TerminalSession> = sessions.values.toList()
 
     /** The tab for a session, creating (and opening) it if needed. */
     fun get(agentId: String, sessionId: String): TerminalSession {
@@ -167,6 +197,10 @@ class SessionRepository(
         if (terminate) client.send(Outgoing.sessionClose(s.agentId, s.sessionId))
         else detach(s)
         sessions.remove(s.key)
+        setQuietAlert(s, false)
+        s.watch = null
+        s.broadcastTo.clear()
+        dropBroadcastTarget(s)
         publish(s.agentId)
     }
 
@@ -187,6 +221,109 @@ class SessionRepository(
     fun input(s: TerminalSession, data: String): Boolean {
         if (s.stream.state != SessionStream.State.ATTACHED) return false
         return client.send(Outgoing.input(s.agentId, s.sessionId, data))
+    }
+
+    /* ------------------------------ broadcast ----------------------------- */
+
+    /**
+     * Type into [source] and into every tab it broadcasts to. Resizes never
+     * travel this way — only what the user typed, pasted or tapped. Targets
+     * that were closed or whose shell ended drop out; a target that is merely
+     * detached is re-attached (its copy of this input is lost meanwhile).
+     */
+    fun inputWithBroadcast(source: TerminalSession, data: String): Boolean {
+        val sent = input(source, data)
+        if (source.broadcastTo.isEmpty()) return sent
+        val before = source.broadcastTo.size
+        val it = source.broadcastTo.iterator()
+        while (it.hasNext()) {
+            val target = sessions[it.next()]
+            if (target == null || !target.isRunning) { it.remove(); continue }
+            if (!input(target, data) && target.stream.state == SessionStream.State.DETACHED) attachAsIs(target)
+        }
+        if (source.broadcastTo.size != before) source.bump()
+        return sent
+    }
+
+    fun startBroadcast(source: TerminalSession, targets: Collection<TerminalSession>) {
+        source.broadcastTo.clear()
+        for (t in targets) if (t !== source && t.isRunning) {
+            source.broadcastTo.add(t.key)
+            if (t.stream.state == SessionStream.State.DETACHED) attachAsIs(t)
+        }
+        source.bump()
+    }
+
+    fun stopBroadcast(source: TerminalSession) {
+        if (source.broadcastTo.isEmpty()) return
+        source.broadcastTo.clear()
+        source.bump()
+    }
+
+    /**
+     * Attach a tab that is not on screen at the size its terminal already has,
+     * so receiving a broadcast never resizes someone else's shell.
+     */
+    private fun attachAsIs(s: TerminalSession) {
+        val info = agents.session(s.agentId, s.sessionId)
+        val cols = info?.cols?.takeIf { it > 0 } ?: s.emulator.cols
+        val rows = info?.rows?.takeIf { it > 0 } ?: s.emulator.rows
+        if (cols != s.emulator.cols || rows != s.emulator.rows) s.emulator.resize(cols, rows)
+        attach(s, cols, rows)
+    }
+
+    /** [gone] closed or ended: no tab broadcasts to it any more. */
+    private fun dropBroadcastTarget(gone: TerminalSession) {
+        for (s in sessions.values) if (s.broadcastTo.remove(gone.key)) s.bump()
+    }
+
+    /** The targets still worth counting: open and running. */
+    fun broadcastTargets(source: TerminalSession): List<TerminalSession> =
+        source.broadcastTo.mapNotNull { sessions[it] }.filter { it.isRunning }
+
+    /* ------------------------------- alerts ------------------------------- */
+
+    fun setWatch(s: TerminalSession, text: String, keepWatching: Boolean) {
+        s.watch = if (text.isEmpty()) null else OutputWatch(text, keepWatching)
+        s.bump()
+    }
+
+    fun clearWatch(s: TerminalSession) { s.watch = null; s.bump() }
+
+    /**
+     * Arm or disarm "Notify when output stops": it fires once, when the
+     * terminal has printed something since arming and then been silent for
+     * [QUIET_MS] — the moment a long build or download finishes.
+     */
+    fun setQuietAlert(s: TerminalSession, on: Boolean) {
+        quietTimers.remove(s.key)?.let { main.removeCallbacks(it) }
+        s.quietAlert = on
+        s.quietSawOutput = false
+        s.bump()
+    }
+
+    private fun onLiveOutput(s: TerminalSession, data: String) {
+        s.watch?.let { w ->
+            if (w.feed(data)) {
+                if (!w.keepWatching) s.watch = null
+                s.bump()
+                onWatchMatched?.invoke(s, w.text)
+            }
+        }
+        if (s.quietAlert) {
+            s.quietSawOutput = true
+            quietTimers.remove(s.key)?.let { main.removeCallbacks(it) }
+            val run = Runnable {
+                quietTimers.remove(s.key)
+                if (!s.quietAlert || !s.quietSawOutput) return@Runnable
+                s.quietAlert = false
+                s.quietSawOutput = false
+                s.bump()
+                onQuiet?.invoke(s)
+            }
+            quietTimers[s.key] = run
+            main.postDelayed(run, QUIET_MS)
+        }
     }
 
     /** The view's grid changed size: resize the emulator and tell the agent. */
@@ -289,6 +426,7 @@ class SessionRepository(
                     s.emulator.resize(event.cols, event.rows)
                 }
                 s.emulator.muteResponses = false
+                s.replayUntil = event.seq
                 s.bump(); s.onOutput?.invoke()
                 s.startupInput?.let { queued -> s.startupInput = null; input(s, queued) }
             }
@@ -301,6 +439,7 @@ class SessionRepository(
                         s.emulator.feed(event.data)
                         s.emulator.muteResponses = false
                         s.onOutput?.invoke()
+                        if (event.seq > s.replayUntil) onLiveOutput(s, event.data)
                     }
                     SessionStream.Verdict.GAP -> { Log.w(TAG, "gap in ${s.sessionId}; re-attaching"); attach(s, s.emulator.cols, s.emulator.rows) }
                     else -> {}
@@ -322,11 +461,14 @@ class SessionRepository(
                 s.state = "exited"; s.exitCode = event.code
                 s.emulator.feed("\r\n[2m[process exited with code ${event.code ?: "?"}][0m\r\n")
                 s.onOutput?.invoke(); s.bump()
+                dropBroadcastTarget(s)
                 onSessionExited?.invoke(s)
             }
             is RelayEvent.SessionClosed -> find(event.agentId, event.sessionId)?.let { s ->
                 s.state = "closed"; s.closedReason = event.reason
                 s.stream.onDisconnected()
+                setQuietAlert(s, false)
+                dropBroadcastTarget(s)
                 if (event.reason != "closed" && event.reason != "exited") s.emulator.feed("\r\n[2m[terminal closed: ${event.reason}][0m\r\n")
                 s.onOutput?.invoke(); s.bump()
             }
@@ -373,5 +515,7 @@ class SessionRepository(
         private const val TAG = "SessionRepository"
         /** 192 KiB raw → 256 KiB base64, comfortably inside the relay's 1 MiB frame limit. */
         private const val CHUNK_BYTES = 192 * 1024
+        /** How long a terminal must stay silent for "Notify when output stops". */
+        const val QUIET_MS = 10_000L
     }
 }

@@ -67,6 +67,10 @@ const KEYS = {
   pinnedTerminals: 'pinned_terminals',
   commandHistory: 'command_history',
   wheelTabs: 'wheel_switch_tabs',
+  clickableLinks: 'clickable_links',
+  filesShowHidden: 'files_show_hidden',
+  filesSort: 'files_sort',
+  processSort: 'process_sort',
   closeTabOnExit: 'close_tab_on_exit',
   closeToTray: 'close_to_tray',
   presets: 'terminal_presets',
@@ -182,6 +186,21 @@ export class Settings extends Emitter {
   /** A horizontal wheel gesture (or Ctrl+Tab) moves to the next/previous tab. */
   get wheelSwitchTabs() { return this.get(KEYS.wheelTabs, true); }
   set wheelSwitchTabs(v) { this.set(KEYS.wheelTabs, !!v); }
+
+  /** Ctrl+click opens links in terminal output. */
+  get clickableLinks() { return this.get(KEYS.clickableLinks, true); }
+  set clickableLinks(v) { this.set(KEYS.clickableLinks, !!v); }
+
+  /* ---------------------------- files, processes ------------------------ */
+
+  get filesShowHidden() { return this.get(KEYS.filesShowHidden, false); }
+  set filesShowHidden(v) { this.set(KEYS.filesShowHidden, !!v); }
+
+  get filesSort() { return this.get(KEYS.filesSort, 'name'); }
+  set filesSort(v) { this.set(KEYS.filesSort, v); }
+
+  get processSort() { return this.get(KEYS.processSort, 'cpu'); }
+  set processSort(v) { this.set(KEYS.processSort, v); }
 
   /**
    * Whether a tab closes itself when its shell finishes. Only a clean exit

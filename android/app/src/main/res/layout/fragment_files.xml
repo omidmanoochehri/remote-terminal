@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A folder on a machine: where you are (breadcrumbs), a filter, any transfer
+  in progress, and the folder's contents. Everything happens under the
+  agent's browsable root; the root has no parent.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <include
+        android:id="@+id/headerBar"
+        layout="@layout/view_back_header" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="@dimen/rt_gutter"
+        android:paddingEnd="8dp">
+
+        <ImageButton
+            android:id="@+id/upButton"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:padding="8dp"
+            android:scaleType="fitCenter"
+            android:background="@drawable/rt_icon_tile"
+            android:src="@drawable/ic_rt_chevron_up"
+            android:contentDescription="@string/files_up"
+            app:tint="@color/rt_text" />
+
+        <HorizontalScrollView
+            android:id="@+id/crumbScroll"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="10dp"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:id="@+id/crumbRow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical" />
+        </HorizontalScrollView>
+
+        <ImageButton
+            android:id="@+id/refreshButton"
+            style="@style/Widget.RemoteTerminal.IconButton"
+            android:src="@drawable/ic_rt_refresh"
+            android:padding="12dp"
+            android:contentDescription="@string/refresh" />
+    </LinearLayout>
+
+    <include
+        android:id="@+id/searchBar"
+        layout="@layout/view_search_field" />
+
+    <include
+        android:id="@+id/transfer"
+        layout="@layout/view_transfer_bar" />
+
+    <TextView
+        android:id="@+id/truncatedNote"
+        style="@style/RtText.RowMeta"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:paddingStart="@dimen/rt_gutter"
+        android:paddingEnd="@dimen/rt_gutter"
+        android:text="@string/files_truncated"
+        android:visibility="gone" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="8dp">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:scrollbars="vertical" />
+
+        <include
+            android:id="@+id/stateBlock"
+            layout="@layout/view_state_block" />
+
+        <ProgressBar
+            android:id="@+id/loading"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="top|center_horizontal"
+            android:layout_marginTop="40dp"
+            android:indeterminateTint="@color/rt_primary"
+            android:visibility="gone" />
+    </FrameLayout>
+</LinearLayout>

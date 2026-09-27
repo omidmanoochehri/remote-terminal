@@ -61,6 +61,8 @@ class App {
     this.agents = null;   // filled in by start()
     this.sessions = null;
     this.notifier = null;
+    /** Broadcast input: { sourceKey, targets:Set<key> } while typing goes to several tabs. */
+    this.broadcast = null;
 
     this.stack = [];      // pushed screens over the current destination
     this.destination = 'home';
@@ -135,6 +137,15 @@ class App {
   openMachine(agentId, tab = 'terminals') {
     this.notifier?.noteAgentUsed(agentId);
     this.push('machine', { agentId, tab });
+  }
+
+  /**
+   * The machine's file browser, optionally at [path]; from a terminal, pass
+   * its key so "Insert path" can type into it.
+   */
+  openFiles(agentId, { path = null, sessionKey = null } = {}) {
+    this.notifier?.noteAgentUsed(agentId);
+    this.push('machine', { agentId, tab: 'files', path, sessionKey });
   }
 
   openMachineSettings(agentId) { this.push('machineSettings', { agentId }); }
@@ -232,6 +243,8 @@ export async function start() {
   app.notifier = new Notifier(settings, app.client, app.agents, app.sessions);
 
   app.client.keepAliveInBackground = () => app.sessions.wantsBackgroundKeepAlive();
+  // A watch the user set fires in the window as well as in the notification area.
+  app.notifier.onAlert = (title) => toast(title, { ms: 6000 });
   app.sessions.onClipboard = (_session, text) => {
     if (settings.osc52Clipboard) system.clipboardWriteText(text).catch(() => {});
   };

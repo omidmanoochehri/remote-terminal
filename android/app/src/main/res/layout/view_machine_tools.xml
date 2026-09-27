@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The machine's tools beside its terminals: its files and its processes. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="13dp"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/rt_gutter"
+    android:paddingEnd="@dimen/rt_gutter"
+    android:baselineAligned="false">
+
+    <LinearLayout
+        android:id="@+id/toolFiles"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="11dp"
+        android:background="@drawable/rt_card_clickable"
+        android:clickable="true"
+        android:focusable="true">
+
+        <FrameLayout
+            android:layout_width="@dimen/rt_tile_sm"
+            android:layout_height="@dimen/rt_tile_sm"
+            android:background="@drawable/rt_icon_tile_quiet">
+
+            <ImageView
+                android:id="@+id/toolFilesIcon"
+                android:layout_width="@dimen/rt_icon_md"
+                android:layout_height="@dimen/rt_icon_md"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_rt_folder"
+                android:importantForAccessibility="no"
+                app:tint="@color/rt_primary" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="10dp"
+            android:orientation="vertical">
+
+            <TextView
+                style="@style/RtText.RowTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:text="@string/tool_files" />
+
+            <TextView
+                android:id="@+id/toolFilesHint"
+                style="@style/RtText.RowMeta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="@string/tool_files_hint" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <Space android:layout_width="10dp" android:layout_height="1dp" />
+
+    <LinearLayout
+        android:id="@+id/toolProcesses"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="11dp"
+        android:background="@drawable/rt_card_clickable"
+        android:clickable="true"
+        android:focusable="true">
+
+        <FrameLayout
+            android:layout_width="@dimen/rt_tile_sm"
+            android:layout_height="@dimen/rt_tile_sm"
+            android:background="@drawable/rt_icon_tile_quiet">
+
+            <ImageView
+                android:id="@+id/toolProcessesIcon"
+                android:layout_width="@dimen/rt_icon_md"
+                android:layout_height="@dimen/rt_icon_md"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_rt_activity"
+                android:importantForAccessibility="no"
+                app:tint="@color/rt_accent" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="10dp"
+            android:orientation="vertical">
+
+            <TextView
+                style="@style/RtText.RowTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:text="@string/tool_processes" />
+
+            <TextView
+                android:id="@+id/toolProcessesHint"
+                style="@style/RtText.RowMeta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="@string/tool_processes_hint" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

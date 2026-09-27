@@ -108,6 +108,13 @@ export function parseIncoming(text) {
         size: Number(o.size) || 0,
         reqId: optStr(o, 'reqId'),
       };
+    case 'agent.response':
+      return {
+        kind: 'agentResponse',
+        agentId: String(o.agent),
+        reqId: optStr(o, 'reqId'),
+        result: o.result && typeof o.result === 'object' && !Array.isArray(o.result) ? o.result : {},
+      };
     case 'error':
       return makeError(String(o.code ?? 'internal'), String(o.message ?? ''), optStr(o, 'reqId'), optStr(o, 'agent'), optStr(o, 'session'));
     case 'pong':

@@ -75,6 +75,18 @@ A pairing code is enough to open a shell on this machine as the
 user. Codes are single\-use and expire in minutes, but treat one like a
 password while it is valid.
 .PP
+A paired app can also browse, download, upload, rename and delete files under
+that user's home folder, and list and end that user's processes. In
+.IR /etc/remote\-terminal\-agent/config.json ,
+.B \(dqfileBrowser\(dq: false
+and
+.B \(dqprocessManager\(dq: false
+turn either off,
+.B \(dqfilesRoot\(dq
+confines the file browser to another folder, and
+.B \(dqallowProcessKill\(dq: false
+allows listing processes but not ending them.
+.PP
 The unit ships with the hardening that costs a terminal nothing. The stricter
 settings, and what each of them breaks, are listed as comments in
 .IR /lib/systemd/system/remote\-terminal\-agent.service ;

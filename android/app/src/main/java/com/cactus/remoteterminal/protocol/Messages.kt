@@ -221,4 +221,8 @@ object Outgoing {
         msg("file.end").put("reqId", reqId).put("agent", agent).put("session", session).toString()
     fun fileAbort(reqId: String, agent: String, session: String) =
         msg("file.abort").put("reqId", reqId).put("agent", agent).put("session", session).toString()
+
+    /** A question for the machine itself — files, processes (PROTOCOL.md §6b). */
+    fun agentRequest(reqId: String, agent: String, method: String, params: JSONObject) =
+        msg("agent.request").put("reqId", reqId).put("agent", agent).put("method", method).put("params", params).toString()
 }

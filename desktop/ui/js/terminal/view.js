@@ -19,6 +19,7 @@
 
 import { TerminalEmulator } from './emulator.js';
 import { REMOTE } from './theme.js';
+import { linkAt } from './links.js';
 import { ModifierState } from './modifiers.js';
 import * as Keys from './keyencoder.js';
 import {
@@ -61,6 +62,13 @@ export class TerminalView {
     this.onSwitchTab = null;
     this.onSearchResult = null;
     this.onContextMenu = null;
+    /** Ctrl+click on a link in the output (the host decides what opening means). */
+    this.onOpenLink = null;
+
+    /** "Clickable links": Ctrl+hover underlines a link, Ctrl+click opens it. */
+    this.linksEnabled = true;
+    this.hoverLink = null;
+    this.lastPointer = null;
 
     /** Cursor style from settings; a DECSCUSR request from the application wins. */
     this.cursorStyleSetting = CURSOR_BLOCK;
@@ -112,6 +120,8 @@ export class TerminalView {
   }
 
   destroy() {
+    window.removeEventListener('keydown', this.onModifierKey, true);
+    window.removeEventListener('keyup', this.onModifierKey, true);
     clearInterval(this.blinkTimer);
     this.resizeObserver.disconnect();
     this.input.remove();
@@ -335,6 +345,7 @@ export class TerminalView {
       if (abs >= total) break;
       const row = em.rowAt(abs);
       this.drawRow(row, y);
+      if (this.hoverLink) this.drawLinkRow(abs, y);
       if (sel && abs >= sel[0] && abs <= sel[2]) this.drawSelectionRow(abs, y, sel, row.cols);
       if (this.matches.length > 0) this.drawSearchRow(abs, y);
       if (showCursor && abs === cursorAbs) this.drawCursor(row, y);
@@ -493,6 +504,15 @@ export class TerminalView {
     this.ctx.fillRect(from * this.charW, y, (to - from + 1) * this.charW, this.lineH);
   }
 
+  /** The underline under a hovered link (Ctrl held), in the cursor colour. */
+  drawLinkRow(abs, y) {
+    for (const span of this.hoverLink.spans) {
+      if (span.row !== abs) continue;
+      this.ctx.fillStyle = this.theme.cursor;
+      this.ctx.fillRect(span.startCol * this.charW, y + this.lineH - 2, (span.endCol - span.startCol + 1) * this.charW, 1);
+    }
+  }
+
   drawSearchRow(abs, y) {
     const ctx = this.ctx;
     for (let i = 0; i < this.matches.length; i++) {
@@ -598,6 +618,16 @@ export class TerminalView {
       this.onContextMenu?.(e);
     });
     canvas.addEventListener('mousedown', () => this.focus());
+    canvas.addEventListener('mouseleave', () => this.setHoverLink(null));
+
+    // Ctrl pressed or released while the pointer rests on a link.
+    this.onModifierKey = (e) => {
+      if (e.key !== 'Control') return;
+      if (e.type === 'keyup' || !this.lastPointer) { this.setHoverLink(null); return; }
+      this.updateHover(this.lastPointer.x, this.lastPointer.y, true);
+    };
+    window.addEventListener('keydown', this.onModifierKey, true);
+    window.addEventListener('keyup', this.onModifierKey, true);
 
     this.input.addEventListener('keydown', (e) => this.onKeyDown(e));
     this.input.addEventListener('compositionstart', () => { this.composing = ' '; });
@@ -646,8 +676,37 @@ export class TerminalView {
     return this.emulator.mouseMode !== MOUSE_OFF && this.follow && !e.shiftKey;
   }
 
+  /* -------------------------------- links --------------------------------- */
+
+  /** The link under a point, or null: `{ url, spans }`. */
+  linkAtPoint(clientX, clientY) {
+    const rect = this.canvas.getBoundingClientRect();
+    if (clientX < rect.left || clientX >= rect.right || clientY < rect.top || clientY >= rect.bottom) return null;
+    const [col, row] = this.cellAt(clientX, clientY);
+    return linkAt(this.emulator, row, col);
+  }
+
+  updateHover(clientX, clientY, ctrl) {
+    this.setHoverLink(ctrl && this.linksEnabled && !this.selecting ? this.linkAtPoint(clientX, clientY) : null);
+  }
+
+  setHoverLink(link) {
+    const same = (a, b) => (a == null && b == null) || (a != null && b != null && a.url === b.url &&
+      a.spans[0].row === b.spans[0].row && a.spans[0].startCol === b.spans[0].startCol);
+    if (same(this.hoverLink, link)) return;
+    this.hoverLink = link;
+    this.canvas.style.cursor = link ? 'pointer' : '';
+    this.canvas.title = link ? link.url : '';
+    this.invalidate();
+  }
+
   onMouseDown(e) {
     if (e.button === 2) return; // the context menu handler takes it
+    // Ctrl+click on a link opens it, even over a program that reports the mouse.
+    if (e.button === 0 && e.ctrlKey && this.linksEnabled) {
+      const link = this.linkAtPoint(e.clientX, e.clientY);
+      if (link) { this.onOpenLink?.(link.url); e.preventDefault(); return; }
+    }
     if (this.reportsMouse(e)) {
       const [col, row] = this.cellAt(e.clientX, e.clientY, true);
       const m = this.mouseMods(e);
@@ -674,6 +733,8 @@ export class TerminalView {
   }
 
   onMouseMove(e) {
+    this.lastPointer = { x: e.clientX, y: e.clientY };
+    if (e.ctrlKey || this.hoverLink) this.updateHover(e.clientX, e.clientY, e.ctrlKey);
     if (this.selecting) {
       const [col, row] = this.cellAt(e.clientX, e.clientY);
       this.selection.endRow = row;

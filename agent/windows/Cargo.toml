@@ -1,6 +1,6 @@
 [package]
 name = "remote-terminal-agent-windows"
-version = "0.11.2"
+version = "0.12.0"
 description = "Remote Terminal agent for Windows — service supervisor and tray icon"
 authors = ["Cactus Software Group"]
 edition = "2021"

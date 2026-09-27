@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A file on its way to or from the machine: what, how far, and a way to stop it. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/transferBar"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="@dimen/rt_gutter"
+    android:layout_marginEnd="@dimen/rt_gutter"
+    android:layout_marginTop="10dp"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingStart="13dp"
+    android:paddingEnd="4dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
+    android:background="@drawable/rt_card"
+    android:visibility="gone"
+    tools:visibility="visible">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/transferLabel"
+            style="@style/RtText.RowTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:ellipsize="middle"
+            tools:text="Downloading backup.tar.gz…" />
+
+        <ProgressBar
+            android:id="@+id/transferProgress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:layout_marginTop="7dp"
+            android:max="1000"
+            android:progressTint="@color/rt_primary" />
+
+        <TextView
+            android:id="@+id/transferDetail"
+            style="@style/RtText.RowMeta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:maxLines="1"
+            tools:text="12 MB of 48 MB" />
+    </LinearLayout>
+
+    <ImageButton
+        android:id="@+id/transferCancel"
+        style="@style/Widget.RemoteTerminal.IconButton"
+        android:src="@drawable/ic_rt_close"
+        android:padding="12dp"
+        android:contentDescription="@string/cancel"
+        app:tint="@color/rt_text_muted" />
+</LinearLayout>

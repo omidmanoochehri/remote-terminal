@@ -85,6 +85,8 @@ export function settingsScreen(app) {
         String(s.terminalPresets.length), () => app.openPresets())
       .toggle('swipe', '--accent', S.settingWheelTabs, S.settingWheelTabsDesc,
         s.wheelSwitchTabs, (v) => { s.wheelSwitchTabs = v; })
+      .toggle('link', '--primary', S.settingClickableLinks, S.settingClickableLinksDesc,
+        s.clickableLinks, (v) => { s.clickableLinks = v; })
       .toggle('close', '--amber', S.settingCloseTabOnExit, S.settingCloseTabOnExitDesc,
         s.closeTabOnExit, (v) => { s.closeTabOnExit = v; })
       .toggle('keyboard', '--primary', S.settingExtraKeys, S.settingExtraKeysDesc,

@@ -86,6 +86,10 @@ class TerminalView @JvmOverloads constructor(context: Context, attrs: AttributeS
     var onSearchResult: ((Int, Int) -> Unit)? = null
     /** A sideways swipe across the grid: true for the next tab, false for the previous one. */
     var onSwipeTab: ((forward: Boolean) -> Unit)? = null
+    /** A tap landed on a link (see [LinkFinder]); the host offers to open or copy it. */
+    var onLinkTap: ((String) -> Unit)? = null
+    /** "Clickable links" in Settings. */
+    var linksEnabled: Boolean = true
 
     /** Cursor style from settings; a DECSCUSR request from the application overrides it. */
     var cursorStyleSetting: Int = TerminalEmulator.CURSOR_BLOCK
@@ -568,6 +572,13 @@ class TerminalView @JvmOverloads constructor(context: Context, attrs: AttributeS
         override fun onSingleTapUp(e: MotionEvent): Boolean {
             if (selection != null) { clearSelection(); return true }
             val em = emulator
+            // Links only when the program is not listening to the mouse: a tap
+            // in vim or htop with mouse support belongs to the program.
+            if (linksEnabled && onLinkTap != null && em.mouseMode == TerminalEmulator.MOUSE_OFF) {
+                val (col, row) = cellAt(e.x, e.y)
+                val link = LinkFinder.linkAt(em, row, col)
+                if (link != null) { onLinkTap?.invoke(link); return true }
+            }
             if (em.mouseMode != TerminalEmulator.MOUSE_OFF && follow) {
                 val (col, row) = cellAt(e.x, e.y, screenRelative = true)
                 em.mouseReport(TerminalEmulator.MOUSE_EVENT_PRESS, col, row, 0)?.let { onInput?.invoke(it) }

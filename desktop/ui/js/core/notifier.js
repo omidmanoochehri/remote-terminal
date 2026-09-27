@@ -3,10 +3,15 @@
  * using went offline, a terminal's process exited, a terminal rang the bell.
  * Raised only while the window is not in front and only when the corresponding
  * setting is on; never for ordinary output.
+ *
+ * The exception is a watch the user set on one terminal ("Watch for text…",
+ * "Notify when output stops"): that is an explicit request, so it notifies
+ * whether or not the window is in front, and shows an in-app toast as well.
  */
 
 import { notify } from './platform.js';
 import { S } from '../ui/strings.js';
+import { TextWatch, QuietWatch } from './watches.js';
 
 export class Notifier {
   constructor(settings, client, agents, sessions) {
@@ -17,6 +22,10 @@ export class Notifier {
     this.foreground = true;
     this.usedAgents = new Set();
     this.lastBell = 0;
+    /** The app shows watch alerts in the window too (a toast); set by the shell. */
+    this.onAlert = null;
+
+    sessions.on('liveOutput', (s, data) => this.onLiveOutput(s, data));
 
     client.on('event', (event) => this.onEvent(event));
 
@@ -42,6 +51,53 @@ export class Notifier {
     if (this.foreground && !perMachine) return;
     const name = this.agents.agent(event.agentId)?.name || 'A machine';
     notify(S.notifOfflineTitle(name), S.notifOfflineText);
+  }
+
+  /* ------------------------------- watches ------------------------------ */
+
+  watchText(s, text, keepWatching) {
+    s.textWatch = new TextWatch(text, keepWatching);
+    s.bump();
+  }
+
+  stopWatch(s) {
+    s.textWatch = null;
+    s.bump();
+  }
+
+  /** Arm "went quiet": it counts from the next output, so a silent tab waits. */
+  watchQuiet(s) {
+    s.quietWatch?.cancel();
+    s.quietWatch = new QuietWatch(() => {
+      s.quietWatch = null;
+      s.bump();
+      this.alert(S.watchQuietTitle(s.displayTitle), this.machineName(s));
+    });
+    s.bump();
+  }
+
+  stopQuiet(s) {
+    s.quietWatch?.cancel();
+    s.quietWatch = null;
+    s.bump();
+  }
+
+  onLiveOutput(s, data) {
+    s.quietWatch?.feed();
+    const watch = s.textWatch;
+    if (!watch || !watch.feed(data)) return;
+    if (!watch.keepWatching) { s.textWatch = null; s.bump(); }
+    this.alert(S.watchMatchTitle(watch.text, s.displayTitle), this.machineName(s));
+  }
+
+  alert(title, body) {
+    notify(title, body);
+    this.onAlert?.(title, body);
+  }
+
+  machineName(s) {
+    const agent = this.agents.agent(s.agentId);
+    return agent?.name || agent?.hostname || '';
   }
 
   notifyExit(s) {

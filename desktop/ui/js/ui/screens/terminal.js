@@ -24,7 +24,11 @@ import { State as StreamState } from '../../protocol/stream.js';
 import { ConnectionState } from '../../core/relay.js';
 import { presence, connectionLabel, connectionTone, duration } from '../../core/format.js';
 import { FONT_SYSTEM } from '../../core/settings.js';
-import { system, pickFile } from '../../core/platform.js';
+import { system, pickFile, pickSavePath, localFiles } from '../../core/platform.js';
+import { isOpenable } from '../../terminal/links.js';
+import { transcriptText, transcriptFileName } from '../../core/transcript.js';
+import { encodeUtf8Base64 } from '../../core/remoteFiles.js';
+import { featureGate } from '../../core/requests.js';
 
 /** The control shortcuts the sheet offers, as on the phone. */
 const SHORTCUT_KEYS = [
@@ -41,6 +45,8 @@ export function terminalScreen(app, { agentId, sessionId }) {
   let creating = false;
   let uploadLabel = null;
   let tabUnsubscribe = null;
+  /** Set while typing something only this terminal should get (an uploaded file's path). */
+  let noBroadcast = false;
 
   /* ------------------------------- markup ------------------------------- */
 
@@ -60,6 +66,12 @@ export function terminalScreen(app, { agentId, sessionId }) {
 
   const tabStrip = el('div.tab-strip', { role: 'tablist' });
   const banner = el('div.terminal-banner.hidden');
+  const broadcastText = el('span', { text: '' });
+  const broadcastBar = el('div.broadcast-bar.hidden', null,
+    svgIcon('radio'),
+    broadcastText,
+    el('span.spacer'),
+    el('button.link-button', { text: S.broadcastStop, onClick: () => stopBroadcast(true) }));
   const canvas = el('canvas', { tabindex: '-1' });
   const newLinesChip = el('button.new-lines-chip.hidden', { text: '', onClick: () => view.scrollToBottom() });
   const frame = el('div.terminal-frame', null, canvas, newLinesChip);
@@ -94,6 +106,7 @@ export function terminalScreen(app, { agentId, sessionId }) {
       headerAction('more', S.more, (e) => moreMenu(e.currentTarget))),
     tabStrip,
     searchBar,
+    broadcastBar,
     banner,
     frame,
     commandBar,
@@ -124,6 +137,7 @@ export function terminalScreen(app, { agentId, sessionId }) {
     searchCount.textContent = total === 0 ? S.searchNone : S.searchCount(cur, total);
   };
   view.onContextMenu = (e) => selectionMenu(e);
+  view.onOpenLink = (url) => openLink(url);
 
   keys.onKey = (spec) => {
     if (spec.action === Action.SPECIAL) view.sendKey(spec.key);
@@ -149,6 +163,16 @@ export function terminalScreen(app, { agentId, sessionId }) {
   };
   root.addEventListener('keydown', onKeyDown);
   screen.track(() => root.removeEventListener('keydown', onKeyDown));
+  // Ctrl+Shift+S has to be caught before the grid turns it into a control code.
+  const onKeyCapture = (e) => {
+    if (e.ctrlKey && e.shiftKey && !e.altKey && e.key.toLowerCase() === 's') {
+      saveTranscript();
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  };
+  root.addEventListener('keydown', onKeyCapture, true);
+  screen.track(() => root.removeEventListener('keydown', onKeyCapture, true));
   screen.track(() => view.destroy());
   screen.track(() => tabUnsubscribe?.());
   screen.track(() => system.setKeepAwake(false).catch(() => {}));
@@ -161,6 +185,7 @@ export function terminalScreen(app, { agentId, sessionId }) {
     view.setLineSpacing(s.lineSpacing);
     view.setFontFamily(s.terminalFontFamily === FONT_SYSTEM);
     view.wheelSwitchTabs = s.wheelSwitchTabs;
+    view.linksEnabled = s.clickableLinks;
     view.cursorStyleSetting =
       s.cursorStyle === 'underline' ? CURSOR_UNDERLINE : s.cursorStyle === 'bar' ? CURSOR_BAR : CURSOR_BLOCK;
     view.blinkEnabled = s.cursorBlink;
@@ -269,6 +294,7 @@ export function terminalScreen(app, { agentId, sessionId }) {
     ensureAttached(s);
     renderTabs();
     updateStatus();
+    renderBroadcast();
     view.focus();
 
     // One subscription at a time: switching tabs is cheap and frequent.
@@ -394,6 +420,156 @@ export function terminalScreen(app, { agentId, sessionId }) {
       if (s.state !== 'running') toast(S.terminalExited);
       else ensureAttached(s);
     }
+    if (!noBroadcast) broadcast(s, data);
+  }
+
+  /* ------------------------------ broadcast ----------------------------- */
+
+  /**
+   * While broadcasting from this tab, everything typed into it goes to the
+   * chosen tabs as well — keys, pastes, the command bar, shortcuts. Mouse
+   * reports do not (a click means something only where it was made), and
+   * neither do resizes. It lives on the app, not the screen, so switching
+   * away and back does not end it; it ends when its targets are gone.
+   */
+  function broadcast(s, data) {
+    const b = app.broadcast;
+    if (!b || b.sourceKey !== s.key) return;
+    if (/^\x1b\[(<|M)/.test(data)) return;
+    for (const key of [...b.targets]) {
+      const t = app.sessions.sessions.get(key);
+      if (!t || !t.isRunning) { b.targets.delete(key); continue; }
+      if (!app.sessions.input(t, data)) app.sessions.attach(t, t.emulator.cols, t.emulator.rows);
+    }
+    if (b.targets.size === 0) stopBroadcast(true);
+    else renderBroadcast();
+  }
+
+  async function chooseBroadcast() {
+    const s = current;
+    if (!s) return;
+    const others = [...app.sessions.sessions.values()].filter((t) => t !== s && t.isRunning);
+    if (others.length === 0) { toast(S.broadcastNone); return; }
+    // Across machines, each target says which machine it is on.
+    const spans = others.some((t) => t.agentId !== s.agentId);
+    const boxes = others.map((t) => {
+      const agent = app.agents.agent(t.agentId);
+      const machine = agent?.name || agent?.hostname || '';
+      const box = el('input', { type: 'checkbox', checked: true });
+      return {
+        t,
+        box,
+        row: el('label.check-row', null, box,
+          el('span', { text: spans && machine ? `${t.displayTitle} — ${machine}` : t.displayTitle })),
+      };
+    });
+    const ok = await customDialog({
+      title: S.broadcastTitle,
+      build: () => el('div', null,
+        el('p', { text: S.broadcastBody }),
+        boxes.map((b) => b.row)),
+      actions: [{ label: S.cancel, value: false }, { label: S.broadcastStart, value: true }],
+    });
+    if (!ok) return;
+    const targets = new Set(boxes.filter((b) => b.box.checked).map((b) => b.t.key));
+    if (targets.size === 0) return;
+    app.broadcast = { sourceKey: s.key, targets };
+    for (const key of targets) {
+      const t = app.sessions.sessions.get(key);
+      if (t) ensureAttached(t);
+    }
+    renderBroadcast();
+    view.focus();
+  }
+
+  function stopBroadcast(announce = false) {
+    if (!app.broadcast) return;
+    app.broadcast = null;
+    renderBroadcast();
+    if (announce) toast(S.broadcastStopped);
+  }
+
+  function renderBroadcast() {
+    const b = app.broadcast;
+    const on = !!b && !!current && b.sourceKey === current.key;
+    broadcastBar.classList.toggle('hidden', !on);
+    if (on) broadcastText.textContent = S.broadcastBanner(b.targets.size);
+  }
+
+  /* ------------------------------- links -------------------------------- */
+
+  function openLink(url) {
+    if (isOpenable(url)) {
+      system.openUrl(url).catch((err) => toast(String(err?.message || err), { error: true }));
+    } else {
+      copyToClipboard(url);
+      toast(S.linkNotOpenable);
+    }
+  }
+
+  /* ----------------------------- transcript ----------------------------- */
+
+  async function saveTranscript() {
+    const s = current;
+    if (!s) return;
+    const text = transcriptText(s.emulator);
+    if (!text) { toast(S.transcriptEmpty); return; }
+    try {
+      const path = await pickSavePath(transcriptFileName(s.displayTitle), [{ name: 'Text', extensions: ['txt'] }]);
+      if (!path) return;
+      await localFiles.write(path, 0, encodeUtf8Base64(text));
+      toast(S.transcriptSaved(path));
+    } catch (err) {
+      toast(String(err?.message || err), { error: true });
+    }
+  }
+
+  function copyTranscript() {
+    const s = current;
+    if (!s) return;
+    const text = transcriptText(s.emulator);
+    if (!text) { toast(S.transcriptEmpty); return; }
+    copyToClipboard(text);
+  }
+
+  /* ------------------------------- watches ------------------------------ */
+
+  async function watchForText() {
+    const s = current;
+    if (!s) return;
+    const input = el('input', { type: 'text', placeholder: S.watchLabel });
+    const keep = el('input', { type: 'checkbox' });
+    const ok = await customDialog({
+      title: S.watchTitle,
+      build: (done) => {
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') done(true); });
+        requestAnimationFrame(() => input.focus());
+        return el('div', null,
+          el('p', { text: S.watchBody }),
+          el('label.field-label', { text: S.watchLabel }),
+          el('div.field-well', null, input),
+          el('label.check-row', { style: { marginTop: '10px' } }, keep, el('span', { text: S.watchKeep })));
+      },
+      actions: [{ label: S.cancel, value: false }, { label: S.watchStart, value: true }],
+    });
+    const text = String(input.value).trim();
+    if (!ok || !text) return;
+    app.notifier.watchText(s, text, keep.checked);
+    toast(S.watchStarted(text));
+  }
+
+  function toggleQuietWatch() {
+    const s = current;
+    if (!s) return;
+    if (s.quietWatch) { app.notifier.stopQuiet(s); return; }
+    app.notifier.watchQuiet(s);
+    toast(S.notifyQuietArmed);
+  }
+
+  function browseFilesHere() {
+    const s = current;
+    if (!s) return;
+    app.openFiles(agentId, { path: s.cwd || null, sessionKey: s.key });
   }
 
   function sendCommandLine() {
@@ -512,7 +688,9 @@ export function terminalScreen(app, { agentId, sessionId }) {
     uploadLabel = null;
     updateStatus();
     if (result.ok) {
+      noBroadcast = true;
       view.sendRaw(shellQuote(result.path));
+      noBroadcast = false;
       toast(S.pasteFileDone(result.path));
     } else {
       toast(S.pasteFileFailed(result.error), { error: true });
@@ -523,7 +701,11 @@ export function terminalScreen(app, { agentId, sessionId }) {
 
   function selectionMenu(e) {
     const text = view.selectedText();
+    const link = app.settings.clickableLinks ? view.linkAtPoint(e.clientX, e.clientY) : null;
     menu({ getBoundingClientRect: () => new DOMRect(e.clientX, e.clientY, 0, 0) }, [
+      link && isOpenable(link.url) ? { label: S.openLink, icon: 'external', onClick: () => openLink(link.url) } : null,
+      link ? { label: S.copyLink, icon: 'link', onClick: () => copyToClipboard(link.url) } : null,
+      link ? { divider: true } : null,
       text ? { label: S.copy, icon: 'copy', onClick: () => { copyToClipboard(text); view.clearSelection(); } } : null,
       { label: S.paste, icon: 'save', onClick: () => paste() },
       { label: S.selectAll, icon: 'check', onClick: () => view.selectAll() },
@@ -536,6 +718,8 @@ export function terminalScreen(app, { agentId, sessionId }) {
     const s = current;
     const pinned = s ? app.settings.isPinnedTerminal(agentId, s.sessionId) : false;
     const presets = app.settings.presetsFor(agentId);
+    const filesOk = featureGate(app.client.caps, app.agents.agent(agentId), 'fs').ok;
+    const broadcasting = !!app.broadcast && !!s && app.broadcast.sourceKey === s.key;
     menu(anchor, [
       { label: S.newTerminal, icon: 'plus', onClick: () => newTerminal() },
       { label: S.actionDuplicate, icon: 'copy', onClick: () => duplicateCurrent() },
@@ -546,6 +730,19 @@ export function terminalScreen(app, { agentId, sessionId }) {
       { label: S.renameTerminal, icon: 'tag', onClick: () => s && renameTab(s) },
       { label: pinned ? S.actionUnpin : S.actionPin, icon: 'bookmark', onClick: () => s && app.settings.togglePinnedTerminal(agentId, s.sessionId) },
       { label: S.terminalThemeTitle, icon: 'moon_star', onClick: () => chooseTheme() },
+      { divider: true },
+      filesOk ? { label: S.browseFilesHere, icon: 'folder', onClick: () => browseFilesHere() } : null,
+      { label: S.saveTranscript, icon: 'save', onClick: () => saveTranscript() },
+      { label: S.copyTranscript, icon: 'copy', onClick: () => copyTranscript() },
+      broadcasting
+        ? { label: S.broadcastStopMenu, icon: 'radio', onClick: () => stopBroadcast(true) }
+        : { label: S.broadcastInput, icon: 'radio', onClick: () => chooseBroadcast() },
+      s?.textWatch
+        ? { label: S.watchStop, icon: 'bell', onClick: () => app.notifier.stopWatch(s) }
+        : { label: S.watchForText, icon: 'bell', onClick: () => watchForText() },
+      s?.quietWatch
+        ? { label: S.notifyQuietStop, icon: 'bell_ring', onClick: () => toggleQuietWatch() }
+        : { label: S.notifyQuiet, icon: 'bell_ring', onClick: () => toggleQuietWatch() },
       { divider: true },
       { label: S.shortcuts, icon: 'command', onClick: () => showShortcuts() },
       { label: S.paste, icon: 'save', onClick: () => paste() },
@@ -638,6 +835,13 @@ export function terminalScreen(app, { agentId, sessionId }) {
   /* ------------------------------ lifecycle ----------------------------- */
 
   function onTabs(changedAgentId) {
+    // A broadcast whose source or targets closed shrinks or ends with them.
+    const b = app.broadcast;
+    if (b) {
+      for (const key of [...b.targets]) if (!app.sessions.sessions.has(key)) b.targets.delete(key);
+      if (!app.sessions.sessions.has(b.sourceKey) || b.targets.size === 0) stopBroadcast(true);
+      else renderBroadcast();
+    }
     if (changedAgentId !== agentId) return;
     tabs = app.sessions.tabs(agentId);
     for (const s of tabs) bindUnread(s);

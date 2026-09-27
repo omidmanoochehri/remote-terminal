@@ -19,12 +19,18 @@ import com.cactus.remoteterminal.data.TerminalSession
 import com.cactus.remoteterminal.net.RelayClient
 import com.cactus.remoteterminal.protocol.RelayEvent
 import com.cactus.remoteterminal.ui.MainActivity
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 
 /**
  * Optional, quiet notifications: a machine you are using went offline, a
  * terminal's process exited, a terminal rang the bell. Only raised while the
  * app is in the background and only when the corresponding setting is on;
  * never for ordinary output.
+ *
+ * The exception is what the user explicitly asked to hear about — a watched
+ * text appearing, a terminal going quiet. Those always notify, and in the
+ * foreground they are also offered to the screen as [inApp] messages.
  */
 class Notifier(
     private val context: Context,
@@ -37,10 +43,24 @@ class Notifier(
     @Volatile var foreground = true
     private val usedAgents = HashSet<String>()
 
+    private val _inApp = MutableSharedFlow<String>(extraBufferCapacity = 8)
+    /** Alerts the user asked for, to show as a snackbar while the app is in front. */
+    val inApp: SharedFlow<String> = _inApp
+
     init {
         createChannels()
         client.addListener(this)
         sessions.onSessionExited = { s -> if (!foreground && settings.notifyExit) notifyExit(s) }
+        sessions.onWatchMatched = { s, text ->
+            val title = context.getString(R.string.notif_watch_title, text, s.displayTitle)
+            post(CHANNEL_ALERTS, (s.key + "|watch").hashCode(), title, agents.agent(s.agentId)?.name ?: "", s)
+            if (foreground) _inApp.tryEmit(title)
+        }
+        sessions.onQuiet = { s ->
+            val title = context.getString(R.string.notif_quiet_title, s.displayTitle)
+            post(CHANNEL_ALERTS, (s.key + "|quiet").hashCode(), title, agents.agent(s.agentId)?.name ?: "", s)
+            if (foreground) _inApp.tryEmit(title)
+        }
         sessions.onBell = { s ->
             if (foreground && settings.bell == "vibrate") vibrate()
             if (!foreground && settings.notifyBell) notifyBell(s)
@@ -119,10 +139,15 @@ class Notifier(
         nm.createNotificationChannel(NotificationChannel(CHANNEL_TERMINAL, context.getString(R.string.channel_terminal), NotificationManager.IMPORTANCE_DEFAULT).apply {
             description = context.getString(R.string.channel_terminal_desc)
         })
+        // Asked for by name, so they may make a sound where the others stay polite.
+        nm.createNotificationChannel(NotificationChannel(CHANNEL_ALERTS, context.getString(R.string.channel_alerts), NotificationManager.IMPORTANCE_HIGH).apply {
+            description = context.getString(R.string.channel_alerts_desc)
+        })
     }
 
     companion object {
         const val CHANNEL_STATUS = "status"
         const val CHANNEL_TERMINAL = "terminal"
+        const val CHANNEL_ALERTS = "alerts"
     }
 }

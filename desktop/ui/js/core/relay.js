@@ -14,6 +14,7 @@ import { Emitter } from './emitter.js';
 import { socket, listen } from './platform.js';
 import { parseIncoming, makeError } from '../protocol/incoming.js';
 import { Outgoing, PROTOCOL_VERSION } from '../protocol/messages.js';
+import { AgentRequests } from './requests.js';
 
 /** How long the socket is held after the window is hidden, then closed to idle quietly. */
 export const BACKGROUND_GRACE_MS = 90_000;
@@ -61,6 +62,11 @@ export class RelayClient extends Emitter {
     this.accountId = credentials.accountId;
     this.connId = null;
     this.limits = null;
+    /** What the relay said it can do (`welcome.caps`); `requests` gates Files and Processes. */
+    this.caps = [];
+
+    /** Agent requests (files, processes): their own reqIds, answered by agent.response or error. */
+    this.agentRequests = new AgentRequests((json) => this.send(json));
 
     this.wireSocketEvents();
     this.wireNetworkEvents();
@@ -240,6 +246,15 @@ export class RelayClient extends Emitter {
   nextReqId() { return `r${++this.reqCounter}`; }
 
   /**
+   * Ask a machine something (PROTOCOL.md §6b). Resolves to the method's result;
+   * rejects with a RequestError whose `code` is the agent's or relay's, or
+   * `timeout` / `disconnected`.
+   */
+  agentRequest(agentId, method, params = {}) {
+    return this.agentRequests.request(agentId, method, params);
+  }
+
+  /**
    * Send a request built with a fresh reqId and await the correlated reply
    * (`session.created`, `session.attached`, `file.stored` or `error`).
    */
@@ -289,6 +304,7 @@ export class RelayClient extends Emitter {
         this.deviceId = event.deviceId;
         this.accountId = event.accountId;
         this.limits = event.limits;
+        this.caps = event.caps;
         this.setState({ name: ConnectionState.CONNECTED });
         this.schedulePing(true);
         break;
@@ -299,7 +315,11 @@ export class RelayClient extends Emitter {
           this.emit('latency', this.latencyMs);
         }
         break;
+      case 'agentResponse':
+        this.agentRequests.handle(event);
+        return;
       case 'error': {
+        if (this.agentRequests.handle(event)) return;
         const resolve = event.reqId ? this.pending.get(event.reqId) : null;
         if (resolve) { resolve(event); return; }
         this.emit('relayError', event);
@@ -350,6 +370,7 @@ export class RelayClient extends Emitter {
       resolve(makeError('disconnected', 'Connection lost.'));
     }
     this.pending.clear();
+    this.agentRequests.failAll('disconnected', 'Connection lost.');
 
     if (code === 4401) {
       console.warn('relay revoked this device');

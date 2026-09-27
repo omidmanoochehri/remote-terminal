@@ -59,6 +59,14 @@ function loadConfig(env = process.env, overrides = {}) {
     maxUploadBytes: n(env.MAX_UPLOAD_BYTES, file.maxUploadBytes, 16 * 1024 * 1024),
     maxUploads: n(env.MAX_UPLOADS, file.maxUploads, 3),
     uploadTimeoutSec: n(env.UPLOAD_TIMEOUT_SEC, file.uploadTimeoutSec, 120),
+    // The app's file browser and process manager (agent requests fs.* and
+    // proc.*). The browser is confined to filesRoot — by default the home of
+    // whoever the terminals belong to — and never reaches outside it.
+    fileBrowser: b(env.FILE_BROWSER, file.fileBrowser, true),
+    filesRoot: s(env.FILES_ROOT, file.filesRoot, ''),
+    maxFileWriteBytes: n(env.MAX_FILE_WRITE_BYTES, file.maxFileWriteBytes, 512 * 1024 * 1024),
+    processManager: b(env.PROCESS_MANAGER, file.processManager, true),
+    allowProcessKill: b(env.ALLOW_PROCESS_KILL, file.allowProcessKill, true),
     inheritEnv: b(env.INHERIT_ENV, file.inheritEnv, false),
     // Windows only. Under the service the agent is LocalSystem, and a shell it
     // starts gets SYSTEM's profile rather than anybody's. "auto" routes those

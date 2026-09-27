@@ -150,10 +150,13 @@ export function actionsDialog({ title, items }) {
         el('button.button', { onClick: () => done(null) }, el('span', { text: S.cancel })))));
 }
 
-/** A dialog whose body the caller builds (the pairing code, the shortcuts sheet). */
-export function customDialog({ title, build, actions }) {
+/**
+ * A dialog whose body the caller builds (the pairing code, the shortcuts
+ * sheet, the file viewer). [wide] gives it most of the window.
+ */
+export function customDialog({ title, build, actions, wide = false }) {
   return showDialog((done) =>
-    el('div.dialog', { role: 'dialog', 'aria-modal': 'true' },
+    el(`div.dialog${wide ? '.wide' : ''}`, { role: 'dialog', 'aria-modal': 'true' },
       el('h2', { text: title }),
       el('div.dialog-body', null, build(done)),
       el('div.dialog-actions', null,

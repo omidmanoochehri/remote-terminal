@@ -76,6 +76,8 @@ class MachineFragment : Fragment(), RtScreen {
         }
 
         binding.newTerminalButton.setOnClickListener { host.openNewTerminal(agentId) }
+        binding.tools.toolFiles.setOnClickListener { agent?.let { MachineActions.openFiles(this, it) } }
+        binding.tools.toolProcesses.setOnClickListener { agent?.let { MachineActions.openProcesses(this, it) } }
         binding.heroCard.root.setOnClickListener { selectTab(Tab.DETAILS) }
 
         selectTab(tab)
@@ -180,12 +182,28 @@ class MachineFragment : Fragment(), RtScreen {
         hero.heroIcon.setImageResource(if (agent.isWindows) R.drawable.ic_rt_monitor else R.drawable.ic_rt_server)
         Design.tint(hero.heroIcon, if (agent.online) R.color.rt_primary else R.color.rt_text_muted)
 
+        renderTools(agent)
         renderPresets(agent)
         renderTerminals(agent)
         renderDetails(agent, state)
 
         binding.newTerminalButton.isEnabled = agent.online
         binding.newTerminalButton.alpha = if (agent.online) 1f else 0.5f
+    }
+
+    /**
+     * Files and Processes stay visible whatever the machine can do, so they
+     * are discoverable; when one cannot be used its hint says why instead.
+     */
+    private fun renderTools(agent: AgentInfo) {
+        val t = binding.tools
+        val caps = app.client.relayCaps
+        val filesWhy = MachineActions.toolUnavailable(requireContext(), caps, agent, files = true)
+        val procsWhy = MachineActions.toolUnavailable(requireContext(), caps, agent, files = false)
+        t.toolFilesHint.text = filesWhy ?: getString(R.string.tool_files_hint)
+        t.toolProcessesHint.text = procsWhy ?: getString(R.string.tool_processes_hint)
+        t.toolFiles.alpha = if (filesWhy == null) 1f else 0.55f
+        t.toolProcesses.alpha = if (procsWhy == null) 1f else 0.55f
     }
 
     /**

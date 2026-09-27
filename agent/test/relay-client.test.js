@@ -277,3 +277,51 @@ test('backpressure pauses shells while the socket buffer is high and resumes aft
   client.stop();
   await relay.close();
 });
+
+test('agent requests are dispatched to their service, answered, and refused cleanly', async () => {
+  const relay = fakeRelay();
+  const { spawn } = makeFakeSpawn();
+  const cfg = testConfig({ server: `ws://127.0.0.1:${relay.port}` });
+  const sessions = new SessionManager({ cfg, log, shells: SHELLS, spawn });
+  const seen = [];
+  const refuse = (code, message) => { const e = new Error(message); e.code = code; throw e; };
+  const files = {
+    handle: async (method, params) => {
+      seen.push([method, params]);
+      if (method === 'fs.read') refuse('not_found', 'no\nsuch\tfile ' + 'x'.repeat(400));
+      if (method === 'fs.delete') refuse('ENOENT', 'a raw fs error is a bug, not a refusal');
+      if (method === 'fs.mkdir') throw new Error('boom');
+      return { entries: [] };
+    },
+  };
+  const client = new RelayClient({ cfg, state: { agentId: 'a_x', agentToken: 't', name: '' }, log, sessions, files, meta: META, shells: SHELLS });
+  const connP = relay.nextConn();
+  client.start();
+  const c = await connP;
+  const reg = await c.next((m) => m.type === 'agent.register');
+  assert.ok(reg.caps.includes('fs'), 'fs advertised when the service is present');
+  assert.ok(!reg.caps.includes('procs'), 'procs not advertised without the service');
+
+  c.send({ type: 'agent.request', client: 'c_p', reqId: 'q1', method: 'fs.list', params: { path: '/x' } });
+  assert.deepStrictEqual(await c.next((m) => m.reqId === 'q1'), { type: 'agent.response', client: 'c_p', reqId: 'q1', result: { entries: [] } });
+  assert.deepStrictEqual(seen[0], ['fs.list', { path: '/x' }]);
+
+  c.send({ type: 'agent.request', client: 'c_p', reqId: 'q2', method: 'fs.read', params: [] });
+  const e2 = await c.next((m) => m.reqId === 'q2');
+  assert.strictEqual(e2.type, 'error');
+  assert.strictEqual(e2.code, 'not_found');
+  assert.strictEqual(e2.client, 'c_p');
+  assert.ok(e2.message.length <= 256 && !/[\n\t]/.test(e2.message), 'message fits the relay rules');
+  assert.deepStrictEqual(seen[1][1], {}, 'non-object params become {}');
+
+  for (const [reqId, method] of [['q3', 'fs.delete'], ['q4', 'fs.mkdir']]) {
+    c.send({ type: 'agent.request', client: 'c_p', reqId, method, params: {} });
+    const e = await c.next((m) => m.reqId === reqId);
+    assert.deepStrictEqual([e.code, e.message], ['internal', 'internal error'], `${method}: bugs do not leak details`);
+  }
+
+  c.send({ type: 'agent.request', client: 'c_p', reqId: 'q5', method: 'proc.list', params: {} });
+  assert.strictEqual((await c.next((m) => m.reqId === 'q5')).code, 'unsupported');
+  client.stop();
+  await relay.close();
+});

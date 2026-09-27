@@ -15,6 +15,12 @@
 
   "metricsIntervalMs": 20000,
 
+  "fileBrowser": true,
+  "filesRoot": "",
+  "maxFileWriteBytes": 536870912,
+  "processManager": true,
+  "allowProcessKill": true,
+
   "inheritEnv": false,
   "runAsUser": "auto",
   "allowRoot": false,

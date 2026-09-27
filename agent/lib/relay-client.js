@@ -24,12 +24,15 @@ const FATAL_CLOSE = { 4401: 'revoked', 4409: 'replaced', 4426: 'upgrade_required
 
 class RelayClient extends EventEmitter {
   /**
-   * @param {{cfg, state, log, sessions, meta, shells, uploads?, metrics?, WebSocketImpl?, now?}} opts
+   * @param {{cfg, state, log, sessions, meta, shells, uploads?, files?, procs?, metrics?, WebSocketImpl?, now?}} opts
+   *   `files` / `procs` answer the app's `fs.*` / `proc.*` requests; null turns them off.
    */
-  constructor({ cfg, state, log, sessions, meta, shells, uploads = null, metrics = undefined, WebSocketImpl = WebSocket, now = Date.now }) {
+  constructor({ cfg, state, log, sessions, meta, shells, uploads = null, files = null, procs = null, metrics = undefined, WebSocketImpl = WebSocket, now = Date.now }) {
     super();
     this.cfg = cfg;
     this.uploads = uploads;
+    this.files = files;
+    this.procs = procs;
     this.state = state;
     this.log = log;
     this.sessions = sessions;
@@ -231,7 +234,9 @@ class RelayClient extends EventEmitter {
   }
 
   error(msg, code, message, extra) {
-    const out = Object.assign({ type: 'error', code, message }, extra);
+    // The relay refuses control characters and anything past 256 characters.
+    const text = String(message || code).replace(/[\x00-\x1F\x7F]+/g, ' ').slice(0, 256);
+    const out = Object.assign({ type: 'error', code, message: text }, extra);
     if (msg.reqId !== undefined) out.reqId = msg.reqId;
     if (msg.client !== undefined) out.client = msg.client;
     if (msg.session !== undefined) out.session = msg.session;
@@ -244,10 +249,18 @@ class RelayClient extends EventEmitter {
       instanceId: this.instanceId,
       name: this.state.name || this.cfg.name || undefined,
       shells: advertise(this.shells),
-      caps: AGENT_CAPS,
+      caps: this.caps(),
       sessions: this.sessions.list(),
       metrics: this.registerMetrics(),
     }, this.meta));
+  }
+
+  /** What this agent can do: the fixed set, plus the request areas that are switched on. */
+  caps() {
+    const caps = AGENT_CAPS.slice();
+    if (this.files) caps.push('fs');
+    if (this.procs) caps.push('procs');
+    return caps;
   }
 
   /* -------------------------------- receive ------------------------------- */
@@ -277,6 +290,7 @@ class RelayClient extends EventEmitter {
       case 'file.abort': return this.onFile(m);
       case 'session.close': return this.guarded(m, () => this.sessions.close(m.session, 'closed'));
       case 'session.rename': return this.guarded(m, () => this.sessions.rename(m.session, String(m.title).slice(0, 64)));
+      case 'agent.request': return this.onRequest(m);
       case 'input': return this.onInput(m);
       case 'resize': return this.guarded(m, () => this.sessions.get(m.session).resize(m.cols | 0, m.rows | 0));
       case 'pong': break;
@@ -353,6 +367,32 @@ class RelayClient extends EventEmitter {
       if (code === 'internal') this.log.error('file transfer failed', { err: err.message });
       else this.log.warn('file transfer rejected', { code, err: err.message });
       this.error(m, code, err.message);
+    }
+    return undefined;
+  }
+
+  /**
+   * A question for the machine rather than a terminal. Each area is a service
+   * that throws errors carrying a protocol `code`; anything else is a bug and
+   * is reported as `internal` without its details.
+   */
+  async onRequest(m) {
+    const method = typeof m.method === 'string' ? m.method : '';
+    const area = method.split('.')[0];
+    const service = area === 'fs' ? this.files : area === 'proc' ? this.procs : null;
+    if (!service) return this.error(m, 'unsupported', `this agent does not support "${method}"`);
+    const params = m.params && typeof m.params === 'object' && !Array.isArray(m.params) ? m.params : {};
+    try {
+      const result = await service.handle(method, params);
+      this.send({ type: 'agent.response', client: m.client, reqId: m.reqId, result: result || {} });
+    } catch (err) {
+      if (err && err.code && typeof err.code === 'string' && !/^E[A-Z]+$/.test(err.code)) {
+        this.log.debug('request refused', { method, code: err.code, err: err.message });
+        this.error(m, err.code, err.message);
+      } else {
+        this.log.error('request failed', { method, err: err && err.message });
+        this.error(m, 'internal', 'internal error');
+      }
     }
     return undefined;
   }

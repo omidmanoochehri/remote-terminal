@@ -25,6 +25,8 @@ sealed class RelayEvent {
     data class SessionLag(val agentId: String, val sessionId: String) : RelayEvent()
     data class Output(val agentId: String, val sessionId: String, val seq: Long, val data: String) : RelayEvent()
     data class FileStored(val agentId: String, val sessionId: String, val path: String, val size: Long, val reqId: String?) : RelayEvent()
+    /** The answer to an `agent.request`; failures arrive as [Error] with the same reqId. */
+    data class AgentResponse(val agentId: String, val reqId: String, val result: JSONObject) : RelayEvent()
     data class Error(val code: String, val message: String, val reqId: String?, val agentId: String?, val sessionId: String?) : RelayEvent() {
         /** Human-readable text for the UI. */
         val display: String
@@ -81,6 +83,7 @@ object Incoming {
             "session.closed" -> RelayEvent.SessionClosed(o.getString("agent"), o.getString("session"), o.optString("reason", "closed"))
             "session.lag" -> RelayEvent.SessionLag(o.getString("agent"), o.getString("session"))
             "file.stored" -> RelayEvent.FileStored(o.getString("agent"), o.getString("session"), o.optString("path"), o.optLong("size", 0L), o.str("reqId"))
+            "agent.response" -> RelayEvent.AgentResponse(o.optString("agent"), o.getString("reqId"), o.optJSONObject("result") ?: JSONObject())
             "error" -> RelayEvent.Error(o.optString("code", "internal"), o.optString("message"), o.str("reqId"), o.str("agent"), o.str("session"))
             "pong" -> RelayEvent.Pong
             else -> RelayEvent.Unknown(type)

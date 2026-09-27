@@ -147,6 +147,11 @@ class AppSettingsFragment : Fragment(), RtScreen {
                 checked = s.swipeSwitchTabs,
             ) { value -> s.raw.edit().putBoolean(Settings.KEY_SWIPE_TABS, value).apply() }
             .toggle(
+                R.drawable.ic_rt_link, R.color.rt_primary,
+                getString(R.string.setting_clickable_links), getString(R.string.setting_clickable_links_desc),
+                checked = s.clickableLinks,
+            ) { value -> s.raw.edit().putBoolean(Settings.KEY_CLICKABLE_LINKS, value).apply() }
+            .toggle(
                 R.drawable.ic_rt_keyboard, R.color.rt_primary,
                 getString(R.string.setting_extra_keys), getString(R.string.setting_extra_keys_desc),
                 checked = s.showExtraKeys,

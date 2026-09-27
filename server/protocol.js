@@ -48,6 +48,9 @@ const MIME_RE = /^[A-Za-z0-9!#$&^_.+-]{1,32}\/[A-Za-z0-9!#$&^_.+-]{1,32}$/;
 const BASE64_RE = /^[A-Za-z0-9+/=\r\n]*$/;
 // Anything that could escape the upload directory or confuse a shell.
 const FILENAME_BAD_RE = /[\/\\]|^\.\.?$/;
+// Requests a phone makes of an agent itself (files, processes): `area.verb`.
+const METHOD_RE = /^[a-z][a-z0-9]{0,15}\.[a-z][a-zA-Z0-9]{0,15}$/;
+const isPlainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 
 const isInt = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
 const isDims = (m) => isInt(m.cols, 1, MAX_COLS) && isInt(m.rows, 1, MAX_ROWS);
@@ -169,6 +172,12 @@ function validatePhoneMessage(m, limits) {
       if (!isId(m.session, 's')) return bad('invalid session');
       if (m.reqId === undefined) return bad('reqId is required');
       return OK;
+    case 'agent.request':
+      if (!isId(m.agent, 'a')) return bad('invalid agent');
+      if (m.reqId === undefined) return bad('reqId is required');
+      if (typeof m.method !== 'string' || !METHOD_RE.test(m.method)) return bad('invalid method');
+      if (m.params !== undefined && !isPlainObject(m.params)) return bad('invalid params');
+      return OK;
     default:
       return bad(`unknown type "${m.type}"`);
   }
@@ -241,6 +250,11 @@ function validateAgentMessage(m) {
       if (m.reqId === undefined) return bad('reqId is required');
       if (!isShort(m.path, 4096)) return bad('invalid path');
       if (!isInt(m.size, 0, MAX_UPLOAD_BYTES)) return bad('invalid size');
+      return OK;
+    case 'agent.response':
+      if (!isId(m.client, 'c')) return bad('missing client');
+      if (m.reqId === undefined) return bad('reqId is required');
+      if (!isPlainObject(m.result)) return bad('invalid result');
       return OK;
     case 'error':
       if (!isShort(m.code, 32)) return bad('invalid code');

@@ -2,7 +2,8 @@
 //!
 //! The Rust side owns exactly what a web view cannot do for itself: the relay
 //! socket (which needs an `Authorization` header), the HTTPS pairing calls,
-//! the credential store, the clipboard, the tray icon and the app lock.
+//! the credential store, the clipboard, local files for the file browser's
+//! transfers, opening links, the tray icon and the app lock.
 //! Everything above that
 //! — the protocol state machine, the terminal emulator, the screens — lives in
 //! `ui/` and is a port of the Android app, so the two clients stay in step.
@@ -10,6 +11,7 @@
 mod http;
 mod store;
 mod sys;
+mod transfer;
 mod tray;
 mod ws;
 
@@ -45,6 +47,11 @@ pub fn run() {
             sys::set_keep_awake,
             sys::app_lock_available,
             sys::app_lock_prompt,
+            transfer::local_file_info,
+            transfer::local_file_read,
+            transfer::local_file_write,
+            transfer::local_file_remove,
+            transfer::open_url,
             tray::set_close_to_tray,
         ])
         .run(tauri::generate_context!())

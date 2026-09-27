@@ -34,7 +34,7 @@ and picks up exactly where it left off when you come back.
   └────────────────────────────────────────┘  └────────────────────────────────┘
 ```
 
-Version **0.11.2**, wire protocol **v3** — see [`PROTOCOL.md`](./PROTOCOL.md)
+Version **0.12.0**, wire protocol **v3** — see [`PROTOCOL.md`](./PROTOCOL.md)
 for the complete wire format.
 
 ---
@@ -144,8 +144,8 @@ Use TLS in production (`wss://`) — see [TLS and reverse proxies](#tls-and-reve
 
 ```bash
 cd agent
-./packaging/build-deb.sh                       # -> dist/remote-terminal-agent_0.11.2_amd64.deb
-sudo apt install ./dist/remote-terminal-agent_0.11.2_amd64.deb
+./packaging/build-deb.sh                       # -> dist/remote-terminal-agent_0.12.0_amd64.deb
+sudo apt install ./dist/remote-terminal-agent_0.12.0_amd64.deb
 
 sudo remote-terminal-agent configure \
   --server wss://relay.example.com \
@@ -220,7 +220,7 @@ journalctl -u remote-terminal-agent -f
 ```powershell
 cd agent\windows\installer
 powershell -ExecutionPolicy Bypass -File build-installer.ps1
-# -> RemoteTerminalAgentSetup-0.11.2.exe   (~4.6 MB)
+# -> RemoteTerminalAgentSetup-0.12.0.exe   (~4.6 MB)
 ```
 
 Double-click it. It asks for the relay URL, the enrolment token and a name for
@@ -397,7 +397,8 @@ A segmented screen:
   Windows PowerShell / Command Prompt / each WSL distribution on Windows;
   bash / zsh / sh … on Linux — the last choice is remembered per machine), a
   working directory (recent ones offered) and an optional start-up command.
-  Saved presets appear as one-tap chips.
+  Saved presets appear as one-tap chips. Two tiles above them open
+  **Files** and **Processes** (below).
 - **Details** — hostname, OS, architecture, agent version, and live **CPU /
   memory / disk / uptime** reported by the agent on Windows and Linux alike. A
   figure a platform cannot answer reads *not reported* rather than zero.
@@ -439,6 +440,41 @@ confirmations wherever you tap it.
   preset, rename, pin, shortcuts, paste, paste image, attach file, per-terminal
   colour scheme, select all, clear, toggle the command bar or the key rows,
   close.
+
+### Files
+
+A file browser for the machine, confined to the home folder of whoever its
+terminals run as. Breadcrumbs, filter, hidden files on demand, and sort by
+name, size or date. A file can be viewed (text up to 1 MiB, images),
+downloaded, shared, renamed, deleted, or have its path copied — or typed into
+the terminal you came from, never executed. A folder can open a new terminal
+already `cd`'d into it. Upload files into the current folder; a name that is
+already taken asks *Replace* or *Skip*. Transfers go in 192 KiB slices with a
+progress bar and cancel, and a partial upload never appears as a finished file.
+*Browse files here* in a terminal's menu opens the folder that terminal is in.
+
+### Processes
+
+Every process on the machine with its CPU share, memory and owner, busiest
+first, refreshed every three seconds while you are looking. Sort by CPU,
+memory or name, and filter by name, pid, user or command line. *End process*
+asks it to exit; *Force end* stops it at once; both ask first. Under the Windows
+service only the signed-in user's processes can be ended — the button says so
+for the rest.
+
+### More in a terminal
+
+- **Links** — tap a URL in the output to open or copy it (Ctrl+click on the
+  desktop). *Settings → Terminal → Clickable links* turns it off.
+- **Transcript** — save or share everything the terminal holds, scrollback
+  included, as plain text.
+- **Broadcast input** — pick other open terminals, on any machine, and
+  everything you type goes to all of them until you tap *Stop*. Handy for the
+  same command on several servers.
+- **Watch for text** — get a notification when a word appears in the output
+  (a build's `FAILED`, a deploy's `ready`), once or every time.
+- **Notify when output stops** — a notification when a busy terminal has been
+  quiet for ten seconds: the long command has finished.
 
 ### Presets
 
@@ -643,6 +679,11 @@ default next to `index.js`; the installers use
 | `MAX_UPLOAD_BYTES` / `MAX_UPLOADS` | 16 MiB / 3 | Largest file, and transfers in flight per phone |
 | `UPLOAD_TIMEOUT_SEC` | 120 | A stalled transfer is discarded after this |
 | `METRICS_INTERVAL_MS` | 20000 | How often CPU / memory / disk / uptime are published (0 turns reporting off; anything below 2000 is clamped up) |
+| `FILE_BROWSER` | 1 | The app's file browser (`fs.*` requests); 0 turns it off |
+| `FILES_ROOT` | the terminal owner's home | The one folder the file browser can reach; nothing outside it is listed, read or written, symlinks and junctions included |
+| `MAX_FILE_WRITE_BYTES` | 512 MiB | Largest file the file browser accepts as an upload |
+| `PROCESS_MANAGER` | 1 | The app's process list (`proc.*` requests); 0 turns it off |
+| `ALLOW_PROCESS_KILL` | 1 | Whether the process list can end processes; 0 keeps it read-only |
 | `ALLOW_ROOT` | 0 | Permit running as root on Linux |
 | `COALESCE_MS` / `MAX_CHUNK` | 16 / 32 KiB | Output coalescing window and chunk size |
 | `BASE_BACKOFF_MS` / `MAX_BACKOFF_MS` | 1000 / 30000 | Reconnect backoff |
@@ -731,6 +772,15 @@ Remote shell access deserves a careful setup.
   falls back to LocalSystem, which *is* administrative, exactly as an SSH
   server's would be — set `"runAsUser": "always"` to refuse that, or install
   with `-Account <user>` to run the whole service as one person.
+- **Files and processes.** The file browser and the process manager answer as
+  the person a terminal belongs to, never as more. Files are confined to one
+  folder — that person's home unless `filesRoot` says otherwise — and every
+  path is resolved through its symlinks and junctions before it is allowed, so
+  nothing outside it can be listed, read, written or deleted; deleting a link
+  removes the link, never what it points at. Under the Windows service the
+  agent is LocalSystem, so it ends only processes that belong to the signed-in
+  user, and it never ends itself. `fileBrowser`, `processManager` and
+  `allowProcessKill` turn each part off.
 - **Hardening you can turn up.** The systemd units ship with the protections
   that cost a terminal nothing (`ProtectSystem=full`, the `ProtectKernel*`
   family, `RestrictSUIDSGID`, an empty `CapabilityBoundingSet`). The stricter
@@ -928,7 +978,7 @@ terminating the session.
 ## Versioning and releases
 
 The project has **one version number**, shared by the server, the agent and the
-Android app and the desktop app — currently **0.11.2** — bumped by semver according to what the work
+Android app and the desktop app — currently **0.12.0** — bumped by semver according to what the work
 did. The Android `versionCode` is a plain integer that must strictly increase on
 every release. The wire protocol version (`v3`) is independent and changes only
 for an actual breaking wire change.
@@ -964,6 +1014,8 @@ A 0.2 client against a v3-only relay is refused with close code `4426`.
 - Two phones attached to one terminal share its size; the last resize wins.
 - Rotating the phone recreates the screen: tabs and shells persist, the scroll
   position does not.
+- Transfers in the file browser stop when you leave the Files screen; they do
+  not continue in the background.
 - Roadmap: optional binary framing, a per-user audit log, mutual TLS or device
   attestation, and session survival across agent restarts via `tmux`/`screen`.
 

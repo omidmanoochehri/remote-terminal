@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Machine tools (files, processes) and the terminal extras that came with them
+  (links, transcripts, broadcast, watches). The wording is shared with the
+  desktop app's strings.js; change both together.
+-->
+<resources>
+
+    <!-- Machine screen entries -->
+    <string name="tool_files">Files</string>
+    <string name="tool_processes">Processes</string>
+    <string name="tool_files_hint">Browse, download, upload</string>
+    <string name="tool_processes_hint">What is running, and end it</string>
+    <string name="tool_files_unsupported">Update the agent on this machine to use Files.</string>
+    <string name="tool_processes_unsupported">Update the agent on this machine to use Processes.</string>
+    <string name="tool_machine_offline">%1$s is offline.</string>
+
+    <!-- Files -->
+    <string name="files_title">Files</string>
+    <string name="files_empty">This folder is empty</string>
+    <string name="files_empty_body">Upload files here, or create a folder.</string>
+    <string name="files_no_match">Nothing here matches “%1$s”</string>
+    <string name="files_filter_hint">Filter this folder</string>
+    <string name="files_up">Up</string>
+    <string name="files_truncated">Showing the first 2,000 entries of this folder.</string>
+    <string name="files_error_title">Cannot open this folder</string>
+    <string name="files_sort">Sort by</string>
+    <string name="files_sort_name">Name</string>
+    <string name="files_sort_size">Size</string>
+    <string name="files_sort_modified">Modified</string>
+    <string name="files_show_hidden">Show hidden files</string>
+    <string name="files_upload">Upload files</string>
+    <string name="files_new_folder">New folder</string>
+    <string name="files_new_folder_hint">Folder name</string>
+    <string name="files_open_terminal_here">Open terminal here</string>
+    <string name="files_view">View</string>
+    <string name="files_download">Download</string>
+    <string name="files_share">Share</string>
+    <string name="files_copy_path">Copy path</string>
+    <string name="files_insert_path">Insert path</string>
+    <string name="files_rename">Rename</string>
+    <string name="files_delete">Delete</string>
+    <string name="files_open">Open</string>
+    <string name="files_delete_title">Delete “%1$s”?</string>
+    <string name="files_delete_file_body">This deletes the file on %1$s. It cannot be undone.</string>
+    <string name="files_delete_folder_body">This deletes the folder and everything in it on %1$s. It cannot be undone.</string>
+    <string name="files_exists_title">“%1$s” already exists</string>
+    <string name="files_replace">Replace</string>
+    <string name="files_skip">Skip</string>
+    <string name="files_downloading">Downloading %1$s…</string>
+    <string name="files_uploading">Uploading %1$s…</string>
+    <string name="files_progress">%1$s of %2$s</string>
+    <string name="files_downloaded">Saved %1$s</string>
+    <string name="files_uploaded">Uploaded %1$s</string>
+    <string name="files_failed">%1$s</string>
+    <string name="files_cancelled">Cancelled</string>
+    <string name="files_too_large_to_view">Too large to view here; download it instead.</string>
+    <string name="files_not_text">This file does not look like text.</string>
+    <string name="files_cannot_read">Cannot read that file on this phone.</string>
+    <string name="files_path_inserted">Path typed into the terminal</string>
+    <string name="files_meta">%1$s · %2$s</string>
+    <string name="files_folder">Folder</string>
+    <string name="files_link">Link</string>
+    <plurals name="files_count">
+        <item quantity="one">%d item</item>
+        <item quantity="other">%d items</item>
+    </plurals>
+
+    <!-- Processes -->
+    <string name="processes_title">Processes</string>
+    <plurals name="processes_count">
+        <item quantity="one">%d process</item>
+        <item quantity="other">%d processes</item>
+    </plurals>
+    <string name="processes_filter_hint">Filter by name, PID, user or command</string>
+    <string name="processes_sort_cpu">CPU</string>
+    <string name="processes_sort_memory">Memory</string>
+    <string name="processes_sort_name">Name</string>
+    <string name="processes_none">No process matches “%1$s”</string>
+    <string name="processes_error_title">Cannot list processes</string>
+    <string name="process_meta">PID %1$d · %2$s</string>
+    <string name="process_pid">PID</string>
+    <string name="process_ppid">Parent PID</string>
+    <string name="process_user">User</string>
+    <string name="process_command">Command line</string>
+    <string name="process_cpu">CPU</string>
+    <string name="process_memory">Memory</string>
+    <string name="process_end">End process</string>
+    <string name="process_force_end">Force end</string>
+    <string name="process_end_title">End %1$s (%2$d)?</string>
+    <string name="process_end_body">The process is asked to exit. Unsaved work in it may be lost.</string>
+    <string name="process_force_body">The process is stopped immediately. Unsaved work in it will be lost.</string>
+    <string name="process_kill_off">Ending processes is turned off on this machine.</string>
+    <string name="process_kill_not_own">Only %1$s\'s processes can be ended from here.</string>
+    <string name="process_ended">%1$s was asked to exit</string>
+    <string name="process_force_ended">%1$s was stopped</string>
+
+    <!-- Terminal extras -->
+    <string name="action_browse_files_here">Browse files here</string>
+    <string name="action_save_transcript">Save transcript</string>
+    <string name="action_share_transcript">Share transcript</string>
+    <string name="action_broadcast">Broadcast input…</string>
+    <string name="action_broadcast_stop">Stop broadcast</string>
+    <string name="action_watch">Watch for text…</string>
+    <string name="action_watch_stop">Stop watching</string>
+    <string name="action_quiet">Notify when output stops</string>
+    <string name="action_quiet_stop">Stop quiet alert</string>
+    <string name="transcript_saved">Transcript saved</string>
+    <string name="transcript_empty">Nothing to save yet</string>
+    <string name="broadcast_title">Broadcast input</string>
+    <string name="broadcast_start">Start</string>
+    <string name="broadcast_none">Open another terminal to broadcast to.</string>
+    <string name="broadcast_banner">Broadcasting to %1$d terminals</string>
+    <string name="broadcast_banner_one">Broadcasting to 1 terminal</string>
+    <string name="broadcast_stop">Stop</string>
+    <string name="watch_title">Watch for text</string>
+    <string name="watch_hint">Text to watch for</string>
+    <string name="watch_keep">Keep watching after a match</string>
+    <string name="watch_armed">Watching for “%1$s”</string>
+    <string name="quiet_armed">You will be notified when this terminal goes quiet</string>
+    <string name="close">Close</string>
+    <string name="link_open">Open link</string>
+    <string name="link_copy">Copy link</string>
+    <string name="link_cannot_open">No app here can open that link.</string>
+    <string name="setting_clickable_links">Clickable links</string>
+    <string name="setting_clickable_links_desc">Tap a link in a terminal to open or copy it</string>
+
+    <!-- Alerts -->
+    <string name="channel_alerts">Terminal alerts</string>
+    <string name="channel_alerts_desc">Watched text appeared, or a terminal went quiet</string>
+    <string name="notif_watch_title">“%1$s” appeared in %2$s</string>
+    <string name="notif_quiet_title">%1$s went quiet</string>
+</resources>

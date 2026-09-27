@@ -56,6 +56,16 @@ export class TerminalSession extends Emitter {
     /** When this tab was opened here; used until the relay reports createdAt. */
     this.openedAt = Date.now();
 
+    /**
+     * The stream position the last attach caught up to. Output at or before it
+     * is replayed history; only output after it is live, and only live output
+     * may fire a watch.
+     */
+    this.liveFrom = 0;
+    /** "Watch for text…" and "Notify when output stops", owned by the Notifier. */
+    this.textWatch = null;
+    this.quietWatch = null;
+
     this.version = 0;
   }
 
@@ -184,6 +194,9 @@ export class SessionRepository extends Emitter {
   closeTab(s, terminate) {
     if (terminate) this.client.send(Outgoing.sessionClose(s.agentId, s.sessionId));
     else this.detach(s);
+    s.quietWatch?.cancel();
+    s.quietWatch = null;
+    s.textWatch = null;
     this.sessions.delete(s.key);
     this.publish(s.agentId);
   }
@@ -320,6 +333,7 @@ export class SessionRepository extends Emitter {
         if (!s) break;
         const r = s.stream.onAttached(event.reqId, event.from, event.seq, event.cols, event.rows);
         if (!r.accepted) break;
+        s.liveFrom = event.seq;
         // Terminal query replies must be muted while applying replayed output;
         // they would otherwise inject stale answers into the shell.
         s.emulator.muteResponses = true;
@@ -343,6 +357,7 @@ export class SessionRepository extends Emitter {
         if (verdict === Verdict.APPLY) {
           s.emulator.feed(event.data);
           s.notifyOutput();
+          if (event.seq > s.liveFrom) this.emit('liveOutput', s, event.data);
         } else if (verdict === Verdict.GAP) {
           console.warn(`gap in ${s.sessionId}; re-attaching`);
           this.attach(s, s.emulator.cols, s.emulator.rows);

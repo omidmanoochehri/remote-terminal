@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What is running on a machine, refreshed while the screen is in front. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <include
+        android:id="@+id/headerBar"
+        layout="@layout/view_back_header" />
+
+    <include
+        android:id="@+id/searchBar"
+        layout="@layout/view_search_field" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="@dimen/rt_gutter"
+        android:paddingEnd="@dimen/rt_gutter">
+
+        <LinearLayout
+            android:id="@+id/sortRow"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="horizontal" />
+
+        <TextView
+            android:id="@+id/countLabel"
+            style="@style/RtText.RowMeta"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="8dp">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:scrollbars="vertical" />
+
+        <include
+            android:id="@+id/stateBlock"
+            layout="@layout/view_state_block" />
+
+        <ProgressBar
+            android:id="@+id/loading"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="top|center_horizontal"
+            android:layout_marginTop="40dp"
+            android:indeterminateTint="@color/rt_primary"
+            android:visibility="gone" />
+    </FrameLayout>
+</LinearLayout>

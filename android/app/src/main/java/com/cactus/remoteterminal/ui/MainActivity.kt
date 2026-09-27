@@ -98,6 +98,16 @@ class MainActivity : AppCompatActivity() {
         supportFragmentManager.executePendingTransactions()
         syncChrome()
 
+        // Watches and quiet alerts the user armed: said on screen as well as
+        // in the shade, because the user may be looking at another terminal.
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                app.notifier.inApp.collect { text ->
+                    com.google.android.material.snackbar.Snackbar.make(binding.root, text, com.google.android.material.snackbar.Snackbar.LENGTH_LONG).show()
+                }
+            }
+        }
+
         // A revoked or unpaired phone always lands back on pairing.
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -253,6 +263,12 @@ class MainActivity : AppCompatActivity() {
 
     fun openMachineSettings(agentId: String) = push(MachineSettingsFragment.newInstance(agentId), "machineSettings:$agentId")
 
+    /** The file browser; [path] null is the browsable root, [sessionId] the terminal "Insert path" types into. */
+    fun openFiles(agentId: String, path: String? = null, sessionId: String? = null) =
+        push(FilesFragment.newInstance(agentId, path, sessionId), "files:$agentId")
+
+    fun openProcesses(agentId: String) = push(ProcessesFragment.newInstance(agentId), "processes:$agentId")
+
     fun openTerminal(agentId: String, sessionId: String?) {
         app.notifier.noteAgentUsed(agentId)
         push(TerminalFragment.newInstance(agentId, sessionId), "terminal:$agentId")
@@ -311,6 +327,16 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton(R.string.permission_not_now, null)
             .show()
+    }
+
+    /**
+     * The user just armed an alert ("Watch for text…", "Notify when output
+     * stops"): the one moment asking for the permission needs no explaining.
+     */
+    fun ensureNotificationPermission() {
+        if (Build.VERSION.SDK_INT < 33) return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return
+        notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
     companion object {

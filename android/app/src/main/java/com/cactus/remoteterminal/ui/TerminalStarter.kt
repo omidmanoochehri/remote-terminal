@@ -50,6 +50,14 @@ object TerminalStarter {
         start(fragment, agent, shellId, title, cwd, "")
     }
 
+    /** A new terminal on [agentId] that starts in [directory] (the file browser's "Open terminal here"). */
+    fun openIn(fragment: Fragment, agentId: String, directory: String) {
+        val agent = resolve(fragment, agentId) ?: return
+        val app = fragment.requireActivity().application as App
+        val shellId = app.settings.lastShell(agentId)?.takeIf { id -> agent.shells.any { it.id == id } }
+        start(fragment, agent, shellId, "", directory, "")
+    }
+
     /** Resolve and vet the machine a start is aimed at. */
     private fun resolve(fragment: Fragment, agentId: String?): AgentInfo? {
         val app = fragment.requireActivity().application as App

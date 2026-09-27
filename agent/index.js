@@ -35,8 +35,10 @@ const { discoverShells, advertise } = require('./lib/shells');
 const { Metrics } = require('./lib/metrics');
 const { spawnPty, ptyAvailable } = require('./lib/pty');
 const { SessionManager } = require('./lib/sessions');
-const { chooseSpawner } = require('./lib/win-user-pty');
+const { chooseSpawner, probe, underSystemProfile } = require('./lib/win-user-pty');
 const { UploadManager } = require('./lib/uploads');
+const { FileService } = require('./lib/files');
+const { ProcessService } = require('./lib/procs');
 const { RelayClient } = require('./lib/relay-client');
 const relayHttp = require('./lib/http');
 
@@ -198,6 +200,8 @@ async function cmdDoctor(cfg, state, log) {
   console.log(`  Env policy:   ${cfg.inheritEnv ? 'INHERIT_ENV=1 (full environment passed to shells!)' : 'minimal allowlist'}`);
   console.log(`  Terminals as: ${await describeShellOwner(cfg, log)}`);
   console.log(`  Uploads:      ${cfg.uploadsDir || path.join(os.homedir(), 'RemoteTerminal')} (max ${Math.round(cfg.maxUploadBytes / (1024 * 1024))} MiB)`);
+  console.log(`  File browser: ${cfg.fileBrowser ? (cfg.filesRoot || 'home folder of the terminal owner') : 'off'}`);
+  console.log(`  Processes:    ${cfg.processManager ? (cfg.allowProcessKill ? 'list and end' : 'list only') : 'off'}`);
   console.log(`  Data dir:     ${cfg.dataDir}${writable(cfg.dataDir) ? '' : '  (NOT WRITABLE)'}`);
   console.log(`  Log file:     ${cfg.logToFile ? logFileFor(cfg) : '(file logging disabled)'}${underSystemd() ? '  — under systemd; use journalctl' : ''}`);
   console.log(`  Limits:       maxSessions=${cfg.maxSessions} replayBytes=${cfg.replayBytes} idleTimeoutSec=${cfg.idleTimeoutSec}`);
@@ -340,6 +344,24 @@ function describeMetrics(cfg, log) {
   return parts.join(', ');
 }
 
+/**
+ * Who the terminals belong to right now, as `{ user, cwd }` — nulls when
+ * nobody is signed in. Only the Windows launcher can change its answer;
+ * everywhere else it is this account.
+ */
+function terminalUserLookup(spawner, ttlMs = 30_000) {
+  let cached = null;
+  let at = 0;
+  return async () => {
+    if (!spawner.launcher) return { user: os.userInfo().username, cwd: os.homedir() };
+    if (cached && Date.now() - at < ttlMs) return cached;
+    const answer = await probe(spawner.launcher);
+    cached = answer && answer.ok ? { user: answer.user || null, cwd: answer.cwd || null } : { user: null, cwd: null };
+    at = Date.now();
+    return cached;
+  };
+}
+
 /* --------------------------------- agent ---------------------------------- */
 
 async function runAgent(cfg, state, log, fileSink) {
@@ -406,7 +428,27 @@ async function runAgent(cfg, state, log, fileSink) {
   uploads.startSweeper();
   log.info('uploads', { dir: cfg.uploadsDir, maxBytes: cfg.maxUploadBytes });
 
-  const client = new RelayClient({ cfg, state, log, sessions, uploads, meta: machineMeta(VERSION), shells });
+  // The file browser and the process manager act for the person the
+  // terminals belong to, never as more. Under the Windows service that person
+  // can sign in or out while we run, so the launcher is asked again (at most
+  // every half minute) rather than trusting what it said at start-up.
+  const terminalUser = terminalUserLookup(spawner);
+  const files = cfg.fileBrowser ? new FileService({
+    root: async () => cfg.filesRoot || (spawner.launcher ? (await terminalUser()).cwd : os.homedir()),
+    maxWriteBytes: cfg.maxFileWriteBytes,
+  }) : null;
+  const restricted = !!spawner.launcher && underSystemProfile();
+  const procs = cfg.processManager ? new ProcessService({
+    restricted,
+    owner: async () => (await terminalUser()).user,
+    allowKill: cfg.allowProcessKill,
+  }) : null;
+  log.info('requests', {
+    files: files ? (cfg.filesRoot || 'terminal home') : 'off',
+    processes: !procs ? 'off' : !cfg.allowProcessKill ? 'list' : restricted ? 'list, end own' : 'list, end',
+  });
+
+  const client = new RelayClient({ cfg, state, log, sessions, uploads, files, procs, meta: machineMeta(VERSION), shells });
   let registered = false;
   let lastError = null;
 

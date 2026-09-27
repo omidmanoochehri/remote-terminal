@@ -36,6 +36,8 @@ export function machineMenu(app, anchor, agent) {
     },
     { label: S.actionTerminals, icon: 'panel_top', onClick: () => app.openMachine(agent.agentId, 'terminals') },
     { label: S.newTerminal, icon: 'plus', onClick: () => app.openNewTerminal(agent.agentId) },
+    { label: S.tabFiles, icon: 'folder', onClick: () => app.openMachine(agent.agentId, 'files') },
+    { label: S.tabProcesses, icon: 'activity', onClick: () => app.openMachine(agent.agentId, 'processes') },
     { label: S.actionDetails, icon: 'info', onClick: () => app.openMachine(agent.agentId, 'details') },
     { label: S.actionSettings, icon: 'settings', onClick: () => app.openMachineSettings(agent.agentId) },
     { divider: true },

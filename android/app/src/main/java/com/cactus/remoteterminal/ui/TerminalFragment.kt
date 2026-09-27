@@ -37,6 +37,7 @@ import com.cactus.remoteterminal.protocol.SessionStream
 import com.cactus.remoteterminal.terminal.ExtraKeysView
 import com.cactus.remoteterminal.terminal.TerminalEmulator
 import com.cactus.remoteterminal.terminal.TerminalTheme
+import com.cactus.remoteterminal.terminal.Transcript
 import com.cactus.remoteterminal.ui.design.Design
 import com.cactus.remoteterminal.ui.design.visible
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -69,6 +70,14 @@ class TerminalFragment : Fragment(), RtScreen {
     /** "Attach file" picker: anything the phone can open, uploaded to the machine. */
     private val pickFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) uploadUri(uri, null)
+    }
+
+    /** "Save transcript": the text captured when the menu was used, waiting for the system picker. */
+    private var pendingTranscript: String? = null
+    private val saveTranscript = registerForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+        val text = pendingTranscript
+        pendingTranscript = null
+        if (uri != null && text != null) writeTranscript(uri, text)
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -110,6 +119,8 @@ class TerminalFragment : Fragment(), RtScreen {
         term.onCopy = { text -> copy(text) }
         term.onPasteRequest = { paste() }
         term.onSwipeTab = { forward -> swipeToTab(forward) }
+        term.onLinkTap = { url -> showLink(url) }
+        b.broadcastStop.setOnClickListener { current?.let { app.sessions.stopBroadcast(it) }; updateStatus() }
         term.onSearchResult = { cur, total ->
             b.searchCount.text = if (total == 0) getString(R.string.search_none) else getString(R.string.search_count, cur, total)
         }
@@ -215,6 +226,7 @@ class TerminalFragment : Fragment(), RtScreen {
         term.setLineSpacing(s.lineSpacing)
         term.setPreferSystemFont(s.terminalFontFamily == Settings.FONT_SYSTEM)
         term.swipeTabsEnabled = s.swipeSwitchTabs
+        term.linksEnabled = s.clickableLinks
         term.cursorStyleSetting = when (s.cursorStyle) {
             "underline" -> TerminalEmulator.CURSOR_UNDERLINE
             "bar" -> TerminalEmulator.CURSOR_BAR
@@ -441,13 +453,24 @@ class TerminalFragment : Fragment(), RtScreen {
             if (startedAt > 0) Format.duration(context, (System.currentTimeMillis() - startedAt) / 1000)
             else getString(R.string.value_unknown)
         b.statusFooter.contentDescription = "$footerLabel, ${b.footerTransport.text}, ${b.footerUptime.text}"
+        renderBroadcast()
+    }
+
+    /** The banner that says typing here also types elsewhere, and how many elsewheres. */
+    private fun renderBroadcast() {
+        val b = _binding ?: return
+        val s = current
+        val n = if (s == null) 0 else app.sessions.broadcastTargets(s).size
+        if (s != null && n == 0 && s.broadcastTo.isNotEmpty()) app.sessions.stopBroadcast(s)
+        b.broadcastBar.visible = n > 0
+        b.broadcastText.text = if (n == 1) getString(R.string.broadcast_banner_one) else getString(R.string.broadcast_banner, n)
     }
 
     /* -------------------------------- input ------------------------------- */
 
     private fun sendInput(data: String) {
         val s = current ?: return
-        if (!app.sessions.input(s, data)) {
+        if (!app.sessions.inputWithBroadcast(s, data)) {
             if (s.state != "running") Toast.makeText(requireContext(), R.string.terminal_exited, Toast.LENGTH_SHORT).show()
             else ensureAttached(s)
         }
@@ -626,6 +649,10 @@ class TerminalFragment : Fragment(), RtScreen {
         menu.menu.findItem(R.id.action_pin).title =
             getString(if (s != null && app.settings.isPinnedTerminal(agentId, s.sessionId)) R.string.action_unpin else R.string.action_pin)
         menu.menu.findItem(R.id.action_preset).isVisible = app.settings.presetsFor(agentId).isNotEmpty()
+        menu.menu.findItem(R.id.action_broadcast).title =
+            getString(if (s != null && s.broadcastTo.isNotEmpty()) R.string.action_broadcast_stop else R.string.action_broadcast)
+        menu.menu.findItem(R.id.action_watch).title = getString(if (s?.watch != null) R.string.action_watch_stop else R.string.action_watch)
+        menu.menu.findItem(R.id.action_quiet).title = getString(if (s?.quietAlert == true) R.string.action_quiet_stop else R.string.action_quiet)
         menu.setOnMenuItemClickListener { item ->
             val term = binding.terminal
             when (item.itemId) {
@@ -638,6 +665,16 @@ class TerminalFragment : Fragment(), RtScreen {
                 R.id.action_paste -> paste()
                 R.id.action_paste_file -> pasteFile(explicit = true)
                 R.id.action_attach_file -> attachFile()
+                R.id.action_browse_files -> browseFilesHere()
+                R.id.action_broadcast -> current?.let { if (it.broadcastTo.isNotEmpty()) { app.sessions.stopBroadcast(it); updateStatus() } else chooseBroadcast(it) }
+                R.id.action_watch -> current?.let { if (it.watch != null) app.sessions.clearWatch(it) else chooseWatch(it) }
+                R.id.action_quiet -> current?.let { s ->
+                    val on = !s.quietAlert
+                    app.sessions.setQuietAlert(s, on)
+                    if (on) { host.ensureNotificationPermission(); toast(getString(R.string.quiet_armed)) }
+                }
+                R.id.action_save_transcript -> current?.let { startSaveTranscript(it) }
+                R.id.action_share_transcript -> current?.let { shareTranscript(it) }
                 R.id.action_theme -> chooseTheme()
                 R.id.action_select_all -> term.selectAll()
                 R.id.action_clear -> { term.emulator.clearScreen(); term.notifyUpdated() }
@@ -691,6 +728,114 @@ class TerminalFragment : Fragment(), RtScreen {
             .setView(input)
             .setPositiveButton(R.string.save) { _, _ ->
                 input.text.toString().trim().takeIf { it.isNotEmpty() }?.let { app.sessions.rename(s, it) }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    /* ------------------------------- extras ------------------------------- */
+
+    /** A link in the output was tapped: open it or copy it, never either by surprise. */
+    private fun showLink(url: String) {
+        val items = ArrayList<ActionSheet.Item>()
+        // A file:// link names a file on the machine, not on this phone.
+        if (!url.startsWith("file:", ignoreCase = true)) {
+            items += ActionSheet.Item(getString(R.string.link_open), R.drawable.ic_rt_globe) {
+                try {
+                    startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url)))
+                } catch (_: Exception) { toast(getString(R.string.link_cannot_open)) }
+            }
+        }
+        items += ActionSheet.Item(getString(R.string.link_copy), R.drawable.ic_rt_copy) { copy(url) }
+        ActionSheet.show(requireContext(), url, null, items)
+    }
+
+    /** The file browser at this terminal's directory, with "Insert path" typing into it. */
+    private fun browseFilesHere() {
+        val agent = app.agents.agent(agentId) ?: return
+        val s = current
+        MachineActions.openFiles(this, agent, s?.cwd?.ifEmpty { null }, s?.sessionId)
+    }
+
+    private fun startSaveTranscript(s: TerminalSession) {
+        val text = Transcript.of(s.emulator)
+        if (text.isEmpty()) { toast(getString(R.string.transcript_empty)); return }
+        pendingTranscript = text
+        try { saveTranscript.launch(Transcript.fileName(s.displayTitle)) } catch (_: Exception) {
+            pendingTranscript = null
+            toast(getString(R.string.attach_file_unavailable))
+        }
+    }
+
+    private fun writeTranscript(uri: Uri, text: String) {
+        val cr = requireContext().contentResolver
+        viewLifecycleOwner.lifecycleScope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                runCatching { cr.openOutputStream(uri, "w")?.use { it.write(text.toByteArray(Charsets.UTF_8)) } != null }.getOrDefault(false)
+            }
+            toast(getString(if (ok) R.string.transcript_saved else R.string.files_cannot_read))
+        }
+    }
+
+    /** Short transcripts travel as text; long ones as a file, which every target app can take. */
+    private fun shareTranscript(s: TerminalSession) {
+        val text = Transcript.of(s.emulator)
+        if (text.isEmpty()) { toast(getString(R.string.transcript_empty)); return }
+        val subject = s.displayTitle
+        if (text.length <= SHARE_AS_TEXT_MAX) { Sharing.shareText(requireContext(), text, subject); return }
+        val context = requireContext()
+        viewLifecycleOwner.lifecycleScope.launch {
+            val file = withContext(Dispatchers.IO) {
+                Sharing.stagingFile(context, Transcript.fileName(subject)).also { it.writeText(text) }
+            }
+            Sharing.shareFile(context, file, "text/plain", subject)
+        }
+    }
+
+    /** Pick the other open terminals that should receive a copy of what is typed here. */
+    private fun chooseBroadcast(s: TerminalSession) {
+        val candidates = app.sessions.allTabs().filter { it !== s && it.isRunning }
+        if (candidates.isEmpty()) { toast(getString(R.string.broadcast_none)); return }
+        val multiMachine = candidates.any { it.agentId != agentId }
+        val labels = candidates.map { t ->
+            val machine = app.agents.agent(t.agentId)?.let { it.name.ifEmpty { it.hostname } } ?: ""
+            if (multiMachine) "${t.displayTitle} — $machine" else t.displayTitle
+        }.toTypedArray<CharSequence>()
+        val checked = BooleanArray(candidates.size) { true }
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.broadcast_title)
+            .setMultiChoiceItems(labels, checked) { _, which, isChecked -> checked[which] = isChecked }
+            .setPositiveButton(R.string.broadcast_start) { _, _ ->
+                app.sessions.startBroadcast(s, candidates.filterIndexed { i, _ -> checked[i] })
+                updateStatus()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun chooseWatch(s: TerminalSession) {
+        val context = requireContext()
+        val pad = Design.dp(context, 20f)
+        val input = EditText(context).apply {
+            setHint(R.string.watch_hint)
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+        }
+        val keep = android.widget.CheckBox(context).apply { setText(R.string.watch_keep) }
+        val box = android.widget.LinearLayout(context).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(pad, pad / 2, pad, 0)
+            addView(input)
+            addView(keep)
+        }
+        MaterialAlertDialogBuilder(context)
+            .setTitle(R.string.watch_title)
+            .setView(box)
+            .setPositiveButton(R.string.save) { _, _ ->
+                val text = input.text.toString()
+                if (text.isBlank()) return@setPositiveButton
+                app.sessions.setWatch(s, text, keep.isChecked)
+                host.ensureNotificationPermission()
+                toast(getString(R.string.watch_armed, text))
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
@@ -783,6 +928,8 @@ class TerminalFragment : Fragment(), RtScreen {
         private const val MAX_UPLOAD_BYTES = 16 * 1024 * 1024
         /** What an upload claims to be when the phone cannot say. */
         private const val DEFAULT_MIME = "application/octet-stream"
+        /** Longer transcripts are shared as a file; some apps truncate a long EXTRA_TEXT. */
+        private const val SHARE_AS_TEXT_MAX = 64 * 1024
         /** Session argument prefix meaning "create a new terminal with this shell id". */
         const val NEW_SESSION_PREFIX = "new:"
         fun newInstance(agentId: String, sessionId: String?) = TerminalFragment().apply {

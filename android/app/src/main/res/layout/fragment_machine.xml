@@ -41,6 +41,11 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
+                <!-- The machine's files and processes, beside its terminals. -->
+                <include
+                    android:id="@+id/tools"
+                    layout="@layout/view_machine_tools" />
+
                 <!-- Saved presets for this machine: one tap starts the terminal. -->
                 <HorizontalScrollView
                     android:id="@+id/presetScroll"

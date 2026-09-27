@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.appcompat.app.AppCompatDelegate
 import com.cactus.remoteterminal.data.AgentRepository
 import com.cactus.remoteterminal.data.CredentialStore
+import com.cactus.remoteterminal.data.RemoteFiles
 import com.cactus.remoteterminal.data.SessionRepository
 import com.cactus.remoteterminal.data.Settings
 import com.cactus.remoteterminal.net.RelayClient
@@ -21,6 +22,8 @@ class App : Application() {
     lateinit var agents: AgentRepository; private set
     lateinit var sessions: SessionRepository; private set
     lateinit var notifier: Notifier; private set
+    /** Files and processes on the machines, over agent requests. */
+    lateinit var remote: RemoteFiles; private set
 
     override fun onCreate() {
         super.onCreate()
@@ -32,6 +35,7 @@ class App : Application() {
         agents = AgentRepository(this, client)
         sessions = SessionRepository(client, agents, settings)
         notifier = Notifier(this, settings, client, agents, sessions)
+        remote = RemoteFiles(client)
         client.keepAliveInBackground = { sessions.wantsBackgroundKeepAlive() }
         sessions.onClipboard = { _, text ->
             if (settings.osc52Clipboard) {
