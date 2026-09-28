@@ -64,7 +64,7 @@ class QrScanFragment : Fragment(), RtScreen {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         binding.headerBar.root.padForStatusBar()
-        binding.manualButton.padForNavigationBar()
+        binding.manualButton.marginForNavigationBar()
 
         binding.headerBar.headerTitle.setText(R.string.qr_title)
         binding.headerBar.headerSubtitle.setText(R.string.qr_subtitle)

@@ -44,7 +44,7 @@ class DevicesFragment : Fragment(), RtScreen {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         binding.headerBar.root.padForStatusBar()
-        binding.addButton.padForNavigationBar()
+        binding.addButton.marginForNavigationBar()
         binding.headerBar.headerTitle.setText(R.string.devices)
         binding.headerBar.headerSubtitle.visible = false
         binding.headerBar.headerOverflow.visible = false

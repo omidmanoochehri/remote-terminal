@@ -53,7 +53,7 @@ class MachineFragment : Fragment(), RtScreen {
         binding.headerBar.root.padForStatusBar()
         binding.terminalsScroll.padForNavigationBar()
         binding.detailsScroll.padForNavigationBar()
-        binding.newTerminalButton.padForNavigationBar()
+        binding.newTerminalButton.marginForNavigationBar()
 
         tab = savedInstanceState?.getString(STATE_TAB)?.let { Tab.valueOf(it) }
             ?: requireArguments().getString(ARG_TAB)?.let { Tab.valueOf(it) }

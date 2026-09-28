@@ -11,7 +11,7 @@ upload into a session; a file browser and a process manager for every machine;
 clickable links, transcripts, broadcast input and output watches in the
 terminal; pairing; paired devices; notifications; the app lock.
 
-Version **0.12.0**, wire protocol **v3** — the same numbers the rest of the
+Version **0.12.1**, wire protocol **v3** — the same numbers the rest of the
 project carries.
 
 ---

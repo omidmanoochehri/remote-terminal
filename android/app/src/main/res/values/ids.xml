@@ -2,4 +2,5 @@
 <resources>
     <!-- Remembers a view's designed padding so window insets can be re-applied idempotently. -->
     <item name="tag_base_padding" type="id" />
+    <item name="tag_base_margin" type="id" />
 </resources>

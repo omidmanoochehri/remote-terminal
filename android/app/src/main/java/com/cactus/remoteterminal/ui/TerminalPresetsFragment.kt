@@ -41,7 +41,7 @@ class TerminalPresetsFragment : Fragment(), RtScreen {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         binding.headerBar.root.padForStatusBar()
-        binding.newPresetButton.padForNavigationBar()
+        binding.newPresetButton.marginForNavigationBar()
 
         binding.headerBar.headerTitle.setText(R.string.presets_title)
         binding.headerBar.headerSubtitle.setText(R.string.presets_subtitle)
