@@ -215,3 +215,122 @@ test('a platform that cannot answer keeps the directory the shell started in', a
   await sleep(10);
   assert.strictEqual(s.info().cwd, 'C:\\Users\\u');
 });
+
+/* ------------------------- what the terminal is running ------------------- */
+
+test('a session remembers the last command the shell echoed back', () => {
+  const { mgr, spawned, events } = setup();
+  const s = mgr.create({ shell: 'bash', cols: 80, rows: 24 });
+  // The shell echoes what is typed, as a shell at a prompt does.
+  const type = (text) => { for (const ch of text) { spawned[0].emitData(ch); s.write(ch); } };
+  type('tail -f app.log');
+  s.write('\r');
+  assert.strictEqual(s.command, 'tail -f app.log');
+  assert.strictEqual(s.info().command, 'tail -f app.log');
+  assert.ok(events.some((e) => e.ev === 'session.updated' && e.x.command === 'tail -f app.log'));
+
+  type('ls');
+  s.write('\r');
+  assert.strictEqual(s.command, 'ls', 'the newest one wins');
+});
+
+test('what the shell does not echo is never remembered: passwords stay out of the file', () => {
+  const { mgr, spawned } = setup();
+  const s = mgr.create({ shell: 'bash', cols: 80, rows: 24 });
+  for (const ch of 'sudo -v') { spawned[0].emitData(ch); s.write(ch); }
+  s.write('\r');
+  assert.strictEqual(s.command, 'sudo -v');
+
+  // A password prompt echoes nothing at all.
+  spawned[0].emitData('[sudo] password for u: ');
+  s.write('hunter2secret');
+  s.write('\r');
+  assert.strictEqual(s.command, 'sudo -v', 'the hidden line was not taken as a command');
+  assert.ok(!JSON.stringify(s.record()).includes('hunter2'));
+});
+
+test('editing a line is followed: backspace, ^C and arrow keys', () => {
+  const { mgr, spawned } = setup();
+  const s = mgr.create({ shell: 'bash', cols: 80, rows: 24 });
+  spawned[0].emitData('git status git log --oneline');  // everything we type is on screen
+  s.write('git statuz');
+  s.write('\x7f');           // backspace over the typo
+  s.write('s');
+  s.write('\r');
+  assert.strictEqual(s.command, 'git status');
+
+  s.write('rm -rf /');
+  s.write('\x03');            // ^C: that line never ran
+  s.write('\r');
+  assert.strictEqual(s.command, 'git status');
+
+  s.write('\x1b[A');          // up arrow (an escape sequence, not text)
+  s.write('git log --oneline');
+  s.write('\r');
+  assert.strictEqual(s.command, 'git log --oneline');
+});
+
+test('a shell that reports its directory is believed, whatever the platform', async () => {
+  const { spawn, spawned } = makeFakeSpawn();
+  const mgr = new SessionManager({
+    cfg: testConfig({ coalesceMs: 1 }), log, shells: SHELLS, spawn, cwd: 'C:\\Users\\u', readCwd: () => '',
+  });
+  const s = mgr.create({ shell: 'bash', cols: 80, rows: 24 });
+  const moved = [];
+  mgr.on('session.updated', (_s, patch) => { if (patch.cwd) moved.push(patch.cwd); });
+
+  spawned[0].emitData('\x1b]9;9;"C:\\Projects\\api"\x07prompt> ');
+  await sleep(5);
+  assert.strictEqual(s.cwd, 'C:\\Projects\\api');
+  spawned[0].emitData('\x1b]7;file://host/srv/with%20space\x07');
+  await sleep(5);
+  assert.strictEqual(s.cwd, '/srv/with space');
+  assert.deepStrictEqual(moved, ['C:\\Projects\\api', '/srv/with space']);
+});
+
+test('the agent can write a line of its own into a session', async () => {
+  const { mgr, events } = setup({ coalesceMs: 1 });
+  const s = mgr.create({ shell: 'bash', cols: 80, rows: 24 });
+  s.inject('[restored]\r\n');
+  await sleep(10);
+  const out = events.filter((e) => e.ev === 'output');
+  assert.strictEqual(out.length, 1);
+  assert.strictEqual(out[0].x.data, '[restored]\r\n');
+  assert.strictEqual(s.seq, '[restored]\r\n'.length, 'it is part of the stream like any other output');
+});
+
+test('the snapshot describes the running terminals, and changes are announced', () => {
+  const { mgr } = setup();
+  const changes = [];
+  mgr.on('session.changed', (snapshot) => changes.push(snapshot));
+  const a = mgr.create({ shell: 'bash', cols: 90, rows: 25, title: 'One' });
+  const b = mgr.create({ shell: 'sh', cols: 80, rows: 24, title: 'Two' });
+  assert.strictEqual(changes.length, 2);
+  assert.deepStrictEqual(mgr.snapshot().map((r) => [r.id, r.title, r.shell, r.cols]), [[a.id, 'One', 'bash', 90], [b.id, 'Two', 'sh', 80]]);
+
+  mgr.rename(a.id, 'Renamed');
+  assert.strictEqual(mgr.snapshot()[0].title, 'Renamed');
+  b.close('closed');
+  assert.strictEqual(mgr.snapshot().length, 1, 'a closed terminal is not described any more');
+  assert.ok(changes.length >= 4);
+});
+
+test('a line sent whole is remembered once the shell echoes it, and dropped when it does not', () => {
+  const { mgr, spawned, now } = setup({ coalesceMs: 1 });
+  const s = mgr.create({ shell: 'bash', cols: 80, rows: 24 });
+  // A snippet, a preset or the command bar: the whole line arrives at once,
+  // so the echo can only come afterwards.
+  s.write('docker compose up -d\r');
+  assert.strictEqual(s.command, '', 'nothing is believed before the shell answers');
+  spawned[0].emitData('docker compose up -d\r\n');
+  assert.strictEqual(s.command, 'docker compose up -d');
+
+  // A password sent the same way is never echoed, so it is forgotten.
+  spawned[0].emitData('Password: ');
+  s.write('hunter2secret\r');
+  spawned[0].emitData('\r\n');
+  now.t += 1000;
+  spawned[0].emitData('Login succeeded\r\n');
+  assert.strictEqual(s.command, 'docker compose up -d');
+  assert.strictEqual(s.candidate, null, 'and not kept waiting either');
+});

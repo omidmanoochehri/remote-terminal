@@ -58,6 +58,9 @@ class OutputRing {
     return { from: this.base, data: this.buf };
   }
 
+  /** The most recent [n] units of the stream (for "did the shell echo this?"). */
+  tail(n) { return n >= this.buf.length ? this.buf : this.buf.slice(this.buf.length - n); }
+
   clear() { this.buf = ''; this.base = this.head; }
 }
 

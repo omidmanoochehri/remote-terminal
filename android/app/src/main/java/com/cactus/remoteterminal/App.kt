@@ -2,6 +2,7 @@ package com.cactus.remoteterminal
 
 import android.app.Application
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 import com.cactus.remoteterminal.data.AgentRepository
 import com.cactus.remoteterminal.data.CredentialStore
 import com.cactus.remoteterminal.data.RemoteFiles
@@ -24,11 +25,14 @@ class App : Application() {
     lateinit var notifier: Notifier; private set
     /** Files and processes on the machines, over agent requests. */
     lateinit var remote: RemoteFiles; private set
+    /** Terminal recordings kept on this phone. */
+    lateinit var recordings: com.cactus.remoteterminal.data.Recordings; private set
 
     override fun onCreate() {
         super.onCreate()
         instance = this
         settings = Settings(this)
+        applyAppLanguage(settings.appLanguage)
         applyAppTheme(settings.appTheme)
         credentials = CredentialStore(this)
         client = RelayClient(this, credentials)
@@ -36,6 +40,7 @@ class App : Application() {
         sessions = SessionRepository(client, agents, settings)
         notifier = Notifier(this, settings, client, agents, sessions)
         remote = RemoteFiles(client)
+        recordings = com.cactus.remoteterminal.data.Recordings(this)
         client.keepAliveInBackground = { sessions.wantsBackgroundKeepAlive() }
         sessions.onClipboard = { _, text ->
             if (settings.osc52Clipboard) {
@@ -53,6 +58,15 @@ class App : Application() {
                 else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
             }
         )
+    }
+
+    fun applyAppLanguage(mode: String) {
+        val tags = when (mode) {
+            "fa" -> "fa"
+            "en" -> "en"
+            else -> ""
+        }
+        AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(tags))
     }
 
     companion object {

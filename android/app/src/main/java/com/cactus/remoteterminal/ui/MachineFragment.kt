@@ -16,6 +16,7 @@ import com.cactus.remoteterminal.databinding.ItemTerminalCardBinding
 import com.cactus.remoteterminal.databinding.ViewInfoRowBinding
 import com.cactus.remoteterminal.databinding.ViewMetricTileBinding
 import com.cactus.remoteterminal.net.RelayClient
+import com.cactus.remoteterminal.protocol.AgentCaps
 import com.cactus.remoteterminal.protocol.AgentInfo
 import com.cactus.remoteterminal.protocol.SessionInfo
 import com.cactus.remoteterminal.ui.design.Design
@@ -78,6 +79,7 @@ class MachineFragment : Fragment(), RtScreen {
         binding.newTerminalButton.setOnClickListener { host.openNewTerminal(agentId) }
         binding.tools.toolFiles.setOnClickListener { agent?.let { MachineActions.openFiles(this, it) } }
         binding.tools.toolProcesses.setOnClickListener { agent?.let { MachineActions.openProcesses(this, it) } }
+        binding.tools.toolSystem.setOnClickListener { agent?.let { MachineActions.openSystem(this, it) } }
         binding.heroCard.root.setOnClickListener { selectTab(Tab.DETAILS) }
 
         selectTab(tab)
@@ -204,6 +206,11 @@ class MachineFragment : Fragment(), RtScreen {
         t.toolProcessesHint.text = procsWhy ?: getString(R.string.tool_processes_hint)
         t.toolFiles.alpha = if (filesWhy == null) 1f else 0.55f
         t.toolProcesses.alpha = if (procsWhy == null) 1f else 0.55f
+        // System appears once the agent can answer it; offline it stays, dimmed, saying why.
+        t.toolSystem.visible = AgentCaps.systemView(caps, agent)
+        val systemWhy = MachineActions.systemUnavailable(requireContext(), caps, agent)
+        t.toolSystemHint.text = systemWhy ?: getString(R.string.tool_system_hint)
+        t.toolSystem.alpha = if (systemWhy == null) 1f else 0.55f
     }
 
     /**
@@ -260,10 +267,15 @@ class MachineFragment : Fragment(), RtScreen {
                     body = getString(R.string.empty_terminals_body),
                 )
             } else {
+                // An offline machine with a known MAC can be woken from here.
+                val canWake = app.settings.wakeTarget(agent.agentId) != null
                 binding.terminalsEmpty.show(
                     icon = R.drawable.ic_rt_wifi_off,
                     title = getString(R.string.machine_offline),
                     body = getString(R.string.agent_offline_hint),
+                    actionLabel = if (canWake) R.string.wol_wake else null,
+                    actionIcon = R.drawable.ic_rt_power,
+                    onAction = if (canWake) ({ WakeUi.wake(this, agent.agentId) }) else null,
                 )
             }
         } else {

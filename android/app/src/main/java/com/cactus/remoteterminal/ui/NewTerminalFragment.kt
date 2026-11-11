@@ -160,6 +160,14 @@ class NewTerminalFragment : Fragment(), RtScreen {
             binding.directoryField.fieldInput.setText(editing.directory)
             binding.commandField.fieldInput.setText(editing.command)
         }
+        // A draft: a terminal that is already running, offered as a preset.
+        val args = requireArguments()
+        if (savedInstanceState == null && editing == null && args.getString(ARG_DRAFT_NAME) != null) {
+            pendingShellId = args.getString(ARG_DRAFT_SHELL)
+            binding.nameField.fieldInput.setText(args.getString(ARG_DRAFT_NAME))
+            binding.directoryField.fieldInput.setText(args.getString(ARG_DRAFT_DIRECTORY) ?: "")
+            binding.commandField.fieldInput.setText(args.getString(ARG_DRAFT_COMMAND) ?: "")
+        }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -443,6 +451,10 @@ class NewTerminalFragment : Fragment(), RtScreen {
         private const val ARG_AGENT = "agent"
         private const val ARG_PRESET = "preset"
         private const val ARG_PRESET_MODE = "presetMode"
+        private const val ARG_DRAFT_NAME = "draftName"
+        private const val ARG_DRAFT_SHELL = "draftShell"
+        private const val ARG_DRAFT_DIRECTORY = "draftDirectory"
+        private const val ARG_DRAFT_COMMAND = "draftCommand"
         private const val STATE_AGENT = "state_agent"
         private const val STATE_ANY_MACHINE = "state_any_machine"
 
@@ -456,6 +468,22 @@ class NewTerminalFragment : Fragment(), RtScreen {
                 putString(ARG_AGENT, agentId)
                 putString(ARG_PRESET, presetId)
                 putBoolean(ARG_PRESET_MODE, true)
+            }
+        }
+
+        /**
+         * A new preset the fields of which are already filled in — "Save as
+         * preset" from a running terminal, with somewhere to change them
+         * before saving.
+         */
+        fun forDraft(draft: TerminalPreset) = NewTerminalFragment().apply {
+            arguments = Bundle().apply {
+                putString(ARG_AGENT, draft.agentId)
+                putBoolean(ARG_PRESET_MODE, true)
+                putString(ARG_DRAFT_NAME, draft.name)
+                putString(ARG_DRAFT_SHELL, draft.shellId)
+                putString(ARG_DRAFT_DIRECTORY, draft.directory)
+                putString(ARG_DRAFT_COMMAND, draft.command)
             }
         }
     }

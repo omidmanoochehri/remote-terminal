@@ -16,8 +16,8 @@ android {
         applicationId "com.cactus.remoteterminal"
         minSdk 24
         targetSdk 35
-        versionCode 20
-        versionName "0.12.1"
+        versionCode 23
+        versionName "0.15.0"
         buildConfigField "int", "PROTOCOL_VERSION", "3"
     }
 

@@ -32,6 +32,10 @@ function loadConfig(env = process.env, overrides = {}) {
   };
 
   const dataDir = s(env.DATA_DIR, file.dataDir, AGENT_DIR);
+  // The open terminals are written beside the identity, wherever that is: a
+  // packaged agent keeps its state in /var/lib and its code in /opt, and the
+  // description of a terminal belongs with the former.
+  const stateFile = s(env.AGENT_STATE, file.stateFile, path.join(dataDir, 'state.json'));
   return {
     configPath,
     fileError,
@@ -40,7 +44,7 @@ function loadConfig(env = process.env, overrides = {}) {
     // ENROLL_TOKEN is the account's enrolment secret. TOKEN / "token" remain as v2 aliases.
     enrollToken: s(env.ENROLL_TOKEN, s(env.TOKEN, s(file.enrollToken, file.token, '')), ''),
     name: s(env.AGENT_NAME, file.name, ''),
-    stateFile: s(env.AGENT_STATE, file.stateFile, path.join(dataDir, 'state.json')),
+    stateFile,
     shells: Array.isArray(file.shells) ? file.shells : null,
     defaultShell: s(env.DEFAULT_SHELL, file.defaultShell, ''),
     cwd: s(env.SHELL_CWD, file.cwd, ''),
@@ -50,6 +54,14 @@ function loadConfig(env = process.env, overrides = {}) {
     idleTimeoutSec: n(env.SESSION_IDLE_TIMEOUT, file.sessionIdleTimeoutSec, 6 * 3600),
     exitedRetentionSec: n(env.EXITED_RETENTION_SEC, file.exitedRetentionSec, 300),
     sweepIntervalMs: n(env.SWEEP_INTERVAL_MS, file.sweepIntervalMs, 30000),
+    // Terminals that outlive the agent process. The open ones are described in
+    // sessionsFile and started again — same name, same directory, same command
+    // — when the agent comes back. RESTORE_COMMANDS=0 brings a terminal back
+    // at a fresh prompt instead of re-running what it was doing.
+    restoreSessions: b(env.RESTORE_SESSIONS, file.restoreSessions, true),
+    restoreCommands: b(env.RESTORE_COMMANDS, file.restoreCommands, true),
+    restoreMaxAgeSec: n(env.RESTORE_MAX_AGE_SEC, file.restoreMaxAgeSec, 24 * 3600),
+    sessionsFile: s(env.SESSIONS_FILE, file.sessionsFile, path.join(path.dirname(stateFile), 'sessions.json')),
     // CPU/memory/disk/uptime for the phone's machine screen; 0 turns reporting
     // off. Anything faster than 2s is pointless (CPU load is a delta) and is
     // clamped up, so a typo cannot flood the relay.
@@ -67,6 +79,10 @@ function loadConfig(env = process.env, overrides = {}) {
     maxFileWriteBytes: n(env.MAX_FILE_WRITE_BYTES, file.maxFileWriteBytes, 512 * 1024 * 1024),
     processManager: b(env.PROCESS_MANAGER, file.processManager, true),
     allowProcessKill: b(env.ALLOW_PROCESS_KILL, file.allowProcessKill, true),
+    // The app's System screen: sys.info (host, OS, CPU, memory, network
+    // interfaces and their MACs) and net.ports (listening TCP / bound UDP).
+    systemInfo: b(env.SYSTEM_INFO, file.systemInfo, true),
+    portList: b(env.PORT_LIST, file.portList, true),
     inheritEnv: b(env.INHERIT_ENV, file.inheritEnv, false),
     // Windows only. Under the service the agent is LocalSystem, and a shell it
     // starts gets SYSTEM's profile rather than anybody's. "auto" routes those

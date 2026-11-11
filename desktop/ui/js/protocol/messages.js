@@ -40,6 +40,10 @@ export function sessionFromJson(o) {
     exitCode: optNum(o, 'exitCode'),
     /** Where the shell is now, when the agent can resolve it; "" otherwise. */
     cwd: str(o, 'cwd'),
+    /** The last command this terminal ran, as the agent saw it; "" when unknown. */
+    command: str(o, 'command'),
+    /** True when the agent brought this terminal back after a restart. */
+    restored: o && o.restored === true,
   };
 }
 

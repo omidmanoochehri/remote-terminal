@@ -74,6 +74,7 @@ class ProcessesFragment : Fragment(), RtScreen {
             render()
         }
         b.searchBar.searchClear.setOnClickListener { b.searchBar.searchInput.setText("") }
+        if (savedInstanceState == null) requireArguments().getString(ARG_FILTER)?.let { b.searchBar.searchInput.setText(it) }
 
         adapter = Adapter { showProcess(it) }
         b.list.layoutManager = LinearLayoutManager(requireContext())
@@ -242,8 +243,11 @@ class ProcessesFragment : Fragment(), RtScreen {
         private const val STATE_SORT = "sort"
         private const val REFRESH_MS = 3_000L
 
-        fun newInstance(agentId: String) = ProcessesFragment().apply {
-            arguments = Bundle().apply { putString(ARG_AGENT, agentId) }
+        private const val ARG_FILTER = "filter"
+
+        /** [filter] pre-fills the filter field (the System screen's "Show process" passes a pid). */
+        fun newInstance(agentId: String, filter: String? = null) = ProcessesFragment().apply {
+            arguments = Bundle().apply { putString(ARG_AGENT, agentId); putString(ARG_FILTER, filter) }
         }
     }
 }

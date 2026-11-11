@@ -28,7 +28,15 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.cactus.remoteterminal.App
 import com.cactus.remoteterminal.R
+import com.cactus.remoteterminal.data.FuzzyMatch
+import com.cactus.remoteterminal.data.OutputWatch
+import com.cactus.remoteterminal.data.Prompt
 import com.cactus.remoteterminal.data.Settings
+import com.cactus.remoteterminal.data.Snippets
+import com.cactus.remoteterminal.data.TerminalPreset
+import com.cactus.remoteterminal.terminal.HardwareShortcuts
+import com.cactus.remoteterminal.ui.Forms.text
+import com.cactus.remoteterminal.ui.Forms.validateOnPositive
 import com.cactus.remoteterminal.data.TerminalSession
 import com.cactus.remoteterminal.databinding.FragmentTerminalBinding
 import com.cactus.remoteterminal.databinding.ItemTabBinding
@@ -40,9 +48,13 @@ import com.cactus.remoteterminal.terminal.TerminalTheme
 import com.cactus.remoteterminal.terminal.Transcript
 import com.cactus.remoteterminal.ui.design.Design
 import com.cactus.remoteterminal.ui.design.visible
+import androidx.core.view.ViewCompat
+import com.google.android.material.chip.Chip
+import com.google.android.material.chip.ChipGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -72,6 +84,14 @@ class TerminalFragment : Fragment(), RtScreen {
         if (uri != null) uploadUri(uri, null)
     }
 
+    /** Prompts written but not sent yet, by terminal, so a cancelled one is there next time. */
+    private val promptDrafts = HashMap<String, PromptDraft>()
+    /** The open prompt composer's way to take picked files; null while it is closed. */
+    private var promptFilesPicked: ((List<Uri>) -> Unit)? = null
+    private val pickPromptFiles = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) promptFilesPicked?.invoke(uris)
+    }
+
     /** "Save transcript": the text captured when the menu was used, waiting for the system picker. */
     private var pendingTranscript: String? = null
     private val saveTranscript = registerForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
@@ -99,6 +119,7 @@ class TerminalFragment : Fragment(), RtScreen {
         Design.excludeFromAutofill(view)
 
         b.backButton.setOnClickListener { host.onBackPressedDispatcher.onBackPressed() }
+        b.promptButton.setOnClickListener { current?.let { writePrompt(it) } ?: toast(getString(R.string.prompt_no_terminal)) }
         b.searchButton.setOnClickListener { toggleSearch(!b.searchBar.visible) }
         b.keyboardButton.setOnClickListener { toggleKeyboard() }
         b.moreButton.setOnClickListener { moreMenu(it) }
@@ -120,6 +141,7 @@ class TerminalFragment : Fragment(), RtScreen {
         term.onPasteRequest = { paste() }
         term.onSwipeTab = { forward -> swipeToTab(forward) }
         term.onLinkTap = { url -> showLink(url) }
+        b.recBadge.setOnClickListener { current?.let { toggleRecording(it) } }
         b.broadcastStop.setOnClickListener { current?.let { app.sessions.stopBroadcast(it) }; updateStatus() }
         term.onSearchResult = { cur, total ->
             b.searchCount.text = if (total == 0) getString(R.string.search_none) else getString(R.string.search_count, cur, total)
@@ -261,7 +283,7 @@ class TerminalFragment : Fragment(), RtScreen {
 
     private fun chooseTheme() {
         val s = current ?: return
-        val themes = TerminalTheme.ALL
+        val themes = TerminalTheme.all()
         val appDefault = TerminalTheme.byId(app.settings.terminalTheme)
         val labels = (listOf(getString(R.string.terminal_theme_default, appDefault.name)) + themes.map { it.name })
             .toTypedArray<CharSequence>()
@@ -453,6 +475,7 @@ class TerminalFragment : Fragment(), RtScreen {
             if (startedAt > 0) Format.duration(context, (System.currentTimeMillis() - startedAt) / 1000)
             else getString(R.string.value_unknown)
         b.statusFooter.contentDescription = "$footerLabel, ${b.footerTransport.text}, ${b.footerUptime.text}"
+        b.recBadge.visible = s?.isRecording == true
         renderBroadcast()
     }
 
@@ -634,58 +657,261 @@ class TerminalFragment : Fragment(), RtScreen {
         return name to bytes
     }
 
+    /* ------------------------------- prompt ------------------------------- */
+
+    /** A prompt being written for one terminal; files are read when attached, while access to them is fresh. */
+    private class PromptDraft(var text: String = "", var enter: Boolean = true) {
+        val files = ArrayList<PromptFile>()
+    }
+
+    /** [remotePath] is set once uploaded, so a retry after a failed upload does not send it twice. */
+    private class PromptFile(val name: String, val mime: String, val bytes: ByteArray) {
+        var remotePath: String? = null
+    }
+
+    /**
+     * The prompt composer: write a prompt in a proper text box, attach files,
+     * and on Send upload the files, type the text and their paths into [s] as
+     * one paste, then press Enter if asked. Made for programs that take a
+     * prompt — a coding assistant, a chat, a REPL — where the cursor is a
+     * cramped place to compose one. A broadcast does not get it: the paths are
+     * of files uploaded for this terminal.
+     */
+    private fun writePrompt(s: TerminalSession, error: String? = null) {
+        val context = requireContext()
+        val filesOk = app.agents.agent(agentId)?.caps?.contains("files") == true
+        val draft = promptDrafts.getOrPut(s.key) { PromptDraft(enter = app.settings.promptEnter) }
+
+        val box = Forms.column(context)
+        box.addView(Forms.note(context, getString(R.string.prompt_body)))
+        val input = Forms.input(
+            context, getString(R.string.prompt_hint), value = draft.text, multiLine = true,
+            type = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES,
+        )
+        if (error != null) input.error = error
+        box.addView(input)
+        val chips = ChipGroup(context).apply {
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = Design.dp(context, 8f) }
+        }
+        box.addView(Forms.note(context, getString(R.string.prompt_files_hint)))
+        box.addView(chips)
+        val enter = Forms.checkBox(context, getString(R.string.prompt_enter), draft.enter)
+        box.addView(enter)
+
+        fun render() {
+            chips.removeAllViews()
+            for (f in draft.files) {
+                chips.addView(Chip(context).apply {
+                    text = f.name
+                    isCheckable = false
+                    isCloseIconVisible = true
+                    closeIconContentDescription = getString(R.string.prompt_remove_file, f.name)
+                    setOnCloseIconClickListener { draft.files.remove(f); render() }
+                })
+            }
+            chips.addView(Chip(context).apply {
+                text = getString(R.string.attach_file)
+                isCheckable = false
+                setOnClickListener {
+                    if (!filesOk) { input.error = getString(R.string.paste_file_unsupported); return@setOnClickListener }
+                    try { pickPromptFiles.launch(arrayOf("*/*")) } catch (_: Exception) { toast(getString(R.string.attach_file_unavailable)) }
+                }
+            })
+            chips.addView(Chip(context).apply {
+                text = getString(R.string.prompt_paste_file)
+                isCheckable = false
+                setOnClickListener {
+                    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    val found = clipboardFile(cm)
+                    if (found == null) toast(getString(R.string.paste_file_none)) else addPromptFiles(draft, listOf(found.first), filesOk, input) { render() }
+                }
+            })
+        }
+
+        promptFilesPicked = { uris -> addPromptFiles(draft, uris, filesOk, input) { render() } }
+        // A picture pasted into the box, or sent by the keyboard, arrives as
+        // content rather than text: attach it instead of losing it.
+        input.editText?.let { edit ->
+            ViewCompat.setOnReceiveContentListener(edit, arrayOf("image/*", "video/*", "application/pdf")) { _, payload ->
+                val split = payload.partition { it.uri != null }
+                val withUri = split.first
+                if (withUri != null) {
+                    val clip = withUri.clip
+                    addPromptFiles(draft, (0 until clip.itemCount).mapNotNull { clip.getItemAt(it).uri }, filesOk, input) { render() }
+                }
+                split.second
+            }
+        }
+        render()
+
+        val dialog = MaterialAlertDialogBuilder(context)
+            .setTitle(R.string.prompt_title)
+            .setView(android.widget.ScrollView(context).apply { addView(box) })
+            .setPositiveButton(R.string.send, null)
+            .setNegativeButton(R.string.cancel, null)
+            .setOnDismissListener {
+                promptFilesPicked = null
+                draft.text = input.text
+                draft.enter = enter.isChecked
+                app.settings.promptEnter = enter.isChecked
+            }
+            .show()
+        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
+        input.editText?.let { it.requestFocus(); it.setSelection(it.text?.length ?: 0) }
+        dialog.validateOnPositive {
+            input.error = null
+            draft.text = input.text
+            draft.enter = enter.isChecked
+            if (draft.text.isBlank() && draft.files.isEmpty()) {
+                input.error = getString(R.string.prompt_empty)
+                return@validateOnPositive false
+            }
+            sendPrompt(s, draft)
+            true
+        }
+    }
+
+    /** Read [uris] now, while this app may, and attach them to [draft]. */
+    private fun addPromptFiles(
+        draft: PromptDraft, uris: List<Uri>, filesOk: Boolean,
+        input: com.google.android.material.textfield.TextInputLayout, done: () -> Unit,
+    ) {
+        if (!filesOk) { input.error = getString(R.string.paste_file_unsupported); return }
+        val cr = requireContext().contentResolver
+        viewLifecycleOwner.lifecycleScope.launch {
+            for (uri in uris) {
+                val mime = try { cr.getType(uri) } catch (_: Exception) { null } ?: DEFAULT_MIME
+                val loaded = withContext(Dispatchers.IO) { runCatching { readFile(uri, mime) } }
+                loaded.onSuccess { (name, bytes) -> draft.files.add(PromptFile(name, mime, bytes)) }
+                    .onFailure { toast(getString(R.string.paste_file_failed, it.message ?: "unreadable")) }
+            }
+            done()
+        }
+    }
+
+    /** Upload what is not uploaded yet, then type the prompt; a failure brings the composer back. */
+    private fun sendPrompt(s: TerminalSession, draft: PromptDraft) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            if (s.stream.state != SessionStream.State.ATTACHED) {
+                writePrompt(s, getString(R.string.terminal_not_connected)); return@launch
+            }
+            val todo = draft.files.filter { it.remotePath == null }
+            for ((index, f) in todo.withIndex()) {
+                uploadLabel = getString(R.string.prompt_uploading, index + 1, todo.size)
+                updateStatus()
+                val result = app.sessions.sendFile(s, f.name, f.mime, f.bytes)
+                val path = result.getOrNull()
+                if (path == null) {
+                    uploadLabel = null
+                    updateStatus()
+                    val why = "${f.name}: ${result.exceptionOrNull()?.message ?: "failed"}"
+                    writePrompt(s, getString(R.string.paste_file_failed, why))
+                    return@launch
+                }
+                f.remotePath = path
+            }
+            uploadLabel = null
+            updateStatus()
+
+            val text = Prompt.text(draft.text, draft.files.map { it.remotePath })
+            val bracketed = s.emulator.bracketedPaste
+            val type = {
+                if (!app.sessions.input(s, Snippets.toInput(text, false, bracketed))) {
+                    writePrompt(s, getString(R.string.terminal_not_connected))
+                } else {
+                    promptDrafts.remove(s.key)
+                    // Enter on its own, a moment later, so a program reading the
+                    // paste takes it as a key and not as part of what was pasted.
+                    if (draft.enter) viewLifecycleOwner.lifecycleScope.launch { delay(PROMPT_ENTER_DELAY_MS); app.sessions.input(s, "\r") }
+                }
+            }
+            // Without bracketed paste every line would run on its own, as with any paste.
+            val lines = text.count { it == '\n' } + 1
+            if (lines > 1 && !bracketed) {
+                MaterialAlertDialogBuilder(requireContext())
+                    .setTitle(getString(R.string.paste_confirm_title, lines))
+                    .setMessage(R.string.paste_confirm_text)
+                    .setPositiveButton(R.string.paste_confirm_ok) { _, _ -> type() }
+                    .setNegativeButton(R.string.cancel) { _, _ -> writePrompt(s) }
+                    .show()
+            } else type()
+        }
+    }
+
     /** Quote a path for a shell only when it needs it (agent-side names are already tame). */
     private fun shellQuote(path: String): String =
         if (path.matches(Regex("^[A-Za-z0-9._/@:+-]+$"))) path else "'" + path.replace("'", "'\\''") + "'"
 
     private fun toast(text: String) = Toast.makeText(requireContext(), text, Toast.LENGTH_LONG).show()
 
+    /** The terminal menu with every title and visibility matching the visible tab. */
+    private fun prepareMenu(menu: android.view.Menu) {
+        menu.findItem(R.id.action_command_bar).isChecked = binding.commandBar.visible
+        menu.findItem(R.id.action_extra_keys).isChecked = binding.extraKeys.visible
+        val s = current
+        menu.findItem(R.id.action_pin).title =
+            getString(if (s != null && app.settings.isPinnedTerminal(agentId, s.sessionId)) R.string.action_unpin else R.string.action_pin)
+        menu.findItem(R.id.action_preset).isVisible = app.settings.presetsFor(agentId).isNotEmpty()
+        menu.findItem(R.id.action_broadcast).title =
+            getString(if (s != null && s.broadcastTo.isNotEmpty()) R.string.action_broadcast_stop else R.string.action_broadcast)
+        menu.findItem(R.id.action_watch).title = getString(
+            when {
+                s?.watch?.isTrigger == true -> R.string.action_trigger_stop
+                s?.watch != null -> R.string.action_watch_stop
+                else -> R.string.action_watch
+            }
+        )
+        menu.findItem(R.id.action_quiet).title = getString(if (s?.quietAlert == true) R.string.action_quiet_stop else R.string.action_quiet)
+        menu.findItem(R.id.action_record).title = getString(if (s?.isRecording == true) R.string.recording_stop else R.string.recording_start)
+    }
+
     private fun moreMenu(anchor: View) {
         val menu = PopupMenu(requireContext(), anchor)
         menu.menuInflater.inflate(R.menu.menu_terminal, menu.menu)
-        menu.menu.findItem(R.id.action_command_bar).isChecked = binding.commandBar.visible
-        menu.menu.findItem(R.id.action_extra_keys).isChecked = binding.extraKeys.visible
-        val s = current
-        menu.menu.findItem(R.id.action_pin).title =
-            getString(if (s != null && app.settings.isPinnedTerminal(agentId, s.sessionId)) R.string.action_unpin else R.string.action_pin)
-        menu.menu.findItem(R.id.action_preset).isVisible = app.settings.presetsFor(agentId).isNotEmpty()
-        menu.menu.findItem(R.id.action_broadcast).title =
-            getString(if (s != null && s.broadcastTo.isNotEmpty()) R.string.action_broadcast_stop else R.string.action_broadcast)
-        menu.menu.findItem(R.id.action_watch).title = getString(if (s?.watch != null) R.string.action_watch_stop else R.string.action_watch)
-        menu.menu.findItem(R.id.action_quiet).title = getString(if (s?.quietAlert == true) R.string.action_quiet_stop else R.string.action_quiet)
-        menu.setOnMenuItemClickListener { item ->
-            val term = binding.terminal
-            when (item.itemId) {
-                R.id.action_new_terminal -> newTerminal()
-                R.id.action_duplicate -> duplicateCurrent()
-                R.id.action_preset -> choosePreset(anchor)
-                R.id.action_rename -> current?.let { renameTab(it) }
-                R.id.action_pin -> current?.let { app.settings.togglePinnedTerminal(agentId, it.sessionId) }
-                R.id.action_shortcuts -> ShortcutsSheet().show(childFragmentManager, "shortcuts")
-                R.id.action_paste -> paste()
-                R.id.action_paste_file -> pasteFile(explicit = true)
-                R.id.action_attach_file -> attachFile()
-                R.id.action_browse_files -> browseFilesHere()
-                R.id.action_broadcast -> current?.let { if (it.broadcastTo.isNotEmpty()) { app.sessions.stopBroadcast(it); updateStatus() } else chooseBroadcast(it) }
-                R.id.action_watch -> current?.let { if (it.watch != null) app.sessions.clearWatch(it) else chooseWatch(it) }
-                R.id.action_quiet -> current?.let { s ->
-                    val on = !s.quietAlert
-                    app.sessions.setQuietAlert(s, on)
-                    if (on) { host.ensureNotificationPermission(); toast(getString(R.string.quiet_armed)) }
-                }
-                R.id.action_save_transcript -> current?.let { startSaveTranscript(it) }
-                R.id.action_share_transcript -> current?.let { shareTranscript(it) }
-                R.id.action_theme -> chooseTheme()
-                R.id.action_select_all -> term.selectAll()
-                R.id.action_clear -> { term.emulator.clearScreen(); term.notifyUpdated() }
-                R.id.action_command_bar -> { val v = !binding.commandBar.visible; app.settings.commandBar = v; binding.commandBar.visible = v }
-                R.id.action_extra_keys -> { val v = !binding.extraKeys.visible; app.settings.showExtraKeys = v; binding.extraKeys.visible = v }
-                R.id.action_close_tab -> current?.let { confirmClose(it) }
-                else -> return@setOnMenuItemClickListener false
-            }
-            true
-        }
+        prepareMenu(menu.menu)
+        menu.setOnMenuItemClickListener { item -> runMenuAction(item.itemId, anchor) }
         menu.show()
+    }
+
+    /** One terminal-menu action, from the menu itself or from the command palette. */
+    private fun runMenuAction(id: Int, anchor: View): Boolean {
+        val term = binding.terminal
+        when (id) {
+            R.id.action_palette -> openPalette()
+            R.id.action_snippets -> openSnippets()
+            R.id.action_prompt -> current?.let { writePrompt(it) } ?: toast(getString(R.string.prompt_no_terminal))
+            R.id.action_record -> current?.let { toggleRecording(it) }
+            R.id.action_new_terminal -> newTerminal()
+            R.id.action_duplicate -> duplicateCurrent()
+            R.id.action_preset -> choosePreset(anchor)
+            R.id.action_save_preset -> current?.let { saveAsPreset(it) }
+            R.id.action_rename -> current?.let { renameTab(it) }
+            R.id.action_pin -> current?.let { app.settings.togglePinnedTerminal(agentId, it.sessionId) }
+            R.id.action_shortcuts -> ShortcutsSheet().show(childFragmentManager, "shortcuts")
+            R.id.action_paste -> paste()
+            R.id.action_paste_file -> pasteFile(explicit = true)
+            R.id.action_attach_file -> attachFile()
+            R.id.action_browse_files -> browseFilesHere()
+            R.id.action_broadcast -> current?.let { if (it.broadcastTo.isNotEmpty()) { app.sessions.stopBroadcast(it); updateStatus() } else chooseBroadcast(it) }
+            R.id.action_watch -> current?.let { if (it.watch != null) app.sessions.clearWatch(it) else chooseWatch(it) }
+            R.id.action_quiet -> current?.let { s ->
+                val on = !s.quietAlert
+                app.sessions.setQuietAlert(s, on)
+                if (on) { host.ensureNotificationPermission(); toast(getString(R.string.quiet_armed)) }
+            }
+            R.id.action_save_transcript -> current?.let { startSaveTranscript(it) }
+            R.id.action_share_transcript -> current?.let { shareTranscript(it) }
+            R.id.action_theme -> chooseTheme()
+            R.id.action_select_all -> term.selectAll()
+            R.id.action_clear -> { term.emulator.clearScreen(); term.notifyUpdated() }
+            R.id.action_command_bar -> { val v = !binding.commandBar.visible; app.settings.commandBar = v; binding.commandBar.visible = v }
+            R.id.action_extra_keys -> { val v = !binding.extraKeys.visible; app.settings.showExtraKeys = v; binding.extraKeys.visible = v }
+            R.id.action_close_tab -> current?.let { confirmClose(it) }
+            else -> return false
+        }
+        return true
     }
 
     /**
@@ -717,6 +943,56 @@ class TerminalFragment : Fragment(), RtScreen {
             true
         }
         menu.show()
+    }
+
+    /**
+     * Keep this terminal as a preset: its name, its machine, its shell, where
+     * it is **now** and what it last ran. Starting the preset later reproduces
+     * this terminal rather than a bare shell, which is the point of saving it
+     * from here rather than filling the form in again.
+     */
+    private fun saveAsPreset(s: TerminalSession) {
+        val context = requireContext()
+        val directory = s.cwd
+        val command = s.command
+        val input = EditText(context).apply {
+            setText(s.displayTitle); inputType = InputType.TYPE_CLASS_TEXT; setSelection(text.length)
+        }
+        val detail = listOfNotNull(
+            directory.ifEmpty { null }?.let { getString(R.string.preset_from_terminal_dir, it) },
+            command.ifEmpty { null }?.let { getString(R.string.preset_from_terminal_command, it) },
+        ).joinToString("\n").ifEmpty { getString(R.string.preset_from_terminal_plain) }
+
+        fun preset(name: String) = TerminalPreset(
+            id = TerminalPreset.newId(),
+            name = name,
+            agentId = agentId,
+            shellId = s.shell.ifEmpty { null },
+            directory = directory,
+            command = command,
+        )
+
+        MaterialAlertDialogBuilder(context)
+            .setTitle(R.string.preset_save_as)
+            .setMessage(detail)
+            .setView(input)
+            .setPositiveButton(R.string.save) { _, _ ->
+                val name = input.text.toString().trim()
+                if (name.isEmpty()) {
+                    Toast.makeText(context, R.string.preset_needs_name, Toast.LENGTH_SHORT).show()
+                } else {
+                    app.settings.savePreset(preset(name))
+                    Toast.makeText(context, getString(R.string.preset_saved, name), Toast.LENGTH_SHORT).show()
+                }
+            }
+            // "Edit…" opens the full form with the same values, for a preset
+            // that should differ from this terminal in some way.
+            .setNeutralButton(R.string.edit) { _, _ ->
+                val name = input.text.toString().trim().ifEmpty { s.displayTitle }
+                host.openPresetDraft(preset(name))
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     private fun renameTab(s: TerminalSession) {
@@ -813,32 +1089,162 @@ class TerminalFragment : Fragment(), RtScreen {
             .show()
     }
 
+    /**
+     * "Watch for text…": the text (or a regular expression) and, optionally, a
+     * reply typed into this terminal whenever it appears — which makes it a
+     * trigger.
+     */
     private fun chooseWatch(s: TerminalSession) {
         val context = requireContext()
-        val pad = Design.dp(context, 20f)
-        val input = EditText(context).apply {
-            setHint(R.string.watch_hint)
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
-        }
-        val keep = android.widget.CheckBox(context).apply { setText(R.string.watch_keep) }
-        val box = android.widget.LinearLayout(context).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            setPadding(pad, pad / 2, pad, 0)
-            addView(input)
-            addView(keep)
-        }
-        MaterialAlertDialogBuilder(context)
+        val box = Forms.column(context)
+        val input = Forms.input(context, getString(R.string.watch_hint))
+        val regex = Forms.checkBox(context, getString(R.string.watch_regex), false)
+        val keep = Forms.checkBox(context, getString(R.string.watch_keep), false)
+        val reply = Forms.input(context, getString(R.string.watch_reply_hint), helper = getString(R.string.watch_reply_help))
+        box.addView(input); box.addView(regex); box.addView(keep); box.addView(reply)
+        box.addView(Forms.note(context, getString(R.string.watch_reply_warning), warning = true))
+        val dialog = MaterialAlertDialogBuilder(context)
             .setTitle(R.string.watch_title)
-            .setView(box)
-            .setPositiveButton(R.string.save) { _, _ ->
-                val text = input.text.toString()
-                if (text.isBlank()) return@setPositiveButton
-                app.sessions.setWatch(s, text, keep.isChecked)
-                host.ensureNotificationPermission()
-                toast(getString(R.string.watch_armed, text))
-            }
+            .setView(android.widget.ScrollView(context).apply { addView(box) })
+            .setPositiveButton(R.string.save, null)
             .setNegativeButton(R.string.cancel, null)
             .show()
+        dialog.validateOnPositive {
+            val text = input.text
+            input.error = null
+            if (text.isBlank()) return@validateOnPositive false
+            if (regex.isChecked) {
+                OutputWatch.regexError(text)?.let { input.error = getString(R.string.watch_regex_invalid, it); return@validateOnPositive false }
+            }
+            val replyText = reply.text
+            app.sessions.setWatch(s, text, keep.isChecked, regex.isChecked, replyText)
+            if (replyText.isEmpty()) {
+                host.ensureNotificationPermission()
+                toast(getString(R.string.watch_armed, text))
+            } else toast(getString(R.string.trigger_armed, text))
+            true
+        }
+    }
+
+    /* ------------------------ snippets and palette ------------------------ */
+
+    private fun openSnippets() {
+        if (current == null) { toast(getString(R.string.snippet_open_terminal_first)); return }
+        SnippetUi.pick(requireContext()) { sendSnippet(it) }
+    }
+
+    /** Type a snippet into the visible terminal, asking for its placeholders first. */
+    private fun sendSnippet(snippet: com.cactus.remoteterminal.data.Snippet) {
+        if (current == null) { toast(getString(R.string.snippet_open_terminal_first)); return }
+        SnippetUi.fill(requireContext(), snippet) { text ->
+            val b = _binding ?: return@fill
+            b.terminal.sendRaw(Snippets.toInput(text, snippet.run, b.terminal.emulator.bracketedPaste))
+        }
+    }
+
+    /**
+     * One search over everything this screen can do: the terminal menu, the
+     * snippets, the presets for this machine, the open terminals and the
+     * machines.
+     */
+    private fun openPalette() {
+        val context = requireContext()
+        val b = _binding ?: return
+        val popup = PopupMenu(context, b.moreButton)
+        popup.menuInflater.inflate(R.menu.menu_terminal, popup.menu)
+        val menu = popup.menu
+        prepareMenu(menu)
+        val entries = ArrayList<SearchSheet.Entry>()
+        for (i in 0 until menu.size()) {
+            val item = menu.getItem(i)
+            if (!item.isVisible || item.itemId == R.id.action_palette) continue
+            val id = item.itemId
+            entries += SearchSheet.Entry(item.title.toString(), null, R.drawable.ic_rt_command) {
+                _binding?.let { runMenuAction(id, it.moreButton) }
+            }
+        }
+        for (sn in app.settings.snippets) {
+            entries += SearchSheet.Entry(getString(R.string.palette_snippet, sn.name), SnippetUi.preview(sn), R.drawable.ic_rt_command) { sendSnippet(sn) }
+        }
+        for (p in app.settings.presetsFor(agentId)) {
+            entries += SearchSheet.Entry(getString(R.string.palette_preset, p.name), p.directory.ifEmpty { null }, R.drawable.ic_rt_bookmark) {
+                TerminalStarter.launch(this, p, agentId)
+            }
+        }
+        for (t in app.sessions.allTabs()) {
+            if (t === current) continue
+            val machine = app.agents.agent(t.agentId)?.let { it.name.ifEmpty { it.hostname } }
+            entries += SearchSheet.Entry(getString(R.string.palette_switch, t.displayTitle), machine, R.drawable.ic_rt_terminal_square) {
+                if (t.agentId == agentId && t in tabs) selectTab(t) else host.openTerminal(t.agentId, t.sessionId)
+            }
+        }
+        for (m in app.agents.agents.value) {
+            val name = m.name.ifEmpty { m.hostname }
+            entries += SearchSheet.Entry(getString(R.string.palette_machine, name), Format.machineSubtitle(m), R.drawable.ic_rt_server) {
+                host.openMachine(m.agentId)
+            }
+        }
+        SearchSheet.show(
+            context,
+            hint = getString(R.string.palette_hint),
+            emptyText = { getString(R.string.palette_none) },
+            results = { q -> FuzzyMatch.rank(entries, q) { it.label } },
+        )
+    }
+
+    /* ------------------------------ recording ----------------------------- */
+
+    private fun toggleRecording(s: TerminalSession) {
+        if (s.isRecording) {
+            val meta = app.sessions.stopRecording(s)
+            updateStatus()
+            if (meta != null) toast(getString(R.string.recording_saved, meta.title))
+            return
+        }
+        val machine = app.agents.agent(agentId)?.let { it.name.ifEmpty { it.hostname } }.orEmpty()
+        val recorder = try {
+            app.recordings.start(s.displayTitle, machine, s.emulator.cols, s.emulator.rows)
+        } catch (e: Exception) {
+            toast(e.message ?: getString(R.string.error_generic, "")); return
+        }
+        app.sessions.startRecording(s, recorder)
+        updateStatus()
+        toast(getString(R.string.recording_started))
+    }
+
+    /* -------------------------- keyboard shortcuts ------------------------ */
+
+    /** A hardware-keyboard shortcut for this screen; false leaves the key to the shell. */
+    fun handleHardwareShortcut(event: android.view.KeyEvent): Boolean {
+        val b = _binding ?: return false
+        val action = HardwareShortcuts.match(event.keyCode, event.isCtrlPressed, event.isShiftPressed, event.isAltPressed) ?: return false
+        val term = b.terminal
+        when (action) {
+            HardwareShortcuts.Action.NEW_TERMINAL -> newTerminal()
+            HardwareShortcuts.Action.CLOSE_TAB -> current?.let { confirmClose(it) }
+            HardwareShortcuts.Action.NEXT_TAB -> cycleTab(forward = true)
+            HardwareShortcuts.Action.PREVIOUS_TAB -> cycleTab(forward = false)
+            HardwareShortcuts.Action.COPY -> {
+                val text = term.selectedText()
+                if (text.isNullOrEmpty()) toast(getString(R.string.kbd_nothing_selected))
+                else { copy(text); term.clearSelection() }
+            }
+            HardwareShortcuts.Action.PASTE -> paste()
+            HardwareShortcuts.Action.SEARCH -> toggleSearch(true)
+            HardwareShortcuts.Action.PALETTE -> openPalette()
+            HardwareShortcuts.Action.SNIPPETS -> openSnippets()
+            HardwareShortcuts.Action.ZOOM_IN -> term.setFontSizeSp(term.fontSizeSp() + 1f)
+            HardwareShortcuts.Action.ZOOM_OUT -> term.setFontSizeSp(term.fontSizeSp() - 1f)
+            HardwareShortcuts.Action.ZOOM_RESET -> term.setFontSizeSp(DEFAULT_FONT_SP)
+        }
+        return true
+    }
+
+    /** Ctrl+Tab / Ctrl+Shift+Tab: the next or previous tab, wrapping round. */
+    private fun cycleTab(forward: Boolean) {
+        if (tabs.size < 2) return
+        val index = tabs.indexOf(current).coerceAtLeast(0)
+        selectTab(tabs[(index + if (forward) 1 else tabs.size - 1) % tabs.size])
     }
 
     /** Called by the shortcuts sheet. */
@@ -928,10 +1334,14 @@ class TerminalFragment : Fragment(), RtScreen {
         private const val MAX_UPLOAD_BYTES = 16 * 1024 * 1024
         /** What an upload claims to be when the phone cannot say. */
         private const val DEFAULT_MIME = "application/octet-stream"
+        /** How long after a prompt Enter waits (see [sendPrompt]). */
+        private const val PROMPT_ENTER_DELAY_MS = 150L
         /** Longer transcripts are shared as a file; some apps truncate a long EXTRA_TEXT. */
         private const val SHARE_AS_TEXT_MAX = 64 * 1024
         /** Session argument prefix meaning "create a new terminal with this shell id". */
         const val NEW_SESSION_PREFIX = "new:"
+        /** Ctrl+0 goes back to the app's default size. */
+        private const val DEFAULT_FONT_SP = 13f
         fun newInstance(agentId: String, sessionId: String?) = TerminalFragment().apply {
             arguments = Bundle().apply { putString(ARG_AGENT, agentId); putString(ARG_SESSION, sessionId) }
         }

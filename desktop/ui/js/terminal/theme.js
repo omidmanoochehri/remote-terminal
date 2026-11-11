@@ -28,6 +28,8 @@ export class TerminalTheme {
     this.cursor = css(cursor);
     this.selection = css(selection);
     this.isLight = isLight;
+    /** The integers it was built from, for export and for copying into a user scheme. */
+    this.raw = { background, foreground, cursor, selection, ansi: ansi.slice(0, 16) };
     /** CSS colours for palette indices 0..255. */
     this.palette = new Array(256);
     for (let i = 0; i < 16; i++) this.palette[i] = css(ansi[i] | 0xff000000);
@@ -90,8 +92,25 @@ export const GRUVBOX = new TerminalTheme(
     0x928374, 0xfb4934, 0xb8bb26, 0xfabd2f, 0x83a598, 0xd3869b, 0x8ec07c, 0xebdbb2],
 );
 
+/** The built-in schemes, in the order the choosers list them. */
 export const ALL_THEMES = [REMOTE, DARK, AMOLED, LIGHT, SOLARIZED_DARK, GRUVBOX];
 
+/**
+ * Schemes the user made or imported (Settings → Terminal → Colour schemes),
+ * registered by the app whenever they change so every chooser and every
+ * terminal sees them.
+ */
+let customThemes = [];
+
+export function setCustomThemes(list) {
+  customThemes = Array.isArray(list) ? list.slice() : [];
+}
+
+/** Built-in schemes first, then the user's own. */
+export function allThemes() {
+  return [...ALL_THEMES, ...customThemes];
+}
+
 export function themeById(id) {
-  return ALL_THEMES.find((t) => t.id === id) || REMOTE;
+  return ALL_THEMES.find((t) => t.id === id) || customThemes.find((t) => t.id === id) || REMOTE;
 }

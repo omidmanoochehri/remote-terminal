@@ -418,7 +418,7 @@ class Router {
         let s = rt.sessions.get(m.session);
         if (!s) { s = this.mirrorEntry({ sessionId: m.session }); rt.sessions.set(s.sessionId, s); }
         const out = { type: 'session.updated', agent: conn.agentId, session: m.session };
-        for (const k of ['title', 'state', 'cols', 'rows', 'exitCode', 'cwd']) if (m[k] !== undefined) { s[k] = m[k]; out[k] = m[k]; }
+        for (const k of ['title', 'state', 'cols', 'rows', 'exitCode', 'cwd', 'command']) if (m[k] !== undefined) { s[k] = m[k]; out[k] = m[k]; }
         return this.broadcastAccount(conn.accountId, out);
       }
 
@@ -497,6 +497,8 @@ class Router {
       seq: s.seq || 0,
       exitCode: s.exitCode === undefined ? null : s.exitCode,
       cwd: typeof s.cwd === 'string' ? s.cwd : '',
+      command: typeof s.command === 'string' ? s.command : '',
+      restored: !!s.restored,
     };
   }
 

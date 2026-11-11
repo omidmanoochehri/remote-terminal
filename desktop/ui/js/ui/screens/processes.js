@@ -243,5 +243,13 @@ export function processesPanel(app, agentId) {
     clearInterval(timer);
   }
 
-  return { root, update, destroy, focus: () => table.focus(), refresh: () => refresh(true) };
+  /** Narrow the list ("Show process" from the System segment passes a PID) and select a match. */
+  function setFilter(text, pid = null) {
+    filterInput.value = text;
+    filter = text;
+    if (pid != null) selectedPid = pid;
+    render();
+  }
+
+  return { root, update, destroy, focus: () => table.focus(), refresh: () => refresh(true), setFilter };
 }

@@ -83,4 +83,25 @@ class MessagesTest {
         assertEquals("device.revoke", JSONObject(Outgoing.deviceRevoke("d_2")).getString("type"))
         assertEquals("ping", JSONObject(Outgoing.ping()).getString("type"))
     }
+
+    @Test fun sessionSaysWhatItIsRunningAndWhetherItWasRecovered() {
+        val json = """{"sessionId":"s_k3x7m2q9p4w8n6b5v1c0","title":"API logs","shell":"bash","state":"running",
+            "createdAt":1,"lastActiveAt":2,"cols":100,"rows":30,"seq":42,"attached":1,"exitCode":null,
+            "cwd":"/srv/api","command":"tail -f app.log","restored":true}"""
+        val s = SessionInfo.fromJson(JSONObject(json))
+        assertEquals("tail -f app.log", s.command)
+        assertTrue(s.restored)
+        assertEquals("/srv/api", s.cwd)
+
+        // An older agent says neither, and both read as "nothing known".
+        val old = SessionInfo.fromJson(JSONObject("""{"sessionId":"s_1","title":"Logs","shell":"bash","state":"running"}"""))
+        assertEquals("", old.command)
+        assertFalse(old.restored)
+
+        val upd = Incoming.parse("""{"type":"session.updated","agent":"a_1","session":"s_1","command":"npm run build","cwd":"/srv/api/web"}""") as RelayEvent.SessionUpdated
+        assertEquals("npm run build", upd.command)
+        assertEquals("/srv/api/web", upd.cwd)
+        val noCommand = Incoming.parse("""{"type":"session.updated","agent":"a_1","session":"s_1","title":"x"}""") as RelayEvent.SessionUpdated
+        assertNull(noCommand.command)
+    }
 }

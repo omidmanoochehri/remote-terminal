@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  0.13.0: snippets, the command palette, recordings, triggers, colour schemes,
+  backup, the System view, Wake-on-LAN and keyboard shortcuts. The wording is
+  shared with the desktop app's strings.js; change both together.
+-->
+<resources>
+
+    <!-- Snippets -->
+    <string name="snippets_title">Snippets</string>
+    <string name="snippets_subtitle">Saved commands with fill-in fields</string>
+    <string name="snippets_menu">Snippets…</string>
+    <string name="snippets_new">New snippet</string>
+    <string name="snippets_edit">Edit snippet</string>
+    <string name="snippets_search_hint">Search snippets</string>
+    <string name="snippets_empty_title">No snippets yet</string>
+    <string name="snippets_empty_body">Save commands you type often. Write {{name}} or {{name:default}} for a field you fill in each time.</string>
+    <string name="snippets_none_match">No snippet matches “%1$s”</string>
+    <string name="snippets_no_folder">No folder</string>
+    <string name="snippet_name">Name</string>
+    <string name="snippet_folder">Folder</string>
+    <string name="snippet_folder_hint">Optional</string>
+    <string name="snippet_body">Command</string>
+    <string name="snippet_body_help">{{name}} or {{name:default}} asks for a value before sending. {{{{ types a literal {{.</string>
+    <string name="snippet_run">Run it (send Enter after the last line)</string>
+    <string name="snippet_name_required">Give the snippet a name.</string>
+    <string name="snippet_body_required">The snippet is empty.</string>
+    <string name="snippet_send">Send</string>
+    <string name="snippet_insert">Insert</string>
+    <string name="snippet_delete_title">Delete “%1$s”?</string>
+    <string name="snippet_delete_body">The snippet is removed from this device.</string>
+    <string name="snippet_fill_title">Fill in “%1$s”</string>
+    <string name="snippet_runs">Runs</string>
+    <string name="snippet_inserts">Inserts</string>
+    <string name="snippet_open_terminal_first">Open a terminal to use a snippet.</string>
+
+    <!-- Command palette -->
+    <string name="palette_menu">Command palette…</string>
+    <string name="palette_hint">Type a command, snippet, preset, terminal or machine</string>
+    <string name="palette_none">Nothing matches.</string>
+    <string name="palette_snippet">Snippet: %1$s</string>
+    <string name="palette_preset">Preset: %1$s</string>
+    <string name="palette_switch">Switch to: %1$s</string>
+    <string name="palette_machine">Machine: %1$s</string>
+
+    <!-- Recording -->
+    <string name="recording_start">Start recording</string>
+    <string name="recording_stop">Stop recording</string>
+    <string name="recording_badge">REC</string>
+    <string name="recording_started">Recording this terminal</string>
+    <string name="recording_saved">Recording saved: %1$s</string>
+    <string name="recording_full">Recording stopped: it reached 16 MB.</string>
+    <string name="recordings_title">Recordings</string>
+    <string name="recordings_subtitle">Terminal sessions recorded on this device</string>
+    <string name="recordings_empty_title">No recordings yet</string>
+    <string name="recordings_empty_body">Choose “Start recording” in a terminal’s menu. Output is saved with its timing and plays back here.</string>
+    <string name="recording_meta_separator">"  •  "</string>
+    <string name="recording_play">Play</string>
+    <string name="recording_share">Share</string>
+    <string name="recording_export">Export (.cast)</string>
+    <string name="recording_rename">Rename</string>
+    <string name="recording_delete">Delete</string>
+    <string name="recording_delete_title">Delete “%1$s”?</string>
+    <string name="recording_delete_body">The recording is removed from this device.</string>
+    <string name="recording_exported">Recording saved</string>
+    <string name="recording_cannot_open">Cannot open this recording: %1$s</string>
+    <string name="player_play">Play</string>
+    <string name="player_pause">Pause</string>
+    <string name="player_speed">Speed</string>
+    <string name="player_skip_idle">Skip idle</string>
+    <string name="player_time">%1$s / %2$s</string>
+    <string name="player_restart">Restart</string>
+
+    <!-- Triggers (watch replies) -->
+    <string name="watch_regex">Regular expression</string>
+    <string name="watch_reply_hint">Reply with (optional)</string>
+    <string name="watch_reply_help">Escapes: \\r Enter, \\n, \\t, \\e Esc, \\\\ backslash.</string>
+    <string name="watch_reply_warning">Replies are typed into the terminal automatically.</string>
+    <string name="watch_regex_invalid">Not a valid regular expression: %1$s</string>
+    <string name="trigger_armed">Trigger set for “%1$s”</string>
+    <string name="trigger_fired">Replied to “%1$s” in %2$s</string>
+    <string name="action_trigger_stop">Stop trigger</string>
+
+    <!-- Colour schemes -->
+    <string name="schemes_title">Colour schemes</string>
+    <string name="schemes_subtitle">Built-in and your own terminal colours</string>
+    <string name="schemes_builtin">Built in</string>
+    <string name="schemes_mine">Your schemes</string>
+    <string name="schemes_new">New scheme</string>
+    <string name="schemes_import">Import</string>
+    <string name="schemes_import_hint">Paste a Windows Terminal scheme (or a list of them, or a settings.json with “schemes”).</string>
+    <plurals name="schemes_imported">
+        <item quantity="one">Imported %d scheme</item>
+        <item quantity="other">Imported %d schemes</item>
+    </plurals>
+    <string name="schemes_in_use">In use</string>
+    <string name="scheme_use">Use for all terminals</string>
+    <string name="scheme_edit">Edit</string>
+    <string name="scheme_edit_title">Edit colour scheme</string>
+    <string name="scheme_copy_new">New scheme from this one</string>
+    <string name="scheme_copy_json">Copy as JSON</string>
+    <string name="scheme_delete">Delete</string>
+    <string name="scheme_delete_title">Delete “%1$s”?</string>
+    <string name="scheme_delete_body">Terminals using it go back to the default scheme.</string>
+    <string name="scheme_copy_name">%1$s copy</string>
+    <string name="scheme_new_from">Start from</string>
+    <string name="scheme_name">Name</string>
+    <string name="scheme_background">Background</string>
+    <string name="scheme_foreground">Foreground</string>
+    <string name="scheme_cursor">Cursor</string>
+    <string name="scheme_selection">Selection</string>
+    <string name="scheme_ansi">ANSI colours</string>
+    <string name="scheme_colours">Colours</string>
+    <string name="scheme_preview">Preview</string>
+    <string name="scheme_invalid_hex">Use #rrggbb</string>
+    <string name="scheme_save">Save scheme</string>
+    <string name="scheme_saved">Saved “%1$s”</string>
+    <string name="scheme_name_required">Give the scheme a name.</string>
+    <string name="scheme_fix_colours">Fix the colours marked in red first.</string>
+    <string-array name="scheme_ansi_names">
+        <item>Black</item>
+        <item>Red</item>
+        <item>Green</item>
+        <item>Yellow</item>
+        <item>Blue</item>
+        <item>Purple</item>
+        <item>Cyan</item>
+        <item>White</item>
+        <item>Bright black</item>
+        <item>Bright red</item>
+        <item>Bright green</item>
+        <item>Bright yellow</item>
+        <item>Bright blue</item>
+        <item>Bright purple</item>
+        <item>Bright cyan</item>
+        <item>Bright white</item>
+    </string-array>
+
+    <!-- Backup & restore -->
+    <string name="group_data">Data</string>
+    <string name="backup_title">Backup &amp; restore</string>
+    <string name="backup_subtitle">Presets, snippets, schemes, shortcuts and terminal settings</string>
+    <string name="backup_export_group">Export</string>
+    <string name="backup_import_group">Import</string>
+    <string name="backup_export_file">Save to a file</string>
+    <string name="backup_export_file_desc">A JSON file the desktop app can import too</string>
+    <string name="backup_share">Share</string>
+    <string name="backup_share_desc">Send the backup to another app</string>
+    <string name="backup_import_file">Import from a file</string>
+    <string name="backup_import_paste">Import pasted text</string>
+    <string name="backup_import_paste_hint">Paste the backup’s JSON</string>
+    <string name="backup_never">Never included: pairing, tokens, the relay, favourites and per-machine settings.</string>
+    <string name="backup_saved">Backup saved</string>
+    <string name="backup_import_title">Restore this backup?</string>
+    <plurals name="backup_n_presets">
+        <item quantity="one">%d preset</item>
+        <item quantity="other">%d presets</item>
+    </plurals>
+    <plurals name="backup_n_snippets">
+        <item quantity="one">%d snippet</item>
+        <item quantity="other">%d snippets</item>
+    </plurals>
+    <plurals name="backup_n_schemes">
+        <item quantity="one">%d scheme</item>
+        <item quantity="other">%d schemes</item>
+    </plurals>
+    <plurals name="backup_n_settings">
+        <item quantity="one">%d setting</item>
+        <item quantity="other">%d settings</item>
+    </plurals>
+    <string name="backup_merge">Merge</string>
+    <string name="backup_replace">Replace</string>
+    <string name="backup_import_help">Merge: keep what is here; items with the same id are replaced by the backup’s. Replace: presets, snippets, schemes and shortcuts become exactly the backup’s.</string>
+    <string name="backup_imported">Backup restored</string>
+    <string name="backup_empty">This backup has nothing to import.</string>
+    <string name="backup_read_failed">Cannot read that file.</string>
+    <string name="backup_contents">This device: %1$s</string>
+
+    <!-- System view -->
+    <string name="tool_system">System</string>
+    <string name="tool_system_hint">Machine, network, listening ports</string>
+    <string name="tool_system_unsupported">Update the agent on this machine to see its system details.</string>
+    <string name="system_title">System</string>
+    <string name="system_machine">Machine</string>
+    <string name="system_network">Network</string>
+    <string name="system_ports">Listening ports</string>
+    <string name="system_not_reported">not reported</string>
+    <string name="system_hostname">Hostname</string>
+    <string name="system_os">Operating system</string>
+    <string name="system_kernel">Kernel / release</string>
+    <string name="system_arch">Architecture</string>
+    <string name="system_cpu">Processor</string>
+    <string name="system_cpu_value">%1$s · %2$d cores</string>
+    <string name="system_memory">Memory</string>
+    <string name="system_uptime">Uptime</string>
+    <string name="system_agent_uptime">Agent running for</string>
+    <string name="system_agent">Agent version</string>
+    <string name="system_node">Node.js</string>
+    <string name="system_user">Terminals run as</string>
+    <string name="system_timezone">Time zone</string>
+    <string name="system_mac">MAC %1$s</string>
+    <string name="system_no_interfaces">No network interfaces reported.</string>
+    <string name="system_ports_filter_hint">Filter by port, protocol, address or process</string>
+    <string name="system_ports_none">No listening ports reported.</string>
+    <string name="system_ports_no_match">No port matches “%1$s”</string>
+    <string name="system_ports_truncated">Only the first 1000 are shown.</string>
+    <string name="system_ports_shown">Showing %1$d of %2$d; filter to narrow them down.</string>
+    <string name="system_port_process">%1$s (%2$d)</string>
+    <string name="system_port_no_process">Process not visible</string>
+    <string name="system_copy_endpoint">Copy address:port</string>
+    <string name="system_show_process">Show process</string>
+    <string name="system_error_title">Cannot read system information</string>
+    <string name="system_sys_unsupported">This agent does not report system information.</string>
+    <string name="system_ports_unsupported">This agent does not list ports.</string>
+    <string name="system_sampled">Sampled %1$s</string>
+
+    <!-- Wake-on-LAN -->
+    <string name="wol_group">Wake-on-LAN</string>
+    <string name="wol_mac">MAC address</string>
+    <string name="wol_mac_hint">aa:bb:cc:dd:ee:ff</string>
+    <string name="wol_broadcast">Broadcast address</string>
+    <string name="wol_port">Port</string>
+    <string name="wol_lan_note">This phone must be on the machine’s local network for the packet to reach it. Filled in from the machine’s last system report.</string>
+    <string name="wol_mac_invalid">Enter a MAC address like aa:bb:cc:dd:ee:ff</string>
+    <string name="wol_broadcast_invalid">Enter an IPv4 address</string>
+    <string name="wol_port_invalid">1–65535</string>
+    <string name="wol_not_set">Not set</string>
+    <string name="wol_saved">Wake-on-LAN saved</string>
+    <string name="wol_wake">Wake</string>
+    <string name="wol_wake_desc">Send the magic packet now</string>
+    <string name="wol_sent">Magic packet sent — the machine may take a minute to appear.</string>
+    <string name="wol_failed">Could not send the magic packet: %1$s</string>
+    <string name="wol_edit_title">Wake-on-LAN</string>
+    <string name="wol_clear">Clear</string>
+
+    <!-- Keyboard shortcuts -->
+    <string name="shortcuts_hw_title">Keyboard shortcuts</string>
+    <string name="shortcuts_hw_desc">Keys the terminal keeps for the app</string>
+    <string name="kbd_new_terminal">New terminal</string>
+    <string name="kbd_close_tab">Close tab</string>
+    <string name="kbd_next_tab">Next tab</string>
+    <string name="kbd_previous_tab">Previous tab</string>
+    <string name="kbd_copy">Copy selection</string>
+    <string name="kbd_paste">Paste</string>
+    <string name="kbd_search">Search scrollback</string>
+    <string name="kbd_palette">Command palette</string>
+    <string name="kbd_snippets">Snippets</string>
+    <string name="kbd_zoom_in">Zoom in</string>
+    <string name="kbd_zoom_out">Zoom out</string>
+    <string name="kbd_zoom_reset">Reset zoom</string>
+    <string name="kbd_nothing_selected">Nothing selected</string>
+</resources>

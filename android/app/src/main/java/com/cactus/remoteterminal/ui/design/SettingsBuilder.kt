@@ -149,6 +149,22 @@ class SettingsBuilder(
         return this
     }
 
+    /** A muted explanation under the current card (what a section does, a caveat). */
+    fun note(text: CharSequence): SettingsBuilder {
+        if (needle.isNotEmpty() || card == null || rowsInCard == 0) return this
+        val view = TextView(context)
+        view.setTextAppearance(R.style.RtText_RowMeta)
+        view.text = text
+        view.setPadding(Design.dp(context, 4f), 0, Design.dp(context, 4f), 0)
+        container.addView(
+            view,
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                topMargin = Design.dp(context, 8f)
+            }
+        )
+        return this
+    }
+
     /** Centred footnote under the last card (version, protocol). */
     fun footnote(text: CharSequence) {
         dropEmptySection()

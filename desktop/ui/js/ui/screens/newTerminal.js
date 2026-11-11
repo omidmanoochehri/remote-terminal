@@ -22,10 +22,12 @@ import { menu, toast, promptDialog } from '../overlays.js';
 import { presence, machineIcon } from '../../core/format.js';
 import { makePreset, newPresetId } from '../../core/preset.js';
 
-export function newTerminalScreen(app, { agentId: initialAgentId = null, presetId = null, presetMode = false }) {
+export function newTerminalScreen(app, { agentId: initialAgentId = null, presetId = null, presetMode = false, draft = null }) {
   const screen = new Screen(app, presetMode ? S.presetsTitle : S.newTerminalTitle);
 
-  const editing = presetId ? app.settings.preset(presetId) : null;
+  // A preset being edited — or a draft taken from a running terminal ("Save as
+  // preset"), which fills the same fields but is saved as a new preset.
+  const editing = presetId ? app.settings.preset(presetId) : draft;
 
   let anyMachine = presetMode && editing != null && editing.agentId == null;
   let agentId = editing?.agentId ?? (anyMachine ? null : initialAgentId) ?? defaultAgent()?.agentId ?? null;

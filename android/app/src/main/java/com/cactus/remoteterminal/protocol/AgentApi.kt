@@ -45,6 +45,19 @@ object AgentCaps {
 
     fun processes(relayCaps: Collection<String>, agent: AgentInfo): Boolean =
         RELAY_REQUESTS in relayCaps && PROCESSES in agent.caps
+
+    const val SYSTEM = "sys"
+    const val PORTS = "ports"
+
+    fun system(relayCaps: Collection<String>, agent: AgentInfo): Boolean =
+        RELAY_REQUESTS in relayCaps && SYSTEM in agent.caps
+
+    fun ports(relayCaps: Collection<String>, agent: AgentInfo): Boolean =
+        RELAY_REQUESTS in relayCaps && PORTS in agent.caps
+
+    /** The System screen shows when the machine can answer either of its two requests. */
+    fun systemView(relayCaps: Collection<String>, agent: AgentInfo): Boolean =
+        system(relayCaps, agent) || ports(relayCaps, agent)
 }
 
 /* ---------------------------------- files --------------------------------- */
@@ -245,5 +258,112 @@ object Processes {
         if (cpu == null) return "—"
         val pct = cpu * 100f
         return if (pct >= 10f || pct == 0f) "${Math.round(pct)}%" else String.format(java.util.Locale.US, "%.1f%%", pct)
+    }
+}
+
+/* --------------------------------- system --------------------------------- */
+
+/** One address of a network interface (`sys.info`). */
+data class NetAddress(val family: String, val address: String, val cidr: String?)
+
+data class NetInterface(val name: String, val mac: String?, val addresses: List<NetAddress>)
+
+/** `sys.info`: every field but hostname, platform and interfaces may be missing (null). */
+data class SysInfo(
+    val hostname: String,
+    val platform: String,
+    val os: String?,
+    val release: String?,
+    val arch: String?,
+    val cpuModel: String?,
+    val cpus: Int?,
+    val memoryTotal: Long?,
+    val uptimeSec: Long?,
+    val agentUptimeSec: Long?,
+    val nodeVersion: String?,
+    val agentVersion: String?,
+    val user: String?,
+    val timezone: String?,
+    val interfaces: List<NetInterface>,
+) {
+    companion object {
+        private fun JSONObject.str(key: String): String? = when (val v = if (isNull(key)) null else opt(key)) {
+            is String -> v.ifEmpty { null }
+            is Number -> v.toString()
+            else -> null
+        }
+
+        private fun JSONObject.long(key: String): Long? =
+            if (!has(key) || isNull(key)) null else (opt(key) as? Number)?.toLong()
+
+        fun fromJson(o: JSONObject) = SysInfo(
+            hostname = o.optString("hostname"),
+            platform = o.optString("platform"),
+            os = o.str("os"),
+            release = o.str("release"),
+            arch = o.str("arch"),
+            cpuModel = o.str("cpuModel"),
+            cpus = o.long("cpus")?.toInt(),
+            memoryTotal = o.long("memoryTotal"),
+            uptimeSec = o.long("uptimeSec"),
+            agentUptimeSec = o.long("agentUptimeSec"),
+            nodeVersion = o.str("nodeVersion"),
+            agentVersion = o.str("agentVersion"),
+            user = o.str("user"),
+            timezone = o.str("timezone"),
+            interfaces = o.optJSONArray("interfaces").toList { i ->
+                NetInterface(
+                    name = i.optString("name"),
+                    mac = i.str("mac")?.takeIf { it.replace(":", "").replace("-", "").any { c -> c != '0' } },
+                    addresses = i.optJSONArray("addresses").toList { a ->
+                        NetAddress(a.optString("family"), a.optString("address"), a.str("cidr"))
+                    },
+                )
+            },
+        )
+    }
+}
+
+/** One listening socket (`net.ports`). */
+data class ListeningPort(
+    val proto: String,
+    val family: String,
+    val address: String,
+    val port: Int,
+    val pid: Int?,
+    val process: String?,
+) {
+    /** `address:port`, with IPv6 addresses bracketed. */
+    val endpoint: String get() = if (address.contains(':')) "[$address]:$port" else "$address:$port"
+
+    companion object {
+        fun fromJson(o: JSONObject) = ListeningPort(
+            proto = o.optString("proto", "tcp"),
+            family = o.optString("family", "IPv4"),
+            address = o.optString("address"),
+            port = o.optInt("port"),
+            pid = if (!o.has("pid") || o.isNull("pid")) null else o.optInt("pid"),
+            process = if (!o.has("process") || o.isNull("process")) null else o.optString("process").ifEmpty { null },
+        )
+    }
+}
+
+data class PortList(val ports: List<ListeningPort>, val sampledAt: Long, val truncated: Boolean) {
+    companion object {
+        fun fromJson(o: JSONObject) = PortList(
+            ports = o.optJSONArray("ports").toList { ListeningPort.fromJson(it) },
+            sampledAt = o.optLong("sampledAt", 0L),
+            truncated = o.optBoolean("truncated", false),
+        )
+
+        /** Filter on port, protocol, address, process name and pid. */
+        fun filter(list: List<ListeningPort>, query: String): List<ListeningPort> {
+            val q = query.trim().lowercase()
+            if (q.isEmpty()) return list
+            return list.filter {
+                it.port.toString().startsWith(q) || it.proto.lowercase() == q || it.address.lowercase().contains(q) ||
+                    (it.process?.lowercase()?.contains(q) == true) || it.pid?.toString() == q
+            }
+        }
     }
 }

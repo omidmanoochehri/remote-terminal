@@ -23,11 +23,13 @@ import {
 import { runningSessions, metricsHaveAny, memoryFraction, storageFraction } from '../../protocol/messages.js';
 import { filesPanel } from './files.js';
 import { processesPanel } from './processes.js';
+import { systemPanel } from './system.js';
+import { wakeMachine } from '../actions.js';
 
 export function machineScreen(app, { agentId, tab: initialTab = 'terminals', path = null, sessionKey = null }) {
   const screen = new Screen(app);
   let tab = initialTab;
-  const panels = { files: null, processes: null };
+  const panels = { files: null, processes: null, system: null };
 
   const heroSlot = el('div');
   const segmentSlot = el('div');
@@ -92,10 +94,12 @@ export function machineScreen(app, { agentId, tab: initialTab = 'terminals', pat
       segment(S.tabTerminals, tab === 'terminals', () => selectTab('terminals')),
       segment(S.tabFiles, tab === 'files', () => selectTab('files')),
       segment(S.tabProcesses, tab === 'processes', () => selectTab('processes')),
+      hasSystem(agent) ? segment(S.tabSystem, tab === 'system', () => selectTab('system')) : null,
       segment(S.tabDetails, tab === 'details', () => selectTab('details')),
       segment(S.tabSettings, false, () => app.openMachineSettings(agentId))));
 
-    if (tab === 'files' || tab === 'processes') {
+    if (tab === 'system' && !hasSystem(agent)) tab = 'details';
+    if (tab === 'files' || tab === 'processes' || tab === 'system') {
       const panel = panelFor(tab);
       if (bodyContent !== panel.root) {
         bodyContent.replaceWith(panel.root);
@@ -117,11 +121,22 @@ export function machineScreen(app, { agentId, tab: initialTab = 'terminals', pat
 
   function panelFor(which) {
     if (!panels[which]) {
-      panels[which] = which === 'files'
-        ? filesPanel(app, agentId, { path, sessionKey })
-        : processesPanel(app, agentId);
+      if (which === 'files') panels.files = filesPanel(app, agentId, { path, sessionKey });
+      else if (which === 'processes') panels.processes = processesPanel(app, agentId);
+      else panels.system = systemPanel(app, agentId, { onShowProcess: (pid) => showProcess(pid) });
     }
     return panels[which];
+  }
+
+  /** The System segment is there when the agent can answer either of its requests. */
+  function hasSystem(agent) {
+    return (agent.caps || []).includes('sys') || (agent.caps || []).includes('ports');
+  }
+
+  /** From a listening port to its process: the Processes segment, filtered by PID. */
+  function showProcess(pid) {
+    selectTab('processes');
+    panels.processes?.setFilter(String(pid), pid);
   }
 
   function segment(label, active, onClick) {
@@ -168,7 +183,15 @@ export function machineScreen(app, { agentId, tab: initialTab = 'terminals', pat
     if (sessions.length === 0) {
       bodyContent.append(agent.online
         ? stateBlock({ icon: 'terminal_square', title: S.emptyTerminalsTitle, body: S.emptyTerminalsBody })
-        : stateBlock({ icon: 'wifi_off', title: S.machineOffline, body: S.agentOfflineHint }));
+        : stateBlock({
+          icon: 'wifi_off',
+          title: S.machineOffline,
+          body: S.agentOfflineHint,
+          // A machine whose MAC is known can be woken from here.
+          actionLabel: app.settings.wol(agentId) ? S.wolWake : null,
+          actionIcon: 'lightbulb',
+          onAction: () => wakeMachine(app, agentId),
+        }));
     } else {
       bodyContent.append(rowsCard(sessions.map((session) => terminalRow(agent, session))));
       const running = runningSessions(agent);
@@ -179,6 +202,12 @@ export function machineScreen(app, { agentId, tab: initialTab = 'terminals', pat
           el('div.note-body', { text: S.machineSessionsNoteBody }))));
     }
 
+    if (!agent.online && sessions.length > 0 && app.settings.wol(agentId)) {
+      bodyContent.append(el('button.button', {
+        onClick: () => wakeMachine(app, agentId),
+        style: { marginTop: '10px', width: '100%' },
+      }, svgIcon('lightbulb'), el('span', { text: S.wolWake })));
+    }
     bodyContent.append(el('button.cta', {
       disabled: !agent.online,
       onClick: () => app.openNewTerminal(agentId),
@@ -270,7 +299,7 @@ export function machineScreen(app, { agentId, tab: initialTab = 'terminals', pat
   screen.listen(app.client, 'state', render);
   screen.listen(app.client, 'latency', render);
   screen.every(30_000, render);
-  screen.track(() => { panels.files?.destroy(); panels.processes?.destroy(); });
+  screen.track(() => { panels.files?.destroy(); panels.processes?.destroy(); panels.system?.destroy(); });
 
   render();
 

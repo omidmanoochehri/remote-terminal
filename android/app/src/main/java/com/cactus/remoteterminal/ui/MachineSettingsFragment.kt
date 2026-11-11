@@ -102,7 +102,7 @@ class MachineSettingsFragment : Fragment(), RtScreen {
                         host.onBackPressedDispatcher.onBackPressed()
                         return@collect
                     }
-                    if (agent == null) render(found) else agent = found
+                    if (agent == null) render(found) else { agent = found; renderWake(found) }
                 }
             }
         }
@@ -121,6 +121,9 @@ class MachineSettingsFragment : Fragment(), RtScreen {
         binding.relayField.fieldTrailing.setTextColor(
             Design.color(context, if (secure) R.color.rt_text_muted else R.color.rt_status_warn)
         )
+
+        renderWake(found)
+        fillWakeFromSystem(found)
 
         val card = binding.securityCard
         card.removeAllViews()
@@ -157,6 +160,50 @@ class MachineSettingsFragment : Fragment(), RtScreen {
         encryption.infoRow.isClickable = false
         encryption.infoRow.background = null
         card.addView(encryption.root)
+    }
+
+    /** MAC, broadcast and port as rows (a tap edits all three), and Wake while the machine is offline. */
+    private fun renderWake(found: AgentInfo) {
+        val b = _binding ?: return
+        val context = requireContext()
+        val card = b.wolCard
+        card.removeAllViews()
+        val target = app.settings.wakeTargetRaw(agentId)
+        fun row(icon: Int, label: Int, value: String?, onClick: () -> Unit) {
+            if (card.childCount > 0) {
+                card.addView(View(context).apply { setBackgroundColor(Design.color(context, R.color.rt_divider)) },
+                    ViewGroup.MarginLayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1).apply {
+                        marginStart = Design.dp(context, 13f); marginEnd = Design.dp(context, 13f)
+                    })
+            }
+            val r = ViewInfoRowBinding.inflate(layoutInflater, card, false)
+            r.infoIcon.setImageResource(icon)
+            r.infoLabel.setText(label)
+            r.infoValue.text = value ?: getString(R.string.wol_not_set)
+            r.infoBadge.visible = false
+            r.infoRow.contentDescription = "${getString(label)}: ${r.infoValue.text}"
+            r.infoRow.setOnClickListener { onClick() }
+            card.addView(r.root)
+        }
+        val edit = { WakeUi.edit(context, agentId) { renderWake(agent ?: found) } }
+        row(R.drawable.ic_rt_network, R.string.wol_mac, target?.mac?.ifEmpty { null }, edit)
+        row(R.drawable.ic_rt_globe, R.string.wol_broadcast, target?.broadcast, edit)
+        row(R.drawable.ic_rt_link, R.string.wol_port, target?.port?.toString(), edit)
+        if (!found.online && app.settings.wakeTarget(agentId) != null) {
+            row(R.drawable.ic_rt_power, R.string.wol_wake, getString(R.string.wol_wake_desc)) { WakeUi.wake(this, agentId) }
+        }
+    }
+
+    /** No MAC yet and the machine can say it: ask once, quietly. */
+    private fun fillWakeFromSystem(found: AgentInfo) {
+        if (app.settings.wakeTargetRaw(agentId) != null) return
+        if (!found.online || !com.cactus.remoteterminal.protocol.AgentCaps.system(app.client.relayCaps, found)) return
+        viewLifecycleOwner.lifecycleScope.launch {
+            runCatching { app.remote.systemInfo(agentId) }.onSuccess { info ->
+                app.settings.noteSysInfo(agentId, info)
+                renderWake(agent ?: found)
+            }
+        }
     }
 
     private fun bindToggle(

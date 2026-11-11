@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The launcher mark, with room to breathe.
+
+    An adaptive icon draws its foreground on a 108dp canvas of which the
+    launcher only ever shows the middle 72dp, so a mark that fills the canvas
+    presses against the mask. Insetting it by 12dp on every side leaves the
+    logo at about two thirds of the visible circle, which is where the rest of
+    the system's icons sit.
+-->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@mipmap/ic_launcher_foreground"
+    android:insetLeft="12dp"
+    android:insetTop="12dp"
+    android:insetRight="12dp"
+    android:insetBottom="12dp" />

@@ -11,7 +11,7 @@ upload into a session; a file browser and a process manager for every machine;
 clickable links, transcripts, broadcast input and output watches in the
 terminal; pairing; paired devices; notifications; the app lock.
 
-Version **0.12.1**, wire protocol **v3** — the same numbers the rest of the
+Version **0.15.0**, wire protocol **v3** — the same numbers the rest of the
 project carries.
 
 ---
@@ -190,12 +190,37 @@ the agent.
   turns it off.
 - **Transcripts** — *Save transcript* (`Ctrl+Shift+S`) writes the scrollback
   and screen as plain text; *Copy transcript* puts it on the clipboard.
+- **Prompt** — the speech-bubble button (or *Write a prompt…*) opens a text
+  box for a prompt to a program such as a coding assistant. Paste or drop
+  files into it, or attach them; on *Send* (`Ctrl+Enter`) they are uploaded
+  to the machine and the text goes in as one paste with their paths after it,
+  then Enter, unless you untick it. A cancelled prompt is kept for next time.
+- **Terminal windows** — *Open in new window* moves a terminal into a window of
+  its own, for another monitor; its pin button keeps it above other windows.
+  Its tab stays in the main window, drawn dashed, and a click on it brings the
+  window forward. Closing the window, or *Return to main window*, puts the
+  terminal back as a tab. The window runs its own relay connection, and
+  settings changed in either window apply in both.
 - **Broadcast input** — choose other open terminals, on any machine, and what
   you type in this one goes to them too, until you press *Stop* on the banner
   or they close.
 - **Watches** — *Watch for text…* notifies when that text appears in live
   output (any case; once, unless you ask to keep watching); *Notify when
   output stops* notifies once the terminal has been silent for ten seconds.
+  A watch can be a regular expression, and can *reply*: the reply (with
+  `\r`, `\n`, `\t`, `\e`, `\\` escapes) is typed into the terminal when it
+  matches, at most once every two seconds.
+- **Snippets** — saved commands with `{{name}}` / `{{name:default}}` fields,
+  managed in Settings → Snippets and sent from *Snippets…*, the palette or
+  `Ctrl+Shift+E`.
+- **Recording** — *Start recording* saves the output with its timing as an
+  asciicast v2 file (up to 16 MB); Settings → Recordings plays, exports,
+  renames and deletes them.
+
+**Elsewhere:** colour schemes of your own (Settings → Colour schemes; Windows
+Terminal JSON in and out), Backup & restore (a JSON file the phone reads too),
+a System segment per machine (`sys.info`, `net.ports`), and Wake-on-LAN for
+an offline machine whose MAC is known (Machine settings).
 
 ---
 
@@ -215,6 +240,10 @@ because `Ctrl+4` is a real control code.
 | `Ctrl+Tab`, `Ctrl+Shift+Tab` | Next / previous terminal tab |
 | `Ctrl+Shift+F` | Find in the scrollback |
 | `Ctrl+Shift+S` | Save the terminal's transcript |
+| `Ctrl+Shift+P` | Command palette (anywhere; in a terminal it also offers the terminal's menu and snippets) |
+| `Ctrl+Shift+E` | Snippets (the same key on the phone with a hardware keyboard) |
+| `Ctrl+Shift+T`, `Ctrl+Shift+W` | New terminal, close the tab (asks as usual) |
+| `Ctrl+=`, `Ctrl+-`, `Ctrl+0` | Font size up, down, back to the default |
 | `Ctrl`+click | Open the link under the pointer |
 | `Ctrl+Shift+C`, `Ctrl+Shift+V` | Copy the selection, paste |
 | `Ctrl+V` (Windows only) | Paste — what the keyboard says and what Windows Terminal does. Elsewhere `Ctrl+V` belongs to the shell, where readline reads it as "take the next key literally" |

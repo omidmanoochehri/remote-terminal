@@ -13,6 +13,11 @@
   "sessionIdleTimeoutSec": 21600,
   "exitedRetentionSec": 300,
 
+  "restoreSessions": true,
+  "restoreCommands": true,
+  "restoreMaxAgeSec": 86400,
+  "sessionsFile": "./sessions.json",
+
   "metricsIntervalMs": 20000,
 
   "fileBrowser": true,
@@ -20,6 +25,8 @@
   "maxFileWriteBytes": 536870912,
   "processManager": true,
   "allowProcessKill": true,
+  "systemInfo": true,
+  "portList": true,
 
   "inheritEnv": false,
   "runAsUser": "auto",

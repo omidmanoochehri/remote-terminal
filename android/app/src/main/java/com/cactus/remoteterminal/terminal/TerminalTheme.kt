@@ -12,7 +12,8 @@ class TerminalTheme(
     val foreground: Int,
     val cursor: Int,
     val selection: Int,
-    ansi: IntArray,
+    /** The 16 ANSI colours, ARGB. */
+    val ansi: IntArray,
     val isLight: Boolean = false,
 ) {
     /** ARGB colours for palette indices 0..255. */
@@ -67,8 +68,17 @@ class TerminalTheme(
                 0x928374, 0xFB4934, 0xB8BB26, 0xFABD2F, 0x83A598, 0xD3869B, 0x8EC07C, 0xEBDBB2),
         )
 
+        /** The built-in schemes. */
         val ALL: List<TerminalTheme> = listOf(REMOTE, DARK, AMOLED, LIGHT, SOLARIZED_DARK, GRUVBOX)
 
-        fun byId(id: String?): TerminalTheme = ALL.firstOrNull { it.id == id } ?: REMOTE
+        /** The user's own schemes (Settings → Colour schemes); kept in step by [com.cactus.remoteterminal.data.Settings]. */
+        @Volatile var custom: List<TerminalTheme> = emptyList()
+
+        /** Every scheme a terminal can use: the built-in ones, then the user's. */
+        fun all(): List<TerminalTheme> = ALL + custom
+
+        fun isCustom(id: String?): Boolean = id != null && id.startsWith(ColorSchemes.USER_PREFIX)
+
+        fun byId(id: String?): TerminalTheme = ALL.firstOrNull { it.id == id } ?: custom.firstOrNull { it.id == id } ?: REMOTE
     }
 }

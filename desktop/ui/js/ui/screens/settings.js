@@ -10,8 +10,11 @@ import { Screen } from './base.js';
 import { el, clear, svgIcon, header, headerAction, stateBlock, debounce } from '../dom.js';
 import { SettingsBuilder } from '../settingsBuilder.js';
 import { S, CHOICES, labelFor } from '../strings.js';
-import { menu, chooseDialog, promptDialog, confirmDialog, toast } from '../overlays.js';
+import { menu, chooseDialog, promptDialog, confirmDialog, customDialog, toast } from '../overlays.js';
 import { copyToClipboard } from '../actions.js';
+import { backupMenu } from '../backupUi.js';
+import { TERMINAL_SHORTCUTS } from './terminal.js';
+import { themeById } from '../../terminal/theme.js';
 import { relayHost } from '../../core/format.js';
 import {
   FONT_SYSTEM, COMMAND_HISTORY_MAX, DEFAULT_ROW1, DEFAULT_ROW2, DEFAULT_ROW3,
@@ -71,6 +74,12 @@ export function settingsScreen(app) {
     const b = new SettingsBuilder(sections, query);
 
     b.section(S.groupAppearance)
+      .row('globe', '--accent', S.settingLanguage, S.settingLanguageDesc,
+        labelFor(CHOICES.appLanguage, s.appLanguage),
+        () => choose(S.settingLanguage, CHOICES.appLanguage, s.appLanguage, (v) => {
+          s.appLanguage = v;
+          app.applyLanguage();
+        }))
       .row('moon_star', '--primary', S.settingTheme, S.settingThemeDesc,
         labelFor(CHOICES.appTheme, s.appTheme),
         () => choose(S.settingTheme, CHOICES.appTheme, s.appTheme, (v) => { s.appTheme = v; app.applyTheme(); }))
@@ -83,6 +92,12 @@ export function settingsScreen(app) {
     b.section(S.groupTerminal)
       .row('bookmark', '--primary', S.presetsTitle, S.presetsSubtitle,
         String(s.terminalPresets.length), () => app.openPresets())
+      .row('command', '--accent', S.snippets, S.snippetsSubtitle,
+        String(s.snippets.length), () => app.openSnippets())
+      .row('play', '--danger', S.recordings, S.recordingsSubtitle,
+        String(app.recordings?.list.length ?? 0), () => app.openRecordings())
+      .row('sliders', '--purple', S.colourSchemes, S.colourSchemesSubtitle,
+        themeById(s.terminalTheme).name, () => app.openColourSchemes())
       .toggle('swipe', '--accent', S.settingWheelTabs, S.settingWheelTabsDesc,
         s.wheelSwitchTabs, (v) => { s.wheelSwitchTabs = v; })
       .toggle('link', '--primary', S.settingClickableLinks, S.settingClickableLinksDesc,
@@ -114,7 +129,11 @@ export function settingsScreen(app) {
     b.section(S.groupKeyboard)
       .row('keyboard', '--accent', S.settingKeyRows, S.settingKeyRowsDesc, null, () => editKeyRows())
       .row('command', '--primary', S.settingCommandShortcuts, S.settingCommandShortcutsDesc,
-        String(s.commandShortcuts.length), () => editCommandShortcuts());
+        String(s.commandShortcuts.length), () => editCommandShortcuts())
+      .row('keyboard', '--purple', S.shortcutsList, S.shortcutsListDesc, null, () => showKeyboardShortcuts());
+
+    b.section(S.backup)
+      .row('save', '--primary', S.backup, S.backupDesc, null, () => backupMenu(app));
 
     b.section(S.groupNotifications)
       .toggle('wifi_off', '--amber', S.settingNotifyOffline, null,
@@ -189,6 +208,16 @@ export function settingsScreen(app) {
         return eq > 0 ? [line.slice(0, eq).trim(), line.slice(eq + 1).trim()] : [line, line];
       });
     build();
+  }
+
+  function showKeyboardShortcuts() {
+    customDialog({
+      title: S.shortcutsList,
+      build: () => el('div.shortcut-list', null, TERMINAL_SHORTCUTS.map(([keys, label]) =>
+        el('div.shortcut-row', null,
+          el('span', { text: S[label] }),
+          el('kbd', { text: keys })))),
+    });
   }
 
   async function confirmUnpair() {

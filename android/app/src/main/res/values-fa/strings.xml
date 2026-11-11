@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ریموت ترمینال</string>
+
+    <string name="state_connected">وصل است</string>
+    <string name="state_connecting">در حال اتصال...</string>
+    <string name="state_reconnecting">اتصال دوباره...</string>
+    <string name="state_reconnecting_in">اتصال دوباره تا %1$d ثانیه...</string>
+    <string name="state_disconnected">وصل نیست</string>
+    <string name="state_unpaired">جفت نشده</string>
+    <string name="state_failed">اتصال ممکن نیست: %1$s</string>
+    <string name="retry_now">تلاش دوباره</string>
+
+    <string name="machine_online">آنلاین</string>
+    <string name="machine_offline">آفلاین</string>
+    <string name="machine_last_seen">آخرین بازدید %1$s</string>
+    <string name="machine_never_seen">هنوز وصل نشده</string>
+    <plurals name="machine_sessions">
+        <item quantity="one">%d ترمینال</item>
+        <item quantity="other">%d ترمینال</item>
+    </plurals>
+    <string name="machines_empty_action">راهنمای نصب Agent</string>
+    <string name="machines_help">روی کامپیوتر:\n\nWindows:\n  install-windows.ps1 -Install -Server wss://relay -EnrollToken ...\n\nUbuntu / Linux:\n  sudo ./install-linux.sh --server wss://relay --enroll-token ...\n\nوقتی Agent به relay وصل شود، دستگاه اینجا دیده می شود.</string>
+    <string name="devices">دستگاه های جفت شده</string>
+    <string name="refresh">تازه سازی</string>
+
+    <string name="agent_offline_hint">این دستگاه آفلاین است. تا زمان اتصال دوباره نمی توان ترمینال جدید ساخت.</string>
+    <string name="new_terminal">ترمینال جدید</string>
+    <string name="rename_machine">تغییر نام دستگاه</string>
+    <string name="remove_machine">حذف دستگاه</string>
+    <string name="remove_machine_confirm">«%1$s» حذف شود؟\n\nتوکن Agent بلافاصله لغو می شود و برای اتصال دوباره باید دوباره enroll شود. ترمینال های در حال اجرا روی آن بسته می شوند.</string>
+    <string name="copy_hostname">کپی نام میزبان</string>
+    <string name="copied">کپی شد</string>
+    <string name="session_state_running">فعال</string>
+    <string name="session_state_detached">جدا شده</string>
+    <string name="session_state_exited">خارج شد (%1$d)</string>
+
+    <string name="terminal">ترمینال</string>
+    <string name="tab_close">بستن تب</string>
+    <string name="tab_keep_running">در حال اجرا بماند</string>
+    <string name="tab_keep_running_desc">تب بسته شود ولی shell روی دستگاه در حال اجرا بماند. بعدا می توانید آن را از صفحه دستگاه دوباره باز کنید.</string>
+    <string name="tab_terminate">پایان</string>
+    <string name="tab_terminate_desc">پردازه shell و همه چیزهای در حال اجرای آن پایان داده می شود.</string>
+    <string name="tab_close_title">«%1$s» بسته شود؟</string>
+    <string name="rename_terminal">تغییر نام ترمینال</string>
+    <string name="search">جستجو</string>
+    <string name="search_hint">جستجو در خروجی</string>
+    <string name="search_none">موردی نیست</string>
+    <string name="search_count">%1$d از %2$d</string>
+    <string name="search_prev">مورد قبلی</string>
+    <string name="search_next">مورد بعدی</string>
+    <string name="close_search">بستن جستجو</string>
+    <string name="command_bar">نوار فرمان</string>
+    <string name="shortcuts">میانبرها</string>
+    <string name="select_all">انتخاب همه</string>
+    <string name="copy">کپی</string>
+    <string name="paste">چسباندن</string>
+    <string name="paste_confirm_title">%1$d خط چسبانده شود؟</string>
+    <string name="paste_confirm_text">کلیپ بورد چند خط دارد. هر خط با Enter تمام می شود و به عنوان فرمان اجرا خواهد شد.</string>
+    <string name="paste_confirm_ok">چسباندن</string>
+    <string name="clear_terminal">پاک کردن صفحه</string>
+    <string name="paste_file">چسباندن فایل</string>
+    <string name="attach_file">پیوست فایل...</string>
+    <string name="attach_file_unavailable">برنامه ای برای انتخاب فایل پیدا نشد.</string>
+    <string name="paste_file_none">فایلی در کلیپ بورد نیست. اول یک فایل را کپی یا share کنید.</string>
+    <string name="paste_file_unsupported">Agent این دستگاه برای دریافت فایل قدیمی است.</string>
+    <string name="paste_file_uploading">در حال آپلود فایل...</string>
+    <string name="paste_file_done">در %1$s ذخیره شد</string>
+    <string name="paste_file_failed">ارسال فایل ممکن نبود: %1$s</string>
+    <string name="paste_file_too_large">فایل بزرگ تر از %1$d MiB است.</string>
+    <string name="new_lines">↓ %1$d خط جدید</string>
+    <string name="new_lines_one">↓ 1 خط جدید</string>
+    <string name="jump_to_bottom">رفتن به آخرین خروجی</string>
+    <string name="send">ارسال</string>
+    <string name="terminal_offline">دستگاه آفلاین است - در انتظار اتصال دوباره</string>
+    <string name="terminal_attaching">در حال اتصال...</string>
+    <string name="terminal_exited">پردازه خارج شد</string>
+    <string name="terminal_closed">ترمینال بسته شد</string>
+    <string name="terminal_gone">این ترمینال دیگر روی دستگاه وجود ندارد</string>
+    <string name="terminal_not_connected">وصل نیست</string>
+    <string name="terminal_content_description">خروجی ترمینال</string>
+    <string name="key_alternates">برای %1$s لمس طولانی کنید</string>
+    <string name="toggle_symbol_row">تغییر ردیف کلیدها</string>
+    <string name="modifier_ctrl">Ctrl</string>
+    <string name="modifier_alt">Alt</string>
+
+    <string name="shell_default">پیش فرض</string>
+    <string name="creating_terminal">در حال شروع ترمینال...</string>
+    <string name="shortcuts_keys">کلیدها</string>
+    <string name="shortcuts_commands">فرمان ها</string>
+    <string name="shortcuts_commands_hint">فرمان ها با لمس اجرا می شوند (Enter فرستاده می شود). از تنظیمات ویرایششان کنید.</string>
+
+    <string name="pair_error_url">آدرس relay را وارد کنید (wss://...)</string>
+    <string name="pair_error_code">کد 6 رقمی را وارد کنید</string>
+    <string name="pair_insecure_title">اتصال رمزنگاری نشده</string>
+    <string name="pair_insecure_text">%1$s از ws:// بدون TLS استفاده می کند. توکن دستگاه و هر چیزی که تایپ کنید به صورت متن ساده منتقل می شود. مگر برای شبکه آزمایشی خصوصی، از wss:// استفاده کنید.</string>
+    <string name="pair_insecure_continue">با همین ادامه بده</string>
+    <string name="pair_failed">جفت سازی ناموفق بود: %1$s</string>
+    <string name="unpair">لغو جفت سازی این دستگاه</string>
+    <string name="unpair_confirm">جفت سازی این دستگاه لغو شود؟\n\nتوکن دستگاه از اینجا حذف می شود. ترمینال های باز روی دستگاه ها در حال اجرا می مانند؛ برای برگشت دوباره جفت کنید.</string>
+    <string name="unpaired_notice">این دستگاه لغو جفت شد. برای ادامه دوباره جفت کنید.</string>
+
+    <string name="device_this_phone">این دستگاه</string>
+    <string name="device_last_seen">آخرین بازدید %1$s</string>
+    <string name="device_online">اکنون آنلاین</string>
+    <string name="add_phone">افزودن دستگاه</string>
+    <string name="add_phone_relay">Relay: %1$s</string>
+    <string name="revoke_device">لغو دسترسی</string>
+    <string name="revoke_device_confirm">دسترسی «%1$s» لغو شود؟\n\nبلافاصله قطع می شود و باید دوباره جفت شود.</string>
+    <string name="rename_device">تغییر نام این دستگاه</string>
+    <string name="devices_empty">دستگاه جفت شده ای نیست.</string>
+
+    <string name="pref_keys_help">کلیدها را با فاصله جدا کنید. نام ها: ESC CTRL ALT SHIFT TAB ENTER BKSP UP DOWN LEFT RIGHT HOME END PGUP PGDN INS DEL F1-F12. هر چیز دیگر عینا تایپ می شود؛ برای جایگزین لمس طولانی a|b بنویسید.</string>
+    <string name="pref_commands_help">هر خط: label = command</string>
+
+    <string name="channel_status">وضعیت دستگاه</string>
+    <string name="channel_status_desc">دستگاهی که استفاده می کردید آفلاین شد</string>
+    <string name="channel_terminal">رویدادهای ترمینال</string>
+    <string name="channel_terminal_desc">خروج پردازه و زنگ ترمینال</string>
+    <string name="notif_offline_title">%1$s آفلاین شد</string>
+    <string name="notif_offline_text">ترمینال ها با اتصال دوباره ادامه پیدا می کنند.</string>
+    <string name="notif_exit_title">«%1$s» خارج شد</string>
+    <string name="notif_exit_text">%1$s - کد خروج %2$d</string>
+    <string name="notif_bell_title">زنگ در «%1$s»</string>
+
+    <string name="ok">باشه</string>
+    <string name="cancel">لغو</string>
+    <string name="save">ذخیره</string>
+    <string name="delete">حذف</string>
+    <string name="remove">حذف</string>
+    <string name="back">بازگشت</string>
+    <string name="more">بیشتر</string>
+    <string name="error_generic">مشکلی پیش آمد: %1$s</string>
+    <string name="time_just_now">همین حالا</string>
+    <string name="time_minutes">%1$d دقیقه پیش</string>
+    <string name="time_hours">%1$d ساعت پیش</string>
+    <string name="time_days">%1$d روز پیش</string>
+</resources>

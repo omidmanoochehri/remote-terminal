@@ -46,6 +46,14 @@ class RemoteFiles(private val client: RelayClient) {
 
     suspend fun processes(agentId: String): ProcessList = ProcessList.fromJson(call(agentId, "proc.list", JSONObject()))
 
+    /** What the machine is (`sys.info`). */
+    suspend fun systemInfo(agentId: String): com.cactus.remoteterminal.protocol.SysInfo =
+        com.cactus.remoteterminal.protocol.SysInfo.fromJson(call(agentId, "sys.info", JSONObject()))
+
+    /** What listens on it (`net.ports`). */
+    suspend fun listeningPorts(agentId: String): com.cactus.remoteterminal.protocol.PortList =
+        com.cactus.remoteterminal.protocol.PortList.fromJson(call(agentId, "net.ports", JSONObject()))
+
     suspend fun kill(agentId: String, pid: Int, force: Boolean) {
         call(agentId, "proc.kill", JSONObject().put("pid", pid).put("force", force))
     }

@@ -92,6 +92,7 @@ export function parseIncoming(text) {
         rows: optNum(o, 'rows'),
         exitCode: optNum(o, 'exitCode'),
         cwd: optStr(o, 'cwd'),
+        command: optStr(o, 'command'),
       };
     case 'exit':
       return { kind: 'exit', agentId: String(o.agent), sessionId: String(o.session), code: optNum(o, 'code') };

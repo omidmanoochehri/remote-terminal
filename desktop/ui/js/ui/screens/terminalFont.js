@@ -10,7 +10,7 @@ import { el, clear, header } from '../dom.js';
 import { SettingsBuilder } from '../settingsBuilder.js';
 import { S, CHOICES, labelFor } from '../strings.js';
 import { chooseDialog } from '../overlays.js';
-import { themeById } from '../../terminal/theme.js';
+import { themeById, allThemes } from '../../terminal/theme.js';
 import { FONT_SYSTEM } from '../../core/settings.js';
 
 export function terminalFontScreen(app) {
@@ -73,8 +73,10 @@ export function terminalFontScreen(app) {
 
     b.section(S.settingTerminalColours)
       .row('moon_star', '--primary', S.settingTerminalColours, null,
-        labelFor(CHOICES.terminalTheme, s.terminalTheme),
-        () => choose(S.settingTerminalColours, CHOICES.terminalTheme, s.terminalTheme, (v) => { s.terminalTheme = v; }))
+        themeById(s.terminalTheme).name,
+        () => choose(S.settingTerminalColours, allThemes().map((t) => [t.id, t.name]), s.terminalTheme, (v) => { s.terminalTheme = v; }))
+      .row('sliders', '--purple', S.colourSchemes, S.colourSchemesSubtitle, String(s.customSchemes.length),
+        () => app.openColourSchemes())
       .row('command', '--accent', S.settingCursor, null,
         labelFor(CHOICES.cursorStyle, s.cursorStyle),
         () => choose(S.settingCursor, CHOICES.cursorStyle, s.cursorStyle, (v) => { s.cursorStyle = v; }))

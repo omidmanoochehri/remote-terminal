@@ -37,6 +37,13 @@
         <item>system</item><item>dark</item><item>light</item>
     </string-array>
 
+    <string-array name="app_language_entries">
+        <item>Follow system</item><item>English</item><item>فارسی</item>
+    </string-array>
+    <string-array name="app_language_values">
+        <item>system</item><item>en</item><item>fa</item>
+    </string-array>
+
     <string-array name="bell_entries">
         <item>Vibrate</item><item>Silent</item>
     </string-array>

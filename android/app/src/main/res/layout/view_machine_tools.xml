@@ -1,13 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The machine's tools beside its terminals: its files and its processes. -->
+<!-- The machine's tools beside its terminals: its files, its processes and (when the agent can say) its system. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="13dp"
-    android:orientation="horizontal"
+    android:orientation="vertical"
     android:paddingStart="@dimen/rt_gutter"
-    android:paddingEnd="@dimen/rt_gutter"
+    android:paddingEnd="@dimen/rt_gutter">
+
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
     android:baselineAligned="false">
 
     <LinearLayout
@@ -115,6 +120,61 @@
                 android:maxLines="1"
                 android:ellipsize="end"
                 android:text="@string/tool_processes_hint" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/toolSystem"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="11dp"
+        android:background="@drawable/rt_card_clickable"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
+
+        <FrameLayout
+            android:layout_width="@dimen/rt_tile_sm"
+            android:layout_height="@dimen/rt_tile_sm"
+            android:background="@drawable/rt_icon_tile_quiet">
+
+            <ImageView
+                android:id="@+id/toolSystemIcon"
+                android:layout_width="@dimen/rt_icon_md"
+                android:layout_height="@dimen/rt_icon_md"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_rt_monitor_cog"
+                android:importantForAccessibility="no"
+                app:tint="@color/rt_purple" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="10dp"
+            android:orientation="vertical">
+
+            <TextView
+                style="@style/RtText.RowTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:text="@string/tool_system" />
+
+            <TextView
+                android:id="@+id/toolSystemHint"
+                style="@style/RtText.RowMeta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="@string/tool_system_hint" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>

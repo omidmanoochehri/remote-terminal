@@ -10,6 +10,7 @@ import { Screen } from './base.js';
 import { el, clear, svgIcon, header, headerAction } from '../dom.js';
 import { S } from '../strings.js';
 import { shellQuote } from '../../core/shell.js';
+import { makePreset, newPresetId } from '../../core/preset.js';
 import {
   menu, toast, confirmDialog, promptDialog, chooseDialog, actionsDialog, customDialog,
 } from '../overlays.js';
@@ -17,7 +18,10 @@ import { terminalMenu, duplicateTerminal, launchPreset, copyToClipboard } from '
 import { TerminalView } from '../../terminal/view.js';
 import { ExtraKeysBar, Action } from '../../terminal/extrakeys.js';
 import { ModifierState } from '../../terminal/modifiers.js';
-import { themeById, ALL_THEMES } from '../../terminal/theme.js';
+import { themeById, allThemes } from '../../terminal/theme.js';
+import { regexError } from '../../core/watches.js';
+import { openPalette } from '../palette.js';
+import { pickSnippet, sendSnippet } from '../snippetsUi.js';
 import * as Keys from '../../terminal/keyencoder.js';
 import { CURSOR_BLOCK, CURSOR_UNDERLINE, CURSOR_BAR } from '../../terminal/attrs.js';
 import { State as StreamState } from '../../protocol/stream.js';
@@ -29,8 +33,36 @@ import { isOpenable } from '../../terminal/links.js';
 import { transcriptText, transcriptFileName } from '../../core/transcript.js';
 import { encodeUtf8Base64 } from '../../core/remoteFiles.js';
 import { featureGate } from '../../core/requests.js';
+import { snippetInput } from '../../core/snippets.js';
+import { newPromptDraft, promptText } from '../../core/prompt.js';
+import { composePrompt } from '../promptUi.js';
+
+/** How long after a prompt Enter waits, so a program reading the paste takes it as a key of its own. */
+const PROMPT_ENTER_DELAY_MS = 150;
 
 /** The control shortcuts the sheet offers, as on the phone. */
+/** What Ctrl+0 goes back to: the settings default. */
+const DEFAULT_FONT_SIZE = 13;
+
+/**
+ * The keys a focused terminal keeps for the app instead of sending them to the
+ * shell, as Settings → Keyboard → Keyboard shortcuts lists them.
+ */
+export const TERMINAL_SHORTCUTS = [
+  ['Ctrl+Shift+T', 'shortcutNewTerminal'],
+  ['Ctrl+Shift+W', 'shortcutCloseTab'],
+  ['Ctrl+Tab / Ctrl+Shift+Tab', 'shortcutNextTab'],
+  ['Ctrl+Shift+C', 'shortcutCopy'],
+  ['Ctrl+Shift+V', 'shortcutPaste'],
+  ['Ctrl+Shift+F', 'shortcutSearch'],
+  ['Ctrl+Shift+P', 'shortcutPalette'],
+  ['Ctrl+Shift+E', 'shortcutSnippets'],
+  ['Ctrl+Shift+S', 'shortcutTranscript'],
+  ['Ctrl+= / Ctrl+- / Ctrl+0', 'shortcutZoom'],
+  ['Ctrl+Shift+1 … 4', 'shortcutDestinations'],
+  ['Alt+←', 'shortcutBack'],
+];
+
 const SHORTCUT_KEYS = [
   'Ctrl+C', 'Ctrl+D', 'Ctrl+Z', 'Ctrl+L', 'Ctrl+A', 'Ctrl+E', 'Ctrl+R',
   'Ctrl+W', 'Ctrl+U', 'Ctrl+K', 'Alt+B', 'Alt+F', 'Shift+Tab',
@@ -47,6 +79,10 @@ export function terminalScreen(app, { agentId, sessionId }) {
   let tabUnsubscribe = null;
   /** Set while typing something only this terminal should get (an uploaded file's path). */
   let noBroadcast = false;
+  /** In a terminal window this screen shows its one terminal, with no tabs and nothing to go back to. */
+  const inWindow = !!app.boot;
+  /** Prompts written but not sent yet, by terminal, so a cancelled one is there next time. */
+  const promptDrafts = new Map();
 
   /* ------------------------------- markup ------------------------------- */
 
@@ -84,6 +120,12 @@ export function terminalScreen(app, { agentId, sessionId }) {
 
   const keyRows = el('div.key-rows');
 
+  // While the visible tab records: a red dot and "REC"; a click stops it.
+  const recBadge = el('button.rec-badge.hidden', {
+    title: S.recordStop,
+    onClick: () => toggleRecording(),
+  }, el('span.rec-dot'), el('span', { text: S.recordBadge }));
+
   const footerDot = el('span.dot');
   const footerState = el('span', { text: '' });
   const footerShell = el('span', { text: S.terminal });
@@ -97,10 +139,16 @@ export function terminalScreen(app, { agentId, sessionId }) {
     el('span', { class: 'spacer' }),
     el('button.link-button', { text: S.terminalSettings, onClick: () => app.openTerminalFont() }));
 
+  // A terminal window's own: keep it above the other windows.
+  const onTopButton = inWindow ? headerAction('pin', S.windowOnTop, () => app.setOnTop(!app.onTop)) : null;
+
   const root = el('div.screen.terminal-screen', null,
     el('div.terminal-top', null,
-      el('button.icon-button', { title: S.back, onClick: () => app.back() }, svgIcon('arrow_left')),
+      inWindow ? null : el('button.icon-button', { title: S.back, onClick: () => app.back() }, svgIcon('arrow_left')),
       el('div.terminal-machine', null, machineName, machineStatus),
+      recBadge,
+      headerAction('message', S.promptTitle, () => writePrompt()),
+      inWindow ? onTopButton : headerAction('external', S.windowOpen, () => { if (current) app.moveToWindow(current); }),
       headerAction('search', S.search, () => toggleSearch(searchBar.classList.contains('hidden'))),
       headerAction('command', S.shortcuts, () => showShortcuts()),
       headerAction('more', S.more, (e) => moreMenu(e.currentTarget))),
@@ -112,6 +160,9 @@ export function terminalScreen(app, { agentId, sessionId }) {
     commandBar,
     keyRows,
     statusFooter);
+
+  // One terminal per window: the strip would only ever hold it.
+  if (inWindow) tabStrip.classList.add('hidden');
 
   const view = new TerminalView(canvas);
   view.modifiers = modifiers;
@@ -153,20 +204,33 @@ export function terminalScreen(app, { agentId, sessionId }) {
     if (e.key === 'Escape') { view.focus(); e.preventDefault(); }
   });
 
-  // Ctrl+Tab and Ctrl+PageUp/Down move between tabs, as every tabbed app does.
+  // Ctrl+PageUp/Down move between tabs, as every tabbed app does.
   const onKeyDown = (e) => {
     if (!e.ctrlKey) return;
-    if (e.key === 'Tab') { switchTab(!e.shiftKey); e.preventDefault(); }
-    else if (e.key === 'PageDown') { switchTab(true); e.preventDefault(); }
+    if (e.key === 'PageDown') { switchTab(true); e.preventDefault(); }
     else if (e.key === 'PageUp') { switchTab(false); e.preventDefault(); }
-    else if (e.key.toLowerCase() === 'f' && e.shiftKey) { toggleSearch(true); e.preventDefault(); }
   };
   root.addEventListener('keydown', onKeyDown);
   screen.track(() => root.removeEventListener('keydown', onKeyDown));
-  // Ctrl+Shift+S has to be caught before the grid turns it into a control code.
+  // The app's own chords have to be caught before the grid turns them into
+  // control codes (TERMINAL_SHORTCUTS lists them for the settings screen).
   const onKeyCapture = (e) => {
-    if (e.ctrlKey && e.shiftKey && !e.altKey && e.key.toLowerCase() === 's') {
-      saveTranscript();
+    if (!e.ctrlKey || e.altKey || e.metaKey) return;
+    const key = e.key.toLowerCase();
+    let handled = true;
+    if (key === 'tab') switchTab(!e.shiftKey);
+    else if (e.shiftKey && (key === 's' || e.code === 'KeyS')) saveTranscript();
+    else if (e.shiftKey && (key === 'f' || e.code === 'KeyF')) toggleSearch(true);
+    else if (e.shiftKey && (key === 'p' || e.code === 'KeyP')) showPalette();
+    else if (e.shiftKey && (key === 'e' || e.code === 'KeyE')) showSnippets();
+    else if (e.shiftKey && (key === 't' || e.code === 'KeyT')) newTerminal();
+    else if (e.shiftKey && (key === 'w' || e.code === 'KeyW')) { if (current) confirmClose(current); }
+    else if (!e.shiftKey && (key === '=' || key === '+' || e.code === 'NumpadAdd')) view.setFontSize(view.fontSize + 1);
+    else if (e.shiftKey && key === '+') view.setFontSize(view.fontSize + 1);
+    else if (!e.shiftKey && (key === '-' || e.code === 'NumpadSubtract')) view.setFontSize(view.fontSize - 1);
+    else if (!e.shiftKey && (key === '0' || e.code === 'Numpad0')) view.setFontSize(DEFAULT_FONT_SIZE);
+    else handled = false;
+    if (handled) {
       e.preventDefault();
       e.stopPropagation();
     }
@@ -213,7 +277,7 @@ export function terminalScreen(app, { agentId, sessionId }) {
     const appDefault = themeById(app.settings.terminalTheme);
     const options = [
       [null, S.terminalThemeDefault(appDefault.name)],
-      ...ALL_THEMES.map((t) => [t.id, t.name]),
+      ...allThemes().map((t) => [t.id, t.name]),
     ];
     const chosen = await chooseDialog({
       title: S.terminalThemeTitle,
@@ -227,9 +291,25 @@ export function terminalScreen(app, { agentId, sessionId }) {
 
   /* -------------------------------- tabs -------------------------------- */
 
+  /** The tabs this window can show; one moved into a window of its own is shown there. */
+  function selectable() {
+    return tabs.filter((t) => !t.windowLabel);
+  }
+
   function renderTabs() {
     clear(tabStrip);
     for (const s of tabs) {
+      if (s.windowLabel) {
+        // Still listed, so it is not lost; a click brings its window forward.
+        tabStrip.append(el('button.tab.in-window', {
+          role: 'tab',
+          'aria-selected': 'false',
+          onClick: () => app.focusWindow(s.windowLabel),
+          oncontextmenu: (e) => { e.preventDefault(); tabMenu(e.currentTarget, s); },
+          title: S.windowTabHint(s.displayTitle),
+        }, svgIcon('external'), el('span', { text: s.displayTitle })));
+        continue;
+      }
       const active = s === current;
       const tab = el('button.tab', {
         role: 'tab',
@@ -240,7 +320,9 @@ export function terminalScreen(app, { agentId, sessionId }) {
         oncontextmenu: (e) => { e.preventDefault(); tabMenu(e.currentTarget, s); },
         title: s.displayTitle,
       },
-      svgIcon('terminal_square'),
+      app.recordings.isRecording(s)
+        ? el('span.rec-dot', { title: S.recordBadge, 'aria-label': S.recordBadge })
+        : svgIcon('terminal_square'),
       el('span', { text: s.displayTitle }),
       !active && s.unreadRows > 0
         ? el('span', { class: 'tab-badge', text: s.unreadRows > 99 ? '99+' : String(s.unreadRows) })
@@ -260,6 +342,13 @@ export function terminalScreen(app, { agentId, sessionId }) {
   }
 
   function tabMenu(anchor, s) {
+    if (s.windowLabel) {
+      menu(anchor, [
+        { label: S.windowShow, icon: 'external', onClick: () => app.focusWindow(s.windowLabel) },
+        { label: S.windowReturn, icon: 'arrow_left', onClick: () => takeBack(s) },
+      ]);
+      return;
+    }
     const info = app.agents.session(agentId, s.sessionId);
     const agent = app.agents.agent(agentId);
     if (info && agent) { terminalMenu(app, anchor, agent, info); return; }
@@ -271,13 +360,25 @@ export function terminalScreen(app, { agentId, sessionId }) {
 
   function chooseInitialTab() {
     const requested = sessionId;
-    const byArg = requested
+    let byArg = requested
       ? tabs.find((t) => t.sessionId === requested) ?? app.sessions.get(agentId, requested)
       : null;
+    if (byArg?.windowLabel) byArg = null;
+    const here = selectable();
     const pick = byArg
-      ?? tabs.find((t) => t.sessionId === app.settings.activeTab(agentId))
-      ?? tabs[0];
+      ?? here.find((t) => t.sessionId === app.settings.activeTab(agentId))
+      ?? here[0];
     if (pick) { selectTab(pick); return; }
+    // A terminal window whose terminal is gone has nothing left to show.
+    if (inWindow) { if (tabs.length === 0) app.closeWindow('closed'); return; }
+    // Every tab here lives in a window of its own: show one, and step back.
+    if (tabs.length > 0) {
+      current = null;
+      app.focusWindow(tabs[0].windowLabel);
+      // Not from inside a render: this screen may still be being built.
+      setTimeout(() => { if (app.current === screen) app.back(); }, 0);
+      return;
+    }
     if (creating) return;
     const agent = app.agents.agent(agentId);
     if (agent?.online) newTerminal();
@@ -306,12 +407,21 @@ export function terminalScreen(app, { agentId, sessionId }) {
 
   /** The neighbouring tab; nothing at the ends. */
   function switchTab(forward) {
-    if (tabs.length < 2 || !current) return;
-    const index = tabs.indexOf(current);
+    const here = selectable();
+    if (here.length < 2 || !current) return;
+    const index = here.indexOf(current);
     if (index < 0) return;
     const next = index + (forward ? 1 : -1);
-    if (next < 0 || next >= tabs.length) return;
-    selectTab(tabs[next]);
+    if (next < 0 || next >= here.length) return;
+    selectTab(here[next]);
+  }
+
+  /** Close the window a tab was moved into; the tab comes back here and is shown. */
+  function takeBack(s) {
+    const label = s.windowLabel;
+    if (!label) return;
+    app.windowResults.set(label, 'return');
+    app.closeTerminalWindow(label);
   }
 
   function ensureAttached(s) {
@@ -321,6 +431,8 @@ export function terminalScreen(app, { agentId, sessionId }) {
   }
 
   function newTerminal() {
+    // A terminal window holds one terminal; new ones open in the main window.
+    if (inWindow) { app.askMain({ action: 'newTerminal', agentId }); return; }
     const agent = app.agents.agent(agentId);
     if (!agent) return;
     if (!agent.online) { toast(S.agentOfflineHint, { error: true }); return; }
@@ -366,6 +478,8 @@ export function terminalScreen(app, { agentId, sessionId }) {
       text = s.closedReason === 'gone' || s.closedReason === 'removed' ? S.terminalGone : S.terminalClosed;
     } else if (s.attachError) text = s.attachError;
     else if (s.stream.state === StreamState.ATTACHING) text = S.terminalAttaching;
+
+    recBadge.classList.toggle('hidden', !app.recordings.isRecording(s));
 
     banner.textContent = text ?? '';
     banner.classList.toggle('hidden', text == null);
@@ -534,28 +648,94 @@ export function terminalScreen(app, { agentId, sessionId }) {
 
   /* ------------------------------- watches ------------------------------ */
 
+  /**
+   * "Watch for text…": a notification when the text appears — or, with a
+   * reply, a trigger that types the reply into this terminal.
+   */
   async function watchForText() {
     const s = current;
     if (!s) return;
     const input = el('input', { type: 'text', placeholder: S.watchLabel });
+    const regex = el('input', { type: 'checkbox' });
+    const reply = el('input', { type: 'text', placeholder: S.watchReplyHint, spellcheck: 'false' });
     const keep = el('input', { type: 'checkbox' });
-    const ok = await customDialog({
-      title: S.watchTitle,
-      build: (done) => {
-        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') done(true); });
-        requestAnimationFrame(() => input.focus());
-        return el('div', null,
-          el('p', { text: S.watchBody }),
-          el('label.field-label', { text: S.watchLabel }),
-          el('div.field-well', null, input),
-          el('label.check-row', { style: { marginTop: '10px' } }, keep, el('span', { text: S.watchKeep })));
+    const error = el('div.field-error.hidden');
+    for (;;) {
+      const ok = await customDialog({
+        title: S.watchTitle,
+        build: (done) => {
+          for (const field of [input, reply]) {
+            field.addEventListener('keydown', (e) => { if (e.key === 'Enter') done(true); });
+          }
+          requestAnimationFrame(() => input.focus());
+          return el('div', null,
+            el('p', { text: S.watchBody }),
+            el('label.field-label', { text: S.watchLabel }),
+            el('div.field-well', null, input),
+            error,
+            el('label.check-row', { style: { marginTop: '8px' } }, regex, el('span', { text: S.watchRegex })),
+            el('label.field-label', { text: S.watchReply, style: { marginTop: '12px' } }),
+            el('div.field-well', null, reply),
+            el('p.hint', { text: S.watchReplyHelp }),
+            el('p.hint.tone-warn', { text: S.watchReplyWarning }),
+            el('label.check-row', { style: { marginTop: '10px' } }, keep, el('span', { text: S.watchKeep })));
+        },
+        actions: [{ label: S.cancel, value: false }, { label: S.watchStart, value: true }],
+      });
+      const text = String(input.value).trim();
+      if (!ok || !text) return;
+      const why = regex.checked ? regexError(text) : null;
+      if (why) {
+        error.textContent = S.watchRegexInvalid(why);
+        error.classList.remove('hidden');
+        continue;
+      }
+      const replyText = reply.value;
+      app.notifier.watchText(s, text, keep.checked, { regex: regex.checked, reply: replyText || null });
+      toast(replyText ? S.watchTriggerStarted(text) : S.watchStarted(text));
+      return;
+    }
+  }
+
+  /* ------------------------------ recording ----------------------------- */
+
+  async function toggleRecording() {
+    const s = current;
+    if (!s) return;
+    if (app.recordings.isRecording(s)) {
+      const entry = await app.recordings.stop(s);
+      if (entry) toast(S.recordStopped(entry.title));
+      return;
+    }
+    const agent = app.agents.agent(agentId);
+    app.recordings.start(s, agent?.name || agent?.hostname || '');
+    toast(S.recordStarted);
+  }
+
+  /* --------------------------- palette, snippets ------------------------ */
+
+  function terminalTarget() {
+    return {
+      agentId,
+      send: (data) => { if (current) { view.sendRaw(data); view.focus(); } },
+      bracketed: () => view.emulator.bracketedPaste,
+      switchTo: (t) => {
+        if (t.agentId === agentId) { selectTab(t); return; }
+        app.openTerminal(t.agentId, t.sessionId);
       },
-      actions: [{ label: S.cancel, value: false }, { label: S.watchStart, value: true }],
-    });
-    const text = String(input.value).trim();
-    if (!ok || !text) return;
-    app.notifier.watchText(s, text, keep.checked);
-    toast(S.watchStarted(text));
+    };
+  }
+
+  function showPalette() {
+    openPalette(app, { actions: menuItems(), terminal: current ? terminalTarget() : null });
+  }
+
+  async function showSnippets() {
+    if (!current) { toast(S.snippetNoTerminal); return; }
+    const snippet = await pickSnippet(app);
+    if (!snippet) { view.focus(); return; }
+    const t = terminalTarget();
+    await sendSnippet(app, snippet, { send: t.send, bracketed: t.bracketed() });
   }
 
   function toggleQuietWatch() {
@@ -697,6 +877,85 @@ export function terminalScreen(app, { agentId, sessionId }) {
     }
   }
 
+  /* ------------------------------- prompt ------------------------------- */
+
+  /**
+   * The prompt composer: write a prompt in a proper text box, attach files,
+   * and on Send upload the files, type the text and their paths into this
+   * terminal as one paste, then press Enter if asked. Made for programs that
+   * take a prompt — a coding assistant, a chat, a REPL — where the cursor is a
+   * cramped place to compose one.
+   *
+   * Only this terminal gets it: a broadcast does not, since the paths are of
+   * files uploaded for this one.
+   */
+  async function writePrompt() {
+    const s = current;
+    if (!s) { toast(S.promptNoTerminal); return; }
+    const filesOk = !!app.agents.agent(agentId)?.caps.includes('files');
+    const draft = promptDrafts.get(s.key) ?? newPromptDraft(app.settings.promptEnter);
+    promptDrafts.set(s.key, draft);
+    let error = null;
+
+    for (;;) {
+      const send = await composePrompt(draft, { filesOk, error });
+      app.settings.promptEnter = draft.enter;
+      if (!send) { view.focus(); return; }
+      error = null;
+      if (!draft.text.trim() && draft.files.length === 0) { error = S.promptEmpty; continue; }
+      if (s.stream.state !== StreamState.ATTACHED) { error = S.terminalNotConnected; continue; }
+
+      const failed = await uploadPromptFiles(s, draft.files);
+      if (failed) { error = S.pasteFileFailed(failed); continue; }
+
+      const text = promptText(draft.text, draft.files.map((f) => f.remotePath));
+      const lines = text.split('\n').length;
+      const bracketed = s.emulator.bracketedPaste;
+      // Without bracketed paste every line would run on its own, as with any paste.
+      if (lines > 1 && !bracketed) {
+        const ok = await confirmDialog({
+          title: S.pasteConfirmTitle(lines),
+          body: S.pasteConfirmText,
+          confirmLabel: S.pasteConfirmOk,
+        });
+        if (!ok) continue;
+      }
+      if (!app.sessions.input(s, snippetInput(text, false, bracketed))) { error = S.terminalNotConnected; continue; }
+      if (draft.enter) setTimeout(() => app.sessions.input(s, '\r'), PROMPT_ENTER_DELAY_MS);
+      promptDrafts.delete(s.key);
+      if (s === current) view.focus();
+      return;
+    }
+  }
+
+  /**
+   * Upload each attached file not uploaded yet, keeping the path the machine
+   * stored it at. Resolves to null, or to what went wrong with which file.
+   */
+  async function uploadPromptFiles(s, files) {
+    const todo = files.filter((f) => !f.remotePath);
+    if (todo.length === 0) return null;
+    let name = '';
+    try {
+      for (let i = 0; i < todo.length; i++) {
+        const f = todo[i];
+        name = f.name;
+        uploadLabel = S.promptUploading(i + 1, todo.length);
+        updateStatus();
+        const file = f.file ?? await system.readFileForUpload(f.path);
+        const result = await app.sessions.sendFile(s, file.name, file.mime, file.data, file.size);
+        if (!result.ok) return `${f.name}: ${result.error}`;
+        f.remotePath = result.path;
+      }
+      return null;
+    } catch (err) {
+      return `${name}: ${String(err?.message || err)}`;
+    } finally {
+      uploadLabel = null;
+      updateStatus();
+    }
+  }
+
   /* -------------------------------- menus ------------------------------- */
 
   function selectionMenu(e) {
@@ -715,17 +974,36 @@ export function terminalScreen(app, { agentId, sessionId }) {
   }
 
   function moreMenu(anchor) {
+    menu(anchor, menuItems(anchor));
+  }
+
+  /** The terminal menu; the command palette offers the same entries by label. */
+  function menuItems(anchor = null) {
     const s = current;
     const pinned = s ? app.settings.isPinnedTerminal(agentId, s.sessionId) : false;
     const presets = app.settings.presetsFor(agentId);
     const filesOk = featureGate(app.client.caps, app.agents.agent(agentId), 'fs').ok;
     const broadcasting = !!app.broadcast && !!s && app.broadcast.sourceKey === s.key;
-    menu(anchor, [
+    const recording = app.recordings.isRecording(s);
+    return [
+      { label: S.paletteMenu, icon: 'search', onClick: () => showPalette(), paletteSkip: true },
+      { label: S.promptMenu, icon: 'message', onClick: () => writePrompt() },
+      { label: S.snippetsMenu, icon: 'command', onClick: () => showSnippets() },
+      { divider: true },
+      // A terminal window holds one terminal: what would open another here
+      // is left to the main window.
       { label: S.newTerminal, icon: 'plus', onClick: () => newTerminal() },
-      { label: S.actionDuplicate, icon: 'copy', onClick: () => duplicateCurrent() },
-      presets.length > 0
+      inWindow ? null : { label: S.actionDuplicate, icon: 'copy', onClick: () => duplicateCurrent() },
+      // The palette lists each preset on its own, so it needs no sub-menu.
+      s ? { label: S.presetSaveAs, icon: 'bookmark', onClick: () => saveAsPreset() } : null,
+      presets.length > 0 && anchor && !inWindow
         ? { label: S.presetStart, icon: 'bookmark', onClick: () => choosePreset(anchor) }
         : null,
+      { divider: true },
+      inWindow
+        ? { label: S.windowOnTop, icon: 'pin', checked: app.onTop, onClick: () => app.setOnTop(!app.onTop) }
+        : (s ? { label: S.windowOpen, icon: 'external', onClick: () => app.moveToWindow(s) } : null),
+      inWindow ? { label: S.windowReturn, icon: 'arrow_left', onClick: () => app.closeWindow('return') } : null,
       { divider: true },
       { label: S.renameTerminal, icon: 'tag', onClick: () => s && renameTab(s) },
       { label: pinned ? S.actionUnpin : S.actionPin, icon: 'bookmark', onClick: () => s && app.settings.togglePinnedTerminal(agentId, s.sessionId) },
@@ -743,6 +1021,11 @@ export function terminalScreen(app, { agentId, sessionId }) {
       s?.quietWatch
         ? { label: S.notifyQuietStop, icon: 'bell_ring', onClick: () => toggleQuietWatch() }
         : { label: S.notifyQuiet, icon: 'bell_ring', onClick: () => toggleQuietWatch() },
+      // Recordings are kept by the main window (one index file), so a
+      // terminal window does not start them.
+      recording
+        ? { label: S.recordStop, icon: 'square', onClick: () => toggleRecording() }
+        : (inWindow ? null : { label: S.recordStart, icon: 'play', onClick: () => toggleRecording() }),
       { divider: true },
       { label: S.shortcuts, icon: 'command', onClick: () => showShortcuts() },
       { label: S.paste, icon: 'save', onClick: () => paste() },
@@ -766,7 +1049,7 @@ export function terminalScreen(app, { agentId, sessionId }) {
       },
       { divider: true },
       { label: S.tabClose, icon: 'close', danger: true, onClick: () => s && confirmClose(s) },
-    ]);
+    ];
   }
 
   /**
@@ -784,6 +1067,38 @@ export function terminalScreen(app, { agentId, sessionId }) {
       exitCode: s.exitCode, cwd: s.cwd,
     };
     duplicateTerminal(app, agent, info);
+  }
+
+  /**
+   * Keep this terminal as a preset: its name, its machine, its shell, where it
+   * is **now** and what it last ran. Starting the preset later reproduces this
+   * terminal rather than a bare shell, which is the point of saving it from
+   * here rather than filling the form in again.
+   */
+  async function saveAsPreset() {
+    const s = current;
+    if (!s) return;
+    const detail = [
+      s.cwd ? S.presetFromTerminalDir(s.cwd) : null,
+      s.command ? S.presetFromTerminalCommand(s.command) : null,
+    ].filter(Boolean).join('\n') || S.presetFromTerminalPlain;
+    const name = await promptDialog({
+      title: S.presetSaveAs,
+      body: detail,
+      label: S.fieldTerminalName,
+      value: s.displayTitle,
+      placeholder: S.presetNameHint,
+    });
+    if (!name) return;
+    app.settings.savePreset(makePreset({
+      id: newPresetId(),
+      name,
+      agentId,
+      shellId: s.shell || null,
+      directory: s.cwd,
+      command: s.command,
+    }));
+    toast(S.presetSaved(name));
   }
 
   /** Start one of the saved presets on this machine, without leaving the terminal. */
@@ -845,7 +1160,7 @@ export function terminalScreen(app, { agentId, sessionId }) {
     if (changedAgentId !== agentId) return;
     tabs = app.sessions.tabs(agentId);
     for (const s of tabs) bindUnread(s);
-    if (!current || !tabs.includes(current)) chooseInitialTab();
+    if (!current || !tabs.includes(current) || current.windowLabel) chooseInitialTab();
     else renderTabs();
   }
 
@@ -891,8 +1206,17 @@ export function terminalScreen(app, { agentId, sessionId }) {
   updateStatus();
   requestAnimationFrame(() => { view.recomputeGeometry(); view.focus(); });
 
+  function renderOnTop() {
+    if (!onTopButton) return;
+    onTopButton.classList.toggle('active', app.onTop);
+    onTopButton.setAttribute('aria-pressed', String(app.onTop));
+  }
+  renderOnTop();
+
   screen.root = root;
+  screen.onWindowChanged = () => renderOnTop();
   screen.onSettingsChanged = () => applySettings();
   screen.createSession = createSession;
+  screen.openPalette = showPalette;
   return screen;
 }

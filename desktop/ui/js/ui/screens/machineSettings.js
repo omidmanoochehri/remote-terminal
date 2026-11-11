@@ -15,6 +15,7 @@ import { S } from '../strings.js';
 import { toast, alertDialog } from '../overlays.js';
 import { machineMenu, confirmRemoveMachine } from '../actions.js';
 import { isSecureRelay } from '../../core/format.js';
+import { parseMac, formatMac, parseIPv4, DEFAULT_BROADCAST, DEFAULT_WOL_PORT } from '../../core/wol.js';
 
 export function machineSettingsScreen(app, { agentId }) {
   const screen = new Screen(app, S.machineSettingsTitle);
@@ -29,6 +30,15 @@ export function machineSettingsScreen(app, { agentId }) {
   const alerts = switchEl(app.settings.connectionAlerts(agentId));
 
   const securityCard = el('div.card.rows-card');
+
+  // Wake-on-LAN: filled in from the machine's last system report, editable.
+  const storedWol = app.settings.wol(agentId);
+  const macInput = el('input', { type: 'text', value: storedWol?.mac ?? '', placeholder: S.wolMacHint, spellcheck: 'false' });
+  const broadcastInput = el('input', { type: 'text', value: storedWol?.broadcast ?? DEFAULT_BROADCAST, spellcheck: 'false' });
+  const portInput = el('input', { type: 'number', min: '1', max: '65535', value: String(storedWol?.port ?? DEFAULT_WOL_PORT) });
+  const macError = el('div.field-error.hidden', { text: S.wolInvalidMac });
+  const broadcastError = el('div.field-error.hidden', { text: S.wolInvalidBroadcast });
+  const portError = el('div.field-error.hidden', { text: S.wolInvalidPort });
 
   const headerNode = header({
     title: S.machineSettingsTitle,
@@ -60,6 +70,13 @@ export function machineSettingsScreen(app, { agentId }) {
       toggleRow(alerts, 'bell_ring', '--amber', S.settingConnectionAlerts, S.settingConnectionAlertsDesc, (v) => {
         app.settings.setConnectionAlerts(agentId, v);
       })),
+
+    el('div.section-label', { text: S.wol }),
+    field(S.wolMac, 'network', macInput, null, macError),
+    el('div', { style: { display: 'flex', gap: '10px', flexWrap: 'wrap' } },
+      el('div', { style: { flex: '2 1 200px' } }, field(S.wolBroadcast, 'globe', broadcastInput, null, broadcastError)),
+      el('div', { style: { flex: '1 1 100px' } }, field(S.wolPort, 'server', portInput, null, portError))),
+    el('div.note-body', { text: storedWol && !app.settings.wolIsManual(agentId) ? `${S.wolAutoFilled} ${S.wolLanNote}` : S.wolLanNote }),
 
     el('div.section-label', { text: S.securityEncryption }),
     securityCard,
@@ -140,9 +157,29 @@ export function machineSettingsScreen(app, { agentId }) {
     const name = nameInput.value.trim();
     if (!name) { nameError.classList.remove('hidden'); return; }
     nameError.classList.add('hidden');
+    if (!saveWol()) return;
     if (agent && name !== agent.name) app.agents.renameAgent(agentId, name);
     toast(S.saved);
     app.back();
+  }
+
+  /** Check and store the Wake-on-LAN fields; false (with the field marked) when one is wrong. */
+  function saveWol() {
+    const macText = macInput.value.trim();
+    const mac = macText ? parseMac(macText) : null;
+    const broadcast = broadcastInput.value.trim() || DEFAULT_BROADCAST;
+    const port = Number(portInput.value);
+    macError.classList.toggle('hidden', !macText || !!mac);
+    broadcastError.classList.toggle('hidden', parseIPv4(broadcast) != null);
+    portError.classList.toggle('hidden', Number.isInteger(port) && port > 0 && port < 65536);
+    if ((macText && !mac) || parseIPv4(broadcast) == null || !(Number.isInteger(port) && port > 0 && port < 65536)) return false;
+    if (!mac) { app.settings.setWol(agentId, null); return true; }
+    const next = { mac: formatMac(mac), broadcast, port };
+    const prev = app.settings.wol(agentId);
+    const unchanged = prev && prev.mac === next.mac && prev.broadcast === next.broadcast && prev.port === next.port;
+    // Untouched auto-filled details stay automatic, so the next report can refresh them.
+    if (!unchanged) app.settings.setWol(agentId, next, { manual: true });
+    return true;
   }
 
   screen.listen(app.agents, 'agents', refresh);

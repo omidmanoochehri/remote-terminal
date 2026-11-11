@@ -9,13 +9,19 @@
 //! Every event carries the connection `id` it belongs to, so a late frame from
 //! a socket the frontend has already given up on is ignored rather than
 //! mistaken for the current connection.
+//!
+//! Each window has a connection of its own: a terminal moved into a window of
+//! its own (src/windows.rs) runs a second copy of the frontend, with its own
+//! protocol state, so its socket is keyed by the window's label and its events
+//! go to that window alone.
 
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 
 use futures_util::{SinkExt, StreamExt};
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, State, WebviewWindow};
 use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
@@ -69,18 +75,19 @@ enum Outbound {
 
 #[derive(Default)]
 pub struct WsState {
-    current: Mutex<Option<Connection>>,
+    /// The live connection of each window, by window label.
+    current: Mutex<HashMap<String, Connection>>,
     next_id: AtomicU64,
 }
 
 impl WsState {
-    fn take_current(&self) -> Option<Connection> {
-        self.current.lock().ok().and_then(|mut g| g.take())
+    fn take_current(&self, label: &str) -> Option<Connection> {
+        self.current.lock().ok().and_then(|mut g| g.remove(label))
     }
 
-    fn set_current(&self, conn: Connection) {
+    fn set_current(&self, label: &str, conn: Connection) {
         if let Ok(mut g) = self.current.lock() {
-            *g = Some(conn);
+            g.insert(label.to_string(), conn);
         }
     }
 
@@ -88,42 +95,50 @@ impl WsState {
     /// finishing after a reconnect must not clear the new connection.
     fn clear_if(&self, id: u64) {
         if let Ok(mut g) = self.current.lock() {
-            if g.as_ref().map(|c| c.id) == Some(id) {
-                *g = None;
-            }
+            g.retain(|_, c| c.id != id);
         }
     }
 
     fn sender_for(&self, id: u64) -> Option<mpsc::UnboundedSender<Outbound>> {
         let g = self.current.lock().ok()?;
-        let conn = g.as_ref()?;
-        if conn.id == id {
-            Some(conn.tx.clone())
-        } else {
-            None
+        g.values().find(|c| c.id == id).map(|c| c.tx.clone())
+    }
+
+    /// A window went away: its socket goes with it.
+    pub fn close_for(&self, label: &str) {
+        if let Some(conn) = self.take_current(label) {
+            let _ = conn.tx.send(Outbound::Close(1000, "window closed".into()));
         }
     }
+}
+
+/// Where a connection's events go: the window that opened it.
+struct Out {
+    app: AppHandle,
+    label: String,
 }
 
 /// Open a relay connection. Returns the id every later event carries.
 #[tauri::command]
 pub fn ws_connect(
     app: AppHandle,
+    window: WebviewWindow,
     state: State<'_, WsState>,
     url: String,
     token: String,
 ) -> Result<u64, String> {
-    // One socket at a time: a new connect supersedes whatever was live.
-    if let Some(previous) = state.take_current() {
+    // One socket per window: a new connect supersedes whatever that window had.
+    let label = window.label().to_string();
+    if let Some(previous) = state.take_current(&label) {
         let _ = previous.tx.send(Outbound::Close(1000, "replaced".into()));
     }
 
     let id = state.next_id.fetch_add(1, Ordering::SeqCst) + 1;
     let (tx, rx) = mpsc::unbounded_channel::<Outbound>();
-    state.set_current(Connection { id, tx });
+    state.set_current(&label, Connection { id, tx });
 
     tauri::async_runtime::spawn(async move {
-        run_connection(app, id, url, token, rx).await;
+        run_connection(Out { app, label }, id, url, token, rx).await;
     });
 
     Ok(id)
@@ -143,7 +158,7 @@ pub fn ws_close(state: State<'_, WsState>, id: u64, code: u16, reason: String) {
 }
 
 async fn run_connection(
-    app: AppHandle,
+    out: Out,
     id: u64,
     url: String,
     token: String,
@@ -152,8 +167,8 @@ async fn run_connection(
     let request = match build_request(&url, &token) {
         Ok(r) => r,
         Err(message) => {
-            emit_error(&app, id, &message);
-            emit_close(&app, id, 1006, "bad relay URL", false);
+            emit_error(&out, id, &message);
+            emit_close(&out, id, 1006, "bad relay URL", false);
             return;
         }
     };
@@ -171,20 +186,20 @@ async fn run_connection(
             // A refused handshake carries the relay's HTTP status, which is how
             // an unauthorized or version-mismatched client learns why.
             let (code, message) = classify(&err);
-            emit_error(&app, id, &message);
-            emit_close(&app, id, code, &message, true);
+            emit_error(&out, id, &message);
+            emit_close(&out, id, code, &message, true);
             return;
         }
     };
 
-    emit(&app, "ws:open", OpenEvent { id });
+    emit(&out, "ws:open", OpenEvent { id });
 
     loop {
         tokio::select! {
             outbound = rx.recv() => match outbound {
                 Some(Outbound::Text(text)) => {
                     if socket.send(Message::Text(text)).await.is_err() {
-                        emit_close(&app, id, 1006, "send failed", false);
+                        emit_close(&out, id, 1006, "send failed", false);
                         break;
                     }
                 }
@@ -192,49 +207,49 @@ async fn run_connection(
                     let frame = CloseFrame { code: CloseCode::from(code), reason: reason.clone().into() };
                     let _ = socket.send(Message::Close(Some(frame))).await;
                     let _ = socket.close(None).await;
-                    emit_close(&app, id, code, &reason, false);
+                    emit_close(&out, id, code, &reason, false);
                     break;
                 }
                 // The handle was dropped: nothing can speak for this socket any more.
                 None => {
                     let _ = socket.close(None).await;
-                    emit_close(&app, id, 1000, "closed", false);
+                    emit_close(&out, id, 1000, "closed", false);
                     break;
                 }
             },
             incoming = socket.next() => match incoming {
-                Some(Ok(Message::Text(text))) => emit(&app, "ws:text", TextEvent { id, data: text }),
+                Some(Ok(Message::Text(text))) => emit(&out, "ws:text", TextEvent { id, data: text }),
                 // The relay speaks JSON text only; binary is not part of v3.
                 Some(Ok(Message::Binary(bytes))) => match String::from_utf8(bytes) {
-                    Ok(text) => emit(&app, "ws:text", TextEvent { id, data: text }),
-                    Err(_) => emit_error(&app, id, "binary frame is not UTF-8"),
+                    Ok(text) => emit(&out, "ws:text", TextEvent { id, data: text }),
+                    Err(_) => emit_error(&out, id, "binary frame is not UTF-8"),
                 },
                 Some(Ok(Message::Close(frame))) => {
                     let (code, reason) = match frame {
                         Some(f) => (u16::from(f.code), f.reason.to_string()),
                         None => (1005, String::new()),
                     };
-                    emit_close(&app, id, code, &reason, true);
+                    emit_close(&out, id, code, &reason, true);
                     break;
                 }
                 Some(Ok(_)) => {} // ping/pong/frame plumbing is tungstenite's job
                 Some(Err(err)) => {
                     let (code, message) = classify(&err);
-                    emit_error(&app, id, &message);
-                    emit_close(&app, id, code, &message, true);
+                    emit_error(&out, id, &message);
+                    emit_close(&out, id, code, &message, true);
                     break;
                 }
                 // Every deliberate close breaks out of the loop above, so a
                 // stream that simply ends is a connection we lost.
                 None => {
-                    emit_close(&app, id, 1006, "connection lost", true);
+                    emit_close(&out, id, 1006, "connection lost", true);
                     break;
                 }
             },
         }
     }
 
-    if let Some(state) = app_state(&app) {
+    if let Some(state) = app_state(&out.app) {
         state.clear_if(id);
     }
 }
@@ -282,17 +297,17 @@ fn classify(err: &tokio_tungstenite::tungstenite::Error) -> (u16, String) {
     }
 }
 
-fn emit<T: Serialize + Clone>(app: &AppHandle, event: &str, payload: T) {
-    let _ = app.emit(event, payload);
+fn emit<T: Serialize + Clone>(out: &Out, event: &str, payload: T) {
+    let _ = out.app.emit_to(out.label.as_str(), event, payload);
 }
 
-fn emit_error(app: &AppHandle, id: u64, message: &str) {
-    emit(app, "ws:error", ErrorEvent { id, message: message.to_string() });
+fn emit_error(out: &Out, id: u64, message: &str) {
+    emit(out, "ws:error", ErrorEvent { id, message: message.to_string() });
 }
 
-fn emit_close(app: &AppHandle, id: u64, code: u16, reason: &str, remote: bool) {
+fn emit_close(out: &Out, id: u64, code: u16, reason: &str, remote: bool) {
     emit(
-        app,
+        out,
         "ws:close",
         CloseEvent { id, code, reason: reason.to_string(), remote },
     );

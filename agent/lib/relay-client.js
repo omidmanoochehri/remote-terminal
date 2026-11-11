@@ -24,15 +24,18 @@ const FATAL_CLOSE = { 4401: 'revoked', 4409: 'replaced', 4426: 'upgrade_required
 
 class RelayClient extends EventEmitter {
   /**
-   * @param {{cfg, state, log, sessions, meta, shells, uploads?, files?, procs?, metrics?, WebSocketImpl?, now?}} opts
-   *   `files` / `procs` answer the app's `fs.*` / `proc.*` requests; null turns them off.
+   * @param {{cfg, state, log, sessions, meta, shells, uploads?, files?, procs?, sys?, ports?, metrics?, WebSocketImpl?, now?}} opts
+   *   `files` / `procs` / `sys` / `ports` answer the app's `fs.*` / `proc.*` /
+   *   `sys.*` / `net.*` requests; null turns them off.
    */
-  constructor({ cfg, state, log, sessions, meta, shells, uploads = null, files = null, procs = null, metrics = undefined, WebSocketImpl = WebSocket, now = Date.now }) {
+  constructor({ cfg, state, log, sessions, meta, shells, uploads = null, files = null, procs = null, sys = null, ports = null, metrics = undefined, WebSocketImpl = WebSocket, now = Date.now }) {
     super();
     this.cfg = cfg;
     this.uploads = uploads;
     this.files = files;
     this.procs = procs;
+    this.sys = sys;
+    this.ports = ports;
     this.state = state;
     this.log = log;
     this.sessions = sessions;
@@ -260,6 +263,8 @@ class RelayClient extends EventEmitter {
     const caps = AGENT_CAPS.slice();
     if (this.files) caps.push('fs');
     if (this.procs) caps.push('procs');
+    if (this.sys) caps.push('sys');
+    if (this.ports) caps.push('ports');
     return caps;
   }
 
@@ -379,7 +384,7 @@ class RelayClient extends EventEmitter {
   async onRequest(m) {
     const method = typeof m.method === 'string' ? m.method : '';
     const area = method.split('.')[0];
-    const service = area === 'fs' ? this.files : area === 'proc' ? this.procs : null;
+    const service = { fs: this.files, proc: this.procs, sys: this.sys, net: this.ports }[area] || null;
     if (!service) return this.error(m, 'unsupported', `this agent does not support "${method}"`);
     const params = m.params && typeof m.params === 'object' && !Array.isArray(m.params) ? m.params : {};
     try {

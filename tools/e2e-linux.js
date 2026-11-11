@@ -11,7 +11,8 @@
  * enrolment, pairing, two simultaneous terminals, ANSI colours, Ctrl+C,
  * resize, phone disconnect → re-attach with `since` (no duplicate output),
  * full replay, closing one terminal without affecting the other, agent
- * restart (new instanceId), and revocation (agent exits, token dead).
+ * restart (new instanceId, and the open terminal recovered in place with its
+ * command running again), and revocation (agent exits, token dead).
  */
 
 const path = require('path');
@@ -170,7 +171,9 @@ async function main() {
     const deviceToken = red.body.deviceToken;
 
     const statusOut = await agentCli(stateFile, ['--status']);
-    check('--status reports the relay connection', /Relay status:\s+connected/.test(statusOut), statusOut.split('\n').find((l) => /Relay status/.test(l)));
+    // A running agent answers over its control socket and reports the state it
+    // is actually in, which is "registered" once the relay has taken it.
+    check('--status reports the relay connection', /Relay status:\s+(registered|connected)/.test(statusOut), statusOut.split('\n').find((l) => /Relay status/.test(l)));
 
     let phone = await connectPhone(deviceToken);
     const a = phone.welcome.agents.find((x) => x.agentId === state.agentId);
@@ -226,6 +229,16 @@ async function main() {
     const killed = sleeper ? await phone.request(agentId, 'proc.kill', { pid: sleeper.pid }) : { error: 'no sleeper' };
     check('proc.kill ends it', !killed.error && await waitFor(() => !fs.existsSync(`/proc/${sleeper.pid}`), 3000), killed.error);
     await phone.settle(s1);
+
+    // System: what the machine is, and which ports it listens on.
+    check('agent advertises sys and ports', !!a && a.caps.includes('sys') && a.caps.includes('ports'), a && a.caps.join(','));
+    const info = await phone.request(agentId, 'sys.info', {});
+    check('sys.info names the machine and the terminal account', !info.error && info.hostname === os.hostname() && info.platform === 'linux'
+      && info.user === os.userInfo().username && Array.isArray(info.interfaces), info.error || JSON.stringify(info).slice(0, 200));
+    const listening = await phone.request(agentId, 'net.ports', {});
+    const relayPort = !listening.error && listening.ports.find((p) => p.proto === 'tcp' && p.port === Number(PORT));
+    check('net.ports lists the relay listening port', !!relayPort && typeof listening.sampledAt === 'number' && listening.truncated === false,
+      listening.error || `${listening.ports.length} ports`);
 
     // Ctrl+C interrupts a running command.
     // The typed line is echoed back verbatim, so use markers that only exist once executed.
@@ -289,8 +302,13 @@ async function main() {
     const retired = await phone.next((m) => m.type === 'session.closed' && m.session === s3, 8000);
     check('exited session is closed after retention', retired.reason === 'exited');
 
-    // Agent restart: sessions end with reason "shutdown", identity persists, instanceId changes.
+    // Agent restart: the identity persists, the instanceId changes, and the
+    // terminal that was running comes back as it was (PROTOCOL §6c).
     const inst1 = again.instanceId;
+    phone.type(agentId, s1, 'cd /tmp\r');
+    phone.type(agentId, s1, 'echo marker_$((3+4))_restored\r');
+    check('the terminal is in /tmp running a command worth recovering', await phone.waitText(s1, 'marker_7_restored'));
+    await phone.settle(s1);
     agent.kill('SIGTERM');
     const shut = await phone.next((m) => m.type === 'session.closed' && m.session === s1, 8000);
     check('agent shutdown closes sessions with reason shutdown', shut.reason === 'shutdown');
@@ -298,7 +316,23 @@ async function main() {
     await agent.exited;
     agent = startAgent(stateFile);
     const online = await phone.next((m) => m.type === 'agent.online', 15000);
-    check('restarted agent keeps its identity and gets a new instanceId', online.agent.agentId === agentId && online.agent.instanceId !== inst1 && online.agent.sessions.length === 0);
+    check('restarted agent keeps its identity and gets a new instanceId', online.agent.agentId === agentId && online.agent.instanceId !== inst1);
+    const reborn = online.agent.sessions.find((x) => x.sessionId === s1);
+    check('the open terminal comes back under the same id, name and directory',
+      !!reborn && reborn.title === 'Terminal 1' && reborn.cwd === '/tmp' && reborn.restored === true && reborn.state === 'running',
+      reborn ? `${reborn.title} · ${reborn.cwd} · restored=${reborn.restored}` : `sessions=[${online.agent.sessions.map((x) => x.sessionId).join(',')}]`);
+    check('terminals that were closed, or whose shell exited, stay gone',
+      !online.agent.sessions.some((x) => x.sessionId === s2 || x.sessionId === s3), `${online.agent.sessions.length} session(s)`);
+
+    // Its stream is new: seq starts at 0 again, which is what the changed
+    // instanceId told the phone to expect.
+    phone.streams.delete(s1);
+    const recovered = await phone.attach(agentId, s1, undefined, 120, 40);
+    check('the recovered terminal attaches at the start of its new stream', recovered.from === 0, `from=${recovered.from}`);
+    check('it explains itself in its own output', await phone.waitText(s1, 'terminal restored'), JSON.stringify(phone.textOf(s1).slice(0, 120)));
+    check('it runs the command it was running again', await phone.waitText(s1, 'marker_7_restored'));
+    phone.type(agentId, s1, 'pwd\r');
+    check('and the shell really is where it was', await phone.waitText(s1, '/tmp\r\n'), JSON.stringify(phone.textOf(s1).slice(-120)));
 
     // Revocation from the phone: the agent process exits and its token is dead.
     phone.sendJson({ type: 'agent.remove', agent: agentId });

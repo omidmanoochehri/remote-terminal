@@ -210,3 +210,31 @@ test('noteGeometry keeps `since` after a resize while attached', () => {
   s.onDisconnected();
   assert.equal(s.beginAttach(120, 40).since, 30);
 });
+
+test('a session says what it is running and whether it was recovered', () => {
+  const a = agentFromJson({
+    ...agentJson,
+    sessions: [{
+      sessionId: 's_k3x7m2q9p4w8n6b5v1c0', title: 'API logs', shell: 'bash', state: 'running',
+      createdAt: 1, lastActiveAt: 2, cols: 100, rows: 30, seq: 42, attached: 1, exitCode: null,
+      cwd: '/srv/api', command: 'tail -f app.log', restored: true,
+    }],
+  });
+  const s = a.sessions[0];
+  assert.equal(s.command, 'tail -f app.log');
+  assert.equal(s.restored, true);
+  assert.equal(s.cwd, '/srv/api');
+
+  // An older agent says neither, and both read as "nothing known".
+  const old = agentFromJson(agentJson).sessions[0];
+  assert.equal(old.command, '');
+  assert.equal(old.restored, false);
+
+  const updated = parseIncoming(JSON.stringify({
+    type: 'session.updated', agent: a.agentId, session: s.sessionId, command: 'npm run build', cwd: '/srv/api/web',
+  }));
+  assert.equal(updated.kind, 'sessionUpdated');
+  assert.equal(updated.command, 'npm run build');
+  assert.equal(updated.cwd, '/srv/api/web');
+  assert.equal(parseIncoming(JSON.stringify({ type: 'session.updated', agent: a.agentId, session: s.sessionId, title: 'x' })).command, null);
+});

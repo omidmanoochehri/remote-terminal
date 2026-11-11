@@ -59,6 +59,15 @@ Environment overrides for the unit, such as
 .I /var/lib/remote-terminal-agent/state.json
 The identity the relay issued at enrolment. Mode 0600.
 .TP
+.I /var/lib/remote-terminal-agent/sessions.json
+The terminals that were open, so they can be started again — same name, same
+directory, same command — when the agent comes back. Mode 0600, because the
+command lines are in it. Set
+.B RESTORE_SESSIONS=0
+to switch recovery off, or
+.B RESTORE_COMMANDS=0
+to bring terminals back at a prompt without running anything.
+.TP
 .I /var/lib/remote-terminal-agent/agent.sock
 The control socket the CLI and the installers use to reach a running agent.
 Mode 0600; the key beside it,
@@ -86,6 +95,15 @@ turn either off,
 confines the file browser to another folder, and
 .B \(dqallowProcessKill\(dq: false
 allows listing processes but not ending them.
+.PP
+The app's System screen shows the host name, operating system, CPU, memory,
+network interfaces (with their MAC addresses, for Wake\-on\-LAN) and the
+ports the machine listens on, with the owning process where the agent may see
+it.
+.B \(dqsystemInfo\(dq: false
+and
+.B \(dqportList\(dq: false
+turn those off.
 .PP
 The unit ships with the hardening that costs a terminal nothing. The stricter
 settings, and what each of them breaks, are listed as comments in

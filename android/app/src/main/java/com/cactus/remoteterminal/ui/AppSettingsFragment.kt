@@ -22,6 +22,8 @@ import com.cactus.remoteterminal.BuildConfig
 import com.cactus.remoteterminal.R
 import com.cactus.remoteterminal.data.Settings
 import com.cactus.remoteterminal.databinding.FragmentAppSettingsBinding
+import com.cactus.remoteterminal.terminal.HardwareShortcuts
+import com.cactus.remoteterminal.terminal.TerminalTheme
 import com.cactus.remoteterminal.ui.design.Design
 import com.cactus.remoteterminal.ui.design.BottomNavView
 import com.cactus.remoteterminal.ui.design.SettingsBuilder
@@ -122,6 +124,14 @@ class AppSettingsFragment : Fragment(), RtScreen {
 
         builder.section(getString(R.string.group_appearance))
             .row(
+                R.drawable.ic_rt_globe, R.color.rt_accent,
+                getString(R.string.setting_language), getString(R.string.setting_language_desc),
+                value = languageLabel(s.appLanguage),
+            ) { chooseFromArray(R.string.setting_language, R.array.app_language_entries, R.array.app_language_values, s.appLanguage) { value ->
+                s.raw.edit().putString(Settings.KEY_APP_LANGUAGE, value).apply()
+                app.applyAppLanguage(value)
+            } }
+            .row(
                 R.drawable.ic_rt_moon_star, R.color.rt_primary,
                 getString(R.string.setting_theme), getString(R.string.setting_theme_desc),
                 value = themeLabel(s.appTheme),
@@ -141,6 +151,20 @@ class AppSettingsFragment : Fragment(), RtScreen {
                 getString(R.string.presets_title), getString(R.string.presets_subtitle),
                 value = s.terminalPresets.size.toString(),
             ) { host.openTerminalPresets() }
+            .row(
+                R.drawable.ic_rt_command, R.color.rt_accent,
+                getString(R.string.snippets_title), getString(R.string.snippets_subtitle),
+                value = s.snippets.size.toString(),
+            ) { host.openSnippets() }
+            .row(
+                R.drawable.ic_rt_sliders, R.color.rt_purple,
+                getString(R.string.schemes_title), getString(R.string.schemes_subtitle),
+                value = TerminalTheme.byId(s.terminalTheme).name,
+            ) { host.openColorSchemes() }
+            .row(
+                R.drawable.ic_rt_record, R.color.rt_danger,
+                getString(R.string.recordings_title), getString(R.string.recordings_subtitle),
+            ) { host.openRecordings() }
             .toggle(
                 R.drawable.ic_rt_swipe, R.color.rt_accent,
                 getString(R.string.setting_swipe_tabs), getString(R.string.setting_swipe_tabs_desc),
@@ -222,6 +246,16 @@ class AppSettingsFragment : Fragment(), RtScreen {
                 getString(R.string.setting_command_shortcuts), getString(R.string.setting_command_shortcuts_desc),
                 value = s.commandShortcuts.size.toString(),
             ) { editCommandShortcuts() }
+            .row(
+                R.drawable.ic_rt_keyboard, R.color.rt_purple,
+                getString(R.string.shortcuts_hw_title), getString(R.string.shortcuts_hw_desc),
+            ) { showKeyboardShortcuts() }
+
+        builder.section(getString(R.string.group_data))
+            .row(
+                R.drawable.ic_rt_save, R.color.rt_primary,
+                getString(R.string.backup_title), getString(R.string.backup_subtitle),
+            ) { host.openBackup() }
 
         builder.section(getString(R.string.group_notifications))
             .toggle(
@@ -298,6 +332,9 @@ class AppSettingsFragment : Fragment(), RtScreen {
 
     private fun themeLabel(value: String): String =
         labelFor(R.array.app_theme_entries, R.array.app_theme_values, value)
+
+    private fun languageLabel(value: String): String =
+        labelFor(R.array.app_language_entries, R.array.app_language_values, value)
 
     private fun bellLabel(value: String): String =
         labelFor(R.array.bell_entries, R.array.bell_values, value)
@@ -390,6 +427,49 @@ class AppSettingsFragment : Fragment(), RtScreen {
                 build()
             }
             .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    /** The hardware-keyboard shortcuts, read-only: they are fixed, like the desktop's. */
+    private fun showKeyboardShortcuts() {
+        val labels = mapOf(
+            HardwareShortcuts.Action.NEW_TERMINAL to R.string.kbd_new_terminal,
+            HardwareShortcuts.Action.CLOSE_TAB to R.string.kbd_close_tab,
+            HardwareShortcuts.Action.NEXT_TAB to R.string.kbd_next_tab,
+            HardwareShortcuts.Action.PREVIOUS_TAB to R.string.kbd_previous_tab,
+            HardwareShortcuts.Action.COPY to R.string.kbd_copy,
+            HardwareShortcuts.Action.PASTE to R.string.kbd_paste,
+            HardwareShortcuts.Action.SEARCH to R.string.kbd_search,
+            HardwareShortcuts.Action.PALETTE to R.string.kbd_palette,
+            HardwareShortcuts.Action.SNIPPETS to R.string.kbd_snippets,
+            HardwareShortcuts.Action.ZOOM_IN to R.string.kbd_zoom_in,
+            HardwareShortcuts.Action.ZOOM_OUT to R.string.kbd_zoom_out,
+            HardwareShortcuts.Action.ZOOM_RESET to R.string.kbd_zoom_reset,
+        )
+        val context = requireContext()
+        val box = Forms.column(context)
+        for ((keys, action) in HardwareShortcuts.KEYS) {
+            val row = android.widget.LinearLayout(context).apply {
+                orientation = android.widget.LinearLayout.HORIZONTAL
+                setPadding(0, Design.dp(context, 7f), 0, Design.dp(context, 7f))
+            }
+            row.addView(android.widget.TextView(context).apply {
+                setTextAppearance(R.style.RtText)
+                textSize = 13f
+                text = getString(labels.getValue(action))
+            }, android.widget.LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            row.addView(android.widget.TextView(context).apply {
+                setTextAppearance(R.style.RtText_Mono)
+                textSize = 12f
+                text = keys
+                setTextColor(Design.color(context, R.color.rt_primary))
+            })
+            box.addView(row)
+        }
+        MaterialAlertDialogBuilder(context)
+            .setTitle(R.string.shortcuts_hw_title)
+            .setView(android.widget.ScrollView(context).apply { addView(box) })
+            .setPositiveButton(android.R.string.ok, null)
             .show()
     }
 

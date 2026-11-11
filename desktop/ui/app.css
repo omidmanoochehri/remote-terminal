@@ -145,6 +145,22 @@
   font-display: block;
 }
 
+@font-face {
+  font-family: 'Peyda';
+  src: url('./assets/peyda_regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Peyda';
+  src: url('./assets/peyda_bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ------------------------------- reset --------------------------------- */
 
 * { box-sizing: border-box; }
@@ -164,6 +180,45 @@ body {
   user-select: none;
   -webkit-user-select: none;
   cursor: default;
+}
+
+:root[lang='fa'] {
+  --sans: 'Peyda', 'Segoe UI Variable Text', 'Segoe UI', Tahoma, system-ui, sans-serif;
+}
+
+:root[dir='rtl'] body {
+  direction: rtl;
+}
+
+:root[dir='rtl'] #nav {
+  margin: 12px 12px 12px 0;
+}
+
+:root[dir='rtl'] .row-item,
+:root[dir='rtl'] .quick-tile,
+:root[dir='rtl'] .dialog .choice,
+:root[dir='rtl'] .menu button,
+:root[dir='rtl'] .picker-item {
+  text-align: right;
+}
+
+:root[dir='rtl'] .banner .link-button,
+:root[dir='rtl'] .menu button .check,
+:root[dir='rtl'] .check-meta {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+:root[dir='rtl'] .terminal-screen,
+:root[dir='rtl'] .terminal-input,
+:root[dir='rtl'] .command-bar,
+:root[dir='rtl'] .command-bar input,
+:root[dir='rtl'] .terminal-search,
+:root[dir='rtl'] .file-view,
+:root[dir='rtl'] .mono,
+:root[dir='rtl'] kbd {
+  direction: ltr;
+  unicode-bidi: plaintext;
 }
 
 button, input, textarea, select {
@@ -287,6 +342,9 @@ button { cursor: pointer; }
 }
 
 /* ------------------------------- screens -------------------------------- */
+
+/* A terminal in a window of its own: no rail; the terminal is the window. */
+.terminal-window #nav { display: none; }
 
 #screen {
   flex: 1 1 auto;
@@ -456,6 +514,22 @@ button { cursor: pointer; }
 .chip .icon { width: 14px; height: 14px; }
 .chip:hover { border-color: var(--outline-strong); color: var(--text-secondary); }
 
+/* An attached file: the chip is its name, and only its cross removes it. */
+.chip.file-chip { padding-right: 6px; color: var(--text-secondary); }
+.chip-remove {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--text-muted);
+}
+.chip-remove .icon { width: 12px; height: 12px; }
+.chip-remove:hover { background: var(--surface-bright-top); color: var(--text); }
+
 .chip[aria-pressed='true'] {
   background: var(--primary-soft);
   border-color: var(--primary-edge);
@@ -584,6 +658,14 @@ textarea.plain {
 }
 
 textarea.plain:focus { border-color: var(--primary-edge); }
+
+/* The prompt composer writes prose, not commands: the interface face, not the mono one. */
+textarea.plain.prompt-text {
+  min-height: 160px;
+  font-family: inherit;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
 
 /* ------------------------------ search bar ------------------------------ */
 
@@ -1158,6 +1240,8 @@ textarea.plain:focus { border-color: var(--primary-edge); }
 }
 .tab[aria-selected='true'] .icon { color: var(--primary); }
 .tab.exited { opacity: 0.6; }
+/* A tab moved into a window of its own: still listed, drawn as away. */
+.tab.in-window { border-style: dashed; color: var(--text-muted); }
 
 .tab .tab-close {
   width: 18px;
@@ -1772,3 +1856,170 @@ textarea.plain:focus { border-color: var(--primary-edge); }
 
 .check-row input { accent-color: var(--primary); width: 15px; height: 15px; }
 .check-meta { margin-left: auto; color: var(--text-muted); font-size: 10.5px; }
+
+/* ------------------------ 0.13: pickers, palette ------------------------ */
+
+.picker .search-bar { margin-bottom: 8px; }
+.picker-list { display: flex; flex-direction: column; gap: 2px; max-height: 52vh; overflow-y: auto; }
+.picker-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--r-control);
+  border: 1px solid transparent;
+  background: none;
+  color: inherit;
+  text-align: left;
+  font-size: 12px;
+}
+.picker-item .icon { width: 15px; height: 15px; color: var(--text-muted); flex: none; }
+.picker-item.active { background: var(--primary-soft); border-color: var(--primary-edge); }
+.picker-item.active .icon { color: var(--primary); }
+.picker-text { flex: 1 1 auto; min-width: 0; }
+.picker-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.picker-detail {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.picker-group {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 10px 10px 4px;
+}
+.picker-empty { padding: 18px 10px; font-size: 12px; color: var(--text-muted); white-space: pre-wrap; }
+
+.dialog .hint, .hint { font-size: 10.5px; color: var(--text-muted); margin: 6px 0 8px; }
+.dialog .hint.tone-warn { color: var(--amber); }
+.mono { font-family: var(--mono); }
+textarea.plain.mono { font-size: 12px; min-height: 110px; }
+
+.snippet-preview {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--r-control);
+  border: 1px solid var(--outline);
+  background: var(--surface-sunken);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 180px;
+  overflow: auto;
+}
+
+/* ------------------------------ recording ------------------------------- */
+
+.rec-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--danger);
+  box-shadow: 0 0 0 3px var(--danger-soft);
+  flex: none;
+  animation: rec-pulse 1.4s ease-in-out infinite;
+}
+@keyframes rec-pulse { 50% { opacity: 0.45; } }
+
+.rec-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--r-control);
+  border: 1px solid var(--danger-edge);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.player-screen .player-body { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; padding: 0 var(--gutter) 14px; gap: 10px; }
+.player-frame { flex: 1 1 auto; min-height: 200px; margin: 0; }
+.player-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.player-slider { flex: 1 1 200px; accent-color: var(--primary); }
+.player-clock { font-family: var(--mono); font-size: 11px; color: var(--text-secondary); min-width: 92px; text-align: center; }
+.player-speeds { margin: 0; }
+.player-skip { padding: 0; }
+
+/* ---------------------------- colour schemes ---------------------------- */
+
+.scheme-swatches {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 6px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  border: 1px solid var(--outline);
+  width: max-content;
+  max-width: 100%;
+}
+.scheme-sample { font-family: var(--mono); font-size: 11px; font-weight: 700; margin-right: 6px; }
+.scheme-dot { width: 11px; height: 11px; border-radius: 3px; flex: none; }
+.scheme-preview {
+  margin: 0 0 14px;
+  padding: 14px 16px;
+  border-radius: var(--r-card);
+  border: 1px solid var(--outline);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+.scheme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 12px; margin-bottom: 8px; }
+.scheme-field { display: flex; flex-direction: column; gap: 4px; }
+.scheme-field-label { font-size: 10px; font-weight: 700; color: var(--text-muted); }
+.scheme-field .field-well { height: 38px; }
+.scheme-field input[type='text'] { font-family: var(--mono); }
+.scheme-field input.invalid { color: var(--danger); }
+.scheme-picker { width: 26px; height: 22px; padding: 0; border: none; background: none; cursor: pointer; flex: none; }
+
+/* -------------------------------- system -------------------------------- */
+
+.system-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.iface { padding: 10px 14px 2px; }
+.iface-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+.iface-head .icon { width: 15px; height: 15px; color: var(--accent); }
+.iface-name { font-weight: 700; font-size: 12px; margin-right: 6px; }
+.chip.small { height: 24px; padding: 0 9px; font-size: 10.5px; }
+.chip.mono { font-family: var(--mono); }
+.system-panel .chip-row { margin: 0 0 8px; }
+.ports-row { grid-template-columns: 70px 64px minmax(0, 1.4fr) minmax(0, 1.6fr); cursor: pointer; }
+.ports-row .procs-cell.num { text-align: left; }
+.ports-table { margin-bottom: 14px; }
+
+/* ------------------------------ shortcuts ------------------------------- */
+
+.shortcut-list { display: flex; flex-direction: column; }
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 2px;
+  border-top: 1px solid var(--divider);
+  font-size: 12px;
+}
+.shortcut-row:first-child { border-top: none; }
+kbd {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  padding: 3px 7px;
+  border-radius: 6px;
+  border: 1px solid var(--outline);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}

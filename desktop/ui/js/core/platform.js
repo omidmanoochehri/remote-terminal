@@ -12,6 +12,16 @@ const tauri = typeof window !== 'undefined' ? window.__TAURI__ : undefined;
 
 export const inShell = !!tauri;
 
+/**
+ * Set in a terminal window by the Rust side before the page loads
+ * (src/windows.rs): `{ kind, label, agentId, sessionId, onTop }`. Null in the
+ * main window.
+ */
+export const terminalWindow = typeof window !== 'undefined' ? window.__RT_WINDOW__ ?? null : null;
+
+/** This window's label: `main`, or the terminal window's own. */
+export const windowLabel = terminalWindow?.label ?? 'main';
+
 export function invoke(command, args) {
   if (!tauri) return Promise.reject(new Error(`Remote Terminal must run in its own window (${command} is unavailable).`));
   return tauri.core.invoke(command, args);
@@ -20,6 +30,12 @@ export function invoke(command, args) {
 export function listen(event, handler) {
   if (!tauri) return Promise.resolve(() => {});
   return tauri.event.listen(event, handler);
+}
+
+/** Tell every window (this one included) about [event]. */
+export function broadcastEvent(event, payload) {
+  if (!tauri) return Promise.resolve();
+  return tauri.event.emit(event, payload).catch(() => {});
 }
 
 /* ------------------------------- storage -------------------------------- */
@@ -77,6 +93,19 @@ export const localFiles = {
   remove: (path) => invoke('local_file_remove', { path }),
 };
 
+/** Session recordings, one asciicast file each in the app's configuration directory. */
+export const recordingFiles = {
+  append: (id, text) => invoke('recording_append', { id, text }),
+  read: (id) => invoke('recording_read', { id }),
+  remove: (id) => invoke('recording_delete', { id }),
+  exportTo: (id, path) => invoke('recording_export', { id, path }),
+};
+
+/** Send a Wake-on-LAN magic packet (built by core/wol.js) as a UDP broadcast. */
+export function wakeOnLan(packet, broadcast, port) {
+  return invoke('wake_on_lan', { packet: Array.from(packet), broadcast, port });
+}
+
 /** Native "open file" dialog; resolves to a path or null when cancelled. */
 export async function pickFile() {
   if (!tauri?.dialog) throw new Error('No file picker is available.');
@@ -133,6 +162,17 @@ export async function notify(title, body) {
 }
 
 /* -------------------------------- window -------------------------------- */
+
+/** Terminals in windows of their own (src/windows.rs). */
+export const terminalWindows = {
+  /** Resolves to the new window's label. */
+  open: (agentId, sessionId, title, onTop) => invoke('terminal_window_open', { agentId, sessionId, title, onTop }),
+  /** A terminal window by label, or `main`. */
+  focus: (label) => invoke('terminal_window_focus', { label }),
+  close: (label) => invoke('terminal_window_close', { label }),
+  /** Keep this window above the others. */
+  setOnTop: (on) => invoke('window_set_on_top', { on }),
+};
 
 export function currentWindow() {
   return tauri?.window?.getCurrentWindow?.() ?? null;

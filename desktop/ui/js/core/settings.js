@@ -7,10 +7,18 @@
  * debounced (settings change on every keystroke of a search box) but always
  * flushed before the window closes. `version` bumps on every change so screens
  * can re-read cheaply.
+ *
+ * A terminal moved into a window of its own runs a second copy of the app with
+ * a second copy of these settings. The two stay one: each tells the other what
+ * changed when it flushes (`onSync` / `applyRemote`), and only the main window
+ * writes the file, so neither can put back a value the other just changed.
  */
 
 import { store } from './platform.js';
 import { presetsFromJson, presetsToJson } from './preset.js';
+import { snippetsFromJson, snippetsToJson } from './snippets.js';
+import { schemesFromJson, schemesToJson } from './schemes.js';
+import { wolConfig } from './wol.js';
 import { Emitter } from './emitter.js';
 
 export const SORT_STATUS = 'status';
@@ -45,6 +53,7 @@ const KEYS = {
   cursorBlink: 'cursor_blink',
   terminalTheme: 'terminal_theme',
   appTheme: 'app_theme',
+  appLanguage: 'app_language',
   keepAwake: 'keep_awake',
   scrollback: 'scrollback_lines',
   bell: 'bell',
@@ -74,6 +83,11 @@ const KEYS = {
   closeTabOnExit: 'close_tab_on_exit',
   closeToTray: 'close_to_tray',
   presets: 'terminal_presets',
+  snippets: 'snippets',
+  snippetValues: 'snippet_values',
+  customSchemes: 'custom_schemes',
+  promptEnter: 'prompt_enter',
+  terminalWindowOnTop: 'terminal_window_on_top',
 };
 
 export class Settings extends Emitter {
@@ -83,6 +97,12 @@ export class Settings extends Emitter {
     this.version = 0;
     this.flushTimer = null;
     this.pending = false;
+    /** False in a terminal window: the main window owns the file. */
+    this.writesDisk = true;
+    /** Told what changed at each flush, so the other windows can follow. */
+    this.onSync = null;
+    /** Each key as the other windows last heard it, as JSON. */
+    this.syncedJson = new Map();
   }
 
   static async load() {
@@ -95,6 +115,7 @@ export class Settings extends Emitter {
       // nothing in it is irreplaceable.
       settings.values = {};
     }
+    settings.diffSinceSync();
     return settings;
   }
 
@@ -128,13 +149,63 @@ export class Settings extends Emitter {
   }
 
   async flush() {
+    if (this.onSync) {
+      const changes = this.diffSinceSync();
+      if (Object.keys(changes).length > 0) this.onSync(changes);
+    }
     if (!this.pending) return;
     this.pending = false;
+    if (!this.writesDisk) return;
     try {
       await store.write('settings', JSON.stringify(this.values, null, 2));
     } catch {
       this.pending = true; // try again on the next change or on close
     }
+  }
+
+  /**
+   * Every key whose value is not what the other windows last heard, with its
+   * value (null for a key that is gone), and from now on counted as heard.
+   * Compared by value rather than tracked per setter, because a few setters
+   * write several keys straight into `values` at once.
+   */
+  diffSinceSync() {
+    const changes = {};
+    const present = new Set();
+    for (const [key, value] of Object.entries(this.values)) {
+      present.add(key);
+      const json = JSON.stringify(value);
+      if (this.syncedJson.get(key) === json) continue;
+      this.syncedJson.set(key, json);
+      changes[key] = value;
+    }
+    for (const key of [...this.syncedJson.keys()]) {
+      if (present.has(key)) continue;
+      this.syncedJson.delete(key);
+      changes[key] = null;
+    }
+    return changes;
+  }
+
+  /** Changes another window made: taken as they are, and not told back. */
+  applyRemote(changes) {
+    let touched = false;
+    for (const [key, value] of Object.entries(changes ?? {})) {
+      if (value === null || value === undefined) {
+        if (!(key in this.values)) continue;
+        delete this.values[key];
+        this.syncedJson.delete(key);
+      } else {
+        this.values[key] = value;
+        this.syncedJson.set(key, JSON.stringify(value));
+      }
+      touched = true;
+    }
+    if (!touched) return;
+    this.version++;
+    this.emit('changed', this.version);
+    // The main window still owes the file the change.
+    if (this.writesDisk) this.scheduleFlush();
   }
 
   /* ---------------------------- terminal look --------------------------- */
@@ -161,6 +232,9 @@ export class Settings extends Emitter {
    */
   get appTheme() { return this.get(KEYS.appTheme, 'dark'); }
   set appTheme(v) { this.set(KEYS.appTheme, v); }
+
+  get appLanguage() { return this.get(KEYS.appLanguage, 'system'); }
+  set appLanguage(v) { this.set(KEYS.appLanguage, v); }
 
   get keepAwake() { return this.get(KEYS.keepAwake, true); }
   set keepAwake(v) { this.set(KEYS.keepAwake, !!v); }
@@ -217,6 +291,14 @@ export class Settings extends Emitter {
    */
   get closeToTray() { return this.get(KEYS.closeToTray, true); }
   set closeToTray(v) { this.set(KEYS.closeToTray, !!v); }
+
+  /** The prompt composer presses Enter after what it types; the last choice sticks. */
+  get promptEnter() { return this.get(KEYS.promptEnter, true); }
+  set promptEnter(v) { this.set(KEYS.promptEnter, !!v); }
+
+  /** A terminal moved into its own window starts kept on top; the last choice sticks. */
+  get terminalWindowOnTop() { return this.get(KEYS.terminalWindowOnTop, false); }
+  set terminalWindowOnTop(v) { this.set(KEYS.terminalWindowOnTop, !!v); }
 
   get commandBar() { return this.get(KEYS.commandBar, true); }
   set commandBar(v) { this.set(KEYS.commandBar, !!v); }
@@ -401,6 +483,89 @@ export class Settings extends Emitter {
 
   deletePreset(id) {
     this.terminalPresets = this.terminalPresets.filter((p) => p.id !== id);
+  }
+
+  /* ------------------------------ snippets ------------------------------ */
+
+  get snippets() { return snippetsFromJson(this.get(KEYS.snippets)); }
+  set snippets(list) { this.set(KEYS.snippets, snippetsToJson(list)); }
+
+  saveSnippet(snippet) {
+    const current = this.snippets;
+    this.snippets = current.some((s) => s.id === snippet.id)
+      ? current.map((s) => (s.id === snippet.id ? snippet : s))
+      : [...current, snippet];
+  }
+
+  deleteSnippet(id) {
+    this.snippets = this.snippets.filter((s) => s.id !== id);
+    const values = { ...this.get(KEYS.snippetValues, {}) };
+    if (id in values) { delete values[id]; this.set(KEYS.snippetValues, values); }
+  }
+
+  /** The values last typed into a snippet's placeholders, by placeholder name. */
+  snippetValues(id) {
+    const all = this.get(KEYS.snippetValues, {});
+    const v = all && typeof all === 'object' ? all[id] : null;
+    return v && typeof v === 'object' ? v : {};
+  }
+
+  setSnippetValues(id, values) {
+    const all = { ...(this.get(KEYS.snippetValues, {}) || {}) };
+    all[id] = values;
+    this.set(KEYS.snippetValues, all);
+  }
+
+  /* ---------------------------- colour schemes -------------------------- */
+
+  get customSchemes() { return schemesFromJson(this.get(KEYS.customSchemes)); }
+  set customSchemes(list) { this.set(KEYS.customSchemes, schemesToJson(list)); }
+
+  saveCustomScheme(scheme) {
+    const current = this.customSchemes;
+    this.customSchemes = current.some((s) => s.id === scheme.id)
+      ? current.map((s) => (s.id === scheme.id ? scheme : s))
+      : [...current, scheme];
+  }
+
+  /** Remove a scheme; anything using it falls back to the default scheme. */
+  deleteCustomScheme(id) {
+    this.customSchemes = this.customSchemes.filter((s) => s.id !== id);
+    if (this.terminalTheme === id) this.terminalTheme = 'remote';
+    let touched = false;
+    for (const key of Object.keys(this.values)) {
+      if (key.startsWith('theme.') && this.values[key] === id) { delete this.values[key]; touched = true; }
+    }
+    if (touched) this.changed();
+  }
+
+  /* --------------------------- backup & restore ------------------------- */
+
+  /** Apply what core/backup.js `applyBackup` worked out, as one change. */
+  restore({ presets, snippets, customSchemes, commandShortcuts, settings }) {
+    this.values[KEYS.presets] = presetsToJson(presets);
+    this.values[KEYS.snippets] = snippetsToJson(snippets);
+    this.values[KEYS.customSchemes] = schemesToJson(customSchemes);
+    this.values[KEYS.commands] = commandShortcuts.map(([label, command]) => ({ label, command }));
+    for (const [key, value] of Object.entries(settings)) this.values[key] = value;
+    this.changed();
+  }
+
+  /* ---------------------------- Wake-on-LAN ----------------------------- */
+
+  /** `{ mac, broadcast, port }` for a machine, or null when no MAC is known. */
+  wol(agentId) { return wolConfig(this.get(`wol.${agentId}`)); }
+
+  /** Whether the stored MAC was typed by the user (and so is not replaced by sys.info). */
+  wolIsManual(agentId) { return this.get(`wol.${agentId}`)?.manual === true; }
+
+  setWol(agentId, config, { manual = true } = {}) {
+    if (!config) { this.set(`wol.${agentId}`, undefined); return; }
+    const next = { mac: config.mac, broadcast: config.broadcast, port: config.port };
+    if (manual) next.manual = true;
+    const prev = this.get(`wol.${agentId}`);
+    if (prev && JSON.stringify(prev) === JSON.stringify(next)) return;
+    this.set(`wol.${agentId}`, next);
   }
 
   /* ------------------------- command history ---------------------------- */

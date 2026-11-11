@@ -13,6 +13,8 @@ mod store;
 mod sys;
 mod transfer;
 mod tray;
+mod windows;
+mod wol;
 mod ws;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -26,7 +28,10 @@ pub fn run() {
             tray::build(app.handle())?;
             Ok(())
         })
-        .on_window_event(tray::on_window_event)
+        .on_window_event(|window, event| {
+            tray::on_window_event(window, event);
+            windows::on_window_event(window, event);
+        })
         .invoke_handler(tauri::generate_handler![
             ws::ws_connect,
             ws::ws_send,
@@ -40,6 +45,11 @@ pub fn run() {
             store::credentials_save,
             store::credentials_clear,
             store::config_directory,
+            store::recording_append,
+            store::recording_read,
+            store::recording_delete,
+            store::recording_export,
+            wol::wake_on_lan,
             sys::read_file_for_upload,
             sys::clipboard_read,
             sys::clipboard_read_image,
@@ -53,6 +63,10 @@ pub fn run() {
             transfer::local_file_remove,
             transfer::open_url,
             tray::set_close_to_tray,
+            windows::terminal_window_open,
+            windows::terminal_window_focus,
+            windows::terminal_window_close,
+            windows::window_set_on_top,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Remote Terminal");

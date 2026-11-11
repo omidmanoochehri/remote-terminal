@@ -104,6 +104,49 @@
                 </LinearLayout>
             </LinearLayout>
 
+            <LinearLayout
+                android:id="@+id/recBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="24dp"
+                android:layout_marginEnd="4dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:background="@drawable/rt_chip"
+                android:clickable="true"
+                android:focusable="true"
+                android:contentDescription="@string/recording_stop"
+                android:visibility="gone">
+
+                <View
+                    android:layout_width="7dp"
+                    android:layout_height="7dp"
+                    android:layout_marginEnd="5dp"
+                    android:background="@drawable/rt_rec_dot"
+                    android:importantForAccessibility="no" />
+
+                <TextView
+                    style="@style/RtText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="9sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/rt_danger"
+                    android:text="@string/recording_badge" />
+            </LinearLayout>
+
+            <ImageButton
+                android:id="@+id/promptButton"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
+                android:background="@drawable/rt_icon_button"
+                android:src="@drawable/ic_rt_message"
+                android:contentDescription="@string/prompt_title"
+                app:tint="@color/rt_text" />
+
             <ImageButton
                 android:id="@+id/searchButton"
                 android:layout_width="36dp"

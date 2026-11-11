@@ -34,6 +34,7 @@ Thumbs.db
 # Relay persisted identity + agent identity (token hashes / tokens) — never commit
 server/data/
 agent/state.json
+agent/sessions.json
 
 # Claude Code worktrees / local session files
 .claude/

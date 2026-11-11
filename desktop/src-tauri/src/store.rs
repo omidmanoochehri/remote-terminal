@@ -52,9 +52,65 @@ fn resolve(app: &AppHandle, name: &str) -> Result<PathBuf, String> {
     let file = match name {
         "settings" => "settings.json",
         "agents" => "agents-cache.json",
+        "recordings" => "recordings-index.json",
         _ => return Err(format!("unknown store: {name}")),
     };
     Ok(config_dir(app)?.join(file))
+}
+
+/* ------------------------------ recordings ----------------------------- */
+
+// Session recordings (asciicast v2) live one file each in `recordings/` under
+// the configuration directory. The frontend names them by an id it generated;
+// only plain ids are accepted, so nothing can reach outside that folder.
+
+fn valid_recording_id(id: &str) -> bool {
+    !id.is_empty() && id.len() <= 64 && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+}
+
+fn recording_path(app: &AppHandle, id: &str) -> Result<PathBuf, String> {
+    if !valid_recording_id(id) {
+        return Err(format!("invalid recording id: {id}"));
+    }
+    let dir = config_dir(app)?.join("recordings");
+    fs::create_dir_all(&dir).map_err(|e| format!("cannot create {}: {e}", dir.display()))?;
+    Ok(dir.join(format!("{id}.cast")))
+}
+
+/// Append recorded lines; the file is created on the first call. Answers the new size.
+#[tauri::command]
+pub fn recording_append(app: AppHandle, id: String, text: String) -> Result<u64, String> {
+    let path = recording_path(&app, &id)?;
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .map_err(|e| format!("{e}"))?;
+    file.write_all(text.as_bytes()).map_err(|e| format!("{e}"))?;
+    file.metadata().map(|m| m.len()).map_err(|e| format!("{e}"))
+}
+
+#[tauri::command]
+pub fn recording_read(app: AppHandle, id: String) -> Result<String, String> {
+    let path = recording_path(&app, &id)?;
+    fs::read_to_string(&path).map_err(|e| format!("{e}"))
+}
+
+#[tauri::command]
+pub fn recording_delete(app: AppHandle, id: String) -> Result<(), String> {
+    let path = recording_path(&app, &id)?;
+    match fs::remove_file(&path) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(format!("{e}")),
+    }
+}
+
+/// Copy a recording to a file the user chose in the save dialog.
+#[tauri::command]
+pub fn recording_export(app: AppHandle, id: String, path: String) -> Result<(), String> {
+    let from = recording_path(&app, &id)?;
+    fs::copy(&from, &path).map(|_| ()).map_err(|e| format!("{e}"))
 }
 
 #[tauri::command]

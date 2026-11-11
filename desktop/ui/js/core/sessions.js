@@ -38,6 +38,12 @@ export class TerminalSession extends Emitter {
      * everything that uses it treats that as "do not assume".
      */
     this.cwd = '';
+    /**
+     * The last command the agent saw run here. It is what "Save as preset"
+     * writes down with the directory, and what a recovered terminal starts
+     * again by itself. Empty when the agent is older or nothing has run yet.
+     */
+    this.command = '';
     this.state = 'running'; // "running" | "exited" | "closed"
     this.exitCode = null;
     this.closedReason = null;
@@ -45,6 +51,13 @@ export class TerminalSession extends Emitter {
 
     /** Rows of output that arrived while this tab was not the visible one. */
     this.unreadRows = 0;
+
+    /**
+     * The label of the window this terminal was moved into, in the main
+     * window; null while it is shown here. A tab that lives elsewhere stays in
+     * the list (and in the saved tabs) but is never attached from here.
+     */
+    this.windowLabel = null;
 
     /**
      * Input queued before the shell was attached (the working directory and the
@@ -88,6 +101,7 @@ export class TerminalSession extends Emitter {
     this.state = info.state;
     this.exitCode = info.exitCode;
     if (info.cwd) this.cwd = info.cwd;
+    if (info.command) this.command = info.command;
     this.bump();
   }
 
@@ -100,11 +114,17 @@ export class TerminalSession extends Emitter {
 }
 
 export class SessionRepository extends Emitter {
-  constructor(client, agents, settings) {
+  /**
+   * In a terminal window [persistTabs] is false: the window holds one terminal
+   * the main window already remembers, and must neither restore the main
+   * window's tabs nor write its own over them.
+   */
+  constructor(client, agents, settings, { persistTabs = true } = {}) {
     super();
     this.client = client;
     this.agents = agents;
     this.settings = settings;
+    this.persistTabs = persistTabs;
 
     /** key → TerminalSession, in the order tabs were opened. */
     this.sessions = new Map();
@@ -120,8 +140,10 @@ export class SessionRepository extends Emitter {
     client.on('state', (state) => this.onConnectionState(state));
 
     // Restore open tabs from the last run for every cached machine.
-    for (const agent of agents.agents) {
-      for (const sessionId of settings.openTabs(agent.agentId)) this.get(agent.agentId, sessionId);
+    if (persistTabs) {
+      for (const agent of agents.agents) {
+        for (const sessionId of settings.openTabs(agent.agentId)) this.get(agent.agentId, sessionId);
+      }
     }
   }
 
@@ -151,7 +173,7 @@ export class SessionRepository extends Emitter {
 
   publish(agentId) {
     const list = this.tabs(agentId);
-    this.settings.setOpenTabs(agentId, list.map((s) => s.sessionId));
+    if (this.persistTabs) this.settings.setOpenTabs(agentId, list.map((s) => s.sessionId));
     this.emit('tabs', agentId, list);
   }
 
@@ -174,6 +196,7 @@ export class SessionRepository extends Emitter {
 
   /** Attach (or re-attach) a tab at the given geometry; safe to call repeatedly. */
   attach(s, cols, rows) {
+    if (s.windowLabel) return; // its own window has it
     if (!this.client.isConnected) return;
     if (s.state === 'closed') return;
     if (s.stream.state === State.ATTACHING) return;
@@ -201,6 +224,37 @@ export class SessionRepository extends Emitter {
     this.publish(s.agentId);
   }
 
+  /**
+   * The terminal now lives in the window [label]: stop receiving it here (the
+   * window attaches with its own connection) and keep the tab, marked.
+   */
+  moveToWindow(s, label) {
+    this.detach(s);
+    s.windowLabel = label;
+    s.bump();
+    this.publish(s.agentId);
+  }
+
+  /** The tab living in window [label], if any. */
+  inWindow(label) {
+    for (const s of this.sessions.values()) if (s.windowLabel === label) return s;
+    return null;
+  }
+
+  /**
+   * Window [label] closed: its terminal is this window's again. The next attach
+   * asks for everything after the last output seen here, so what happened in
+   * the window is replayed into this tab.
+   */
+  returnFromWindow(label) {
+    const s = this.inWindow(label);
+    if (!s) return null;
+    s.windowLabel = null;
+    s.bump();
+    this.publish(s.agentId);
+    return s;
+  }
+
   rename(s, title) {
     this.client.send(Outgoing.sessionRename(s.agentId, s.sessionId, title));
     s.title = title;
@@ -226,6 +280,7 @@ export class SessionRepository extends Emitter {
   resize(s, cols, rows) {
     if (s.emulator.cols === cols && s.emulator.rows === rows) return;
     s.emulator.resize(cols, rows);
+    this.emit('recordResize', s, cols, rows);
     s.stream.noteGeometry(cols, rows);
     if (s.stream.state === State.ATTACHED) this.client.send(Outgoing.resize(s.agentId, s.sessionId, cols, rows));
     s.notifyOutput();
@@ -343,6 +398,7 @@ export class SessionRepository extends Emitter {
           // The agent's PTY is a different size (another client set it); follow
           // it until our own resize lands.
           s.emulator.resize(event.cols, event.rows);
+          this.emit('recordResize', s, event.cols, event.rows);
         }
         s.emulator.muteResponses = false;
         s.bump();
@@ -356,6 +412,7 @@ export class SessionRepository extends Emitter {
         const verdict = s.stream.onOutput(event.seq, event.data.length);
         if (verdict === Verdict.APPLY) {
           s.emulator.feed(event.data);
+          this.emit('recordOutput', s, event.data);
           s.notifyOutput();
           if (event.seq > s.liveFrom) this.emit('liveOutput', s, event.data);
         } else if (verdict === Verdict.GAP) {
@@ -378,10 +435,12 @@ export class SessionRepository extends Emitter {
         if (event.state != null) s.state = event.state;
         if (event.exitCode != null) s.exitCode = event.exitCode;
         if (event.cwd != null) s.noteDirectory(event.cwd);
+        if (event.command) s.command = event.command;
         if (event.cols != null && event.rows != null && event.cols > 0 && event.rows > 0 &&
           s.stream.state === State.ATTACHED &&
           (event.cols !== s.emulator.cols || event.rows !== s.emulator.rows)) {
           s.emulator.resize(event.cols, event.rows);
+          this.emit('recordResize', s, event.cols, event.rows);
           s.notifyOutput();
         }
         s.bump();

@@ -34,6 +34,8 @@ object MachineActions {
         menu.menu.add(0, ID_DETAILS, 3, R.string.action_details)
         menu.menu.add(0, ID_FILES, 3, R.string.tool_files)
         menu.menu.add(0, ID_PROCESSES, 3, R.string.tool_processes)
+        if (AgentCaps.systemView(app.client.relayCaps, agent)) menu.menu.add(0, ID_SYSTEM, 3, R.string.tool_system)
+        if (!agent.online && app.settings.wakeTarget(agent.agentId) != null) menu.menu.add(0, ID_WAKE, 0, R.string.wol_wake)
         menu.menu.add(0, ID_SETTINGS, 4, R.string.action_settings)
         menu.menu.add(0, ID_RENAME, 5, R.string.rename_machine)
         menu.menu.add(0, ID_COPY_HOST, 6, R.string.copy_hostname)
@@ -47,6 +49,8 @@ object MachineActions {
                 ID_DETAILS -> host.openMachine(agent.agentId, MachineFragment.Tab.DETAILS)
                 ID_FILES -> openFiles(fragment, agent)
                 ID_PROCESSES -> openProcesses(fragment, agent)
+                ID_SYSTEM -> openSystem(fragment, agent)
+                ID_WAKE -> WakeUi.wake(fragment, agent.agentId)
                 ID_SETTINGS -> host.openMachineSettings(agent.agentId)
                 ID_RENAME -> rename(fragment, agent)
                 ID_COPY_HOST -> copy(context, agent.hostname.ifEmpty { agent.name })
@@ -80,6 +84,20 @@ object MachineActions {
         val why = toolUnavailable(fragment.requireContext(), app.client.relayCaps, agent, files = false)
         if (why != null) { Toast.makeText(fragment.requireContext(), why, Toast.LENGTH_LONG).show(); return }
         (fragment.requireActivity() as MainActivity).openProcesses(agent.agentId)
+    }
+
+    /** Why the System view cannot be opened right now, or null when it can. */
+    fun systemUnavailable(context: Context, relayCaps: List<String>, agent: AgentInfo): String? = when {
+        !agent.online -> context.getString(R.string.tool_machine_offline, agent.name.ifEmpty { agent.hostname })
+        !AgentCaps.systemView(relayCaps, agent) -> context.getString(R.string.tool_system_unsupported)
+        else -> null
+    }
+
+    fun openSystem(fragment: Fragment, agent: AgentInfo) {
+        val app = fragment.requireActivity().application as App
+        val why = systemUnavailable(fragment.requireContext(), app.client.relayCaps, agent)
+        if (why != null) { Toast.makeText(fragment.requireContext(), why, Toast.LENGTH_LONG).show(); return }
+        (fragment.requireActivity() as MainActivity).openSystem(agent.agentId)
     }
 
     fun rename(fragment: Fragment, agent: AgentInfo) {
@@ -133,4 +151,6 @@ object MachineActions {
     private const val ID_REMOVE = 8
     private const val ID_FILES = 9
     private const val ID_PROCESSES = 10
+    private const val ID_SYSTEM = 11
+    private const val ID_WAKE = 12
 }

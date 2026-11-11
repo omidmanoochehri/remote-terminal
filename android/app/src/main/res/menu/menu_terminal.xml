@@ -1,11 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/action_palette" android:title="@string/palette_menu" />
     <item android:id="@+id/action_new_terminal" android:title="@string/new_terminal" />
     <item android:id="@+id/action_duplicate" android:title="@string/action_duplicate" />
     <item android:id="@+id/action_preset" android:title="@string/preset_start" />
+    <item android:id="@+id/action_save_preset" android:title="@string/preset_save_as" />
     <item android:id="@+id/action_rename" android:title="@string/rename_terminal" />
     <item android:id="@+id/action_theme" android:title="@string/terminal_theme_title" />
     <item android:id="@+id/action_pin" android:title="@string/action_pin" />
+    <item android:id="@+id/action_prompt" android:title="@string/prompt_menu" />
+    <item android:id="@+id/action_snippets" android:title="@string/snippets_menu" />
     <item android:id="@+id/action_shortcuts" android:title="@string/shortcuts" />
     <item android:id="@+id/action_paste" android:title="@string/paste" />
     <item android:id="@+id/action_paste_file" android:title="@string/paste_file" />
@@ -14,6 +18,7 @@
     <item android:id="@+id/action_broadcast" android:title="@string/action_broadcast" />
     <item android:id="@+id/action_watch" android:title="@string/action_watch" />
     <item android:id="@+id/action_quiet" android:title="@string/action_quiet" />
+    <item android:id="@+id/action_record" android:title="@string/recording_start" />
     <item android:id="@+id/action_save_transcript" android:title="@string/action_save_transcript" />
     <item android:id="@+id/action_share_transcript" android:title="@string/action_share_transcript" />
     <item android:id="@+id/action_select_all" android:title="@string/select_all" />

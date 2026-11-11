@@ -97,14 +97,30 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     Ok(())
 }
 
-/// The close button. Hides rather than closes unless the user asked otherwise,
-/// or unless this close *is* the quit.
+/// The main window's close button. Hides rather than closes unless the user
+/// asked otherwise, or unless this close *is* the quit. A terminal window's
+/// close button really closes it: its terminal goes back to the main window.
+///
+/// When the main window does close, the app goes with it — terminal windows
+/// included — rather than living on in windows that have no way back.
 pub fn on_window_event<R: Runtime>(window: &tauri::Window<R>, event: &WindowEvent) {
-    let WindowEvent::CloseRequested { api, .. } = event else { return };
-    let state = window.app_handle().state::<TrayState>();
-    if state.quitting.load(Ordering::SeqCst) || !state.close_to_tray.load(Ordering::SeqCst) {
+    if window.label() != "main" {
         return;
     }
-    api.prevent_close();
-    let _ = window.hide();
+    let state = window.app_handle().state::<TrayState>();
+    match event {
+        WindowEvent::CloseRequested { api, .. } => {
+            if state.quitting.load(Ordering::SeqCst) || !state.close_to_tray.load(Ordering::SeqCst) {
+                return;
+            }
+            api.prevent_close();
+            let _ = window.hide();
+        }
+        WindowEvent::Destroyed => {
+            if !state.quitting.swap(true, Ordering::SeqCst) {
+                window.app_handle().exit(0);
+            }
+        }
+        _ => {}
+    }
 }

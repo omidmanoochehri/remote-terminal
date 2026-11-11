@@ -130,4 +130,16 @@
     <string name="channel_alerts_desc">Watched text appeared, or a terminal went quiet</string>
     <string name="notif_watch_title">“%1$s” appeared in %2$s</string>
     <string name="notif_quiet_title">%1$s went quiet</string>
+    <!-- Prompt composer -->
+    <string name="prompt_title">Prompt</string>
+    <string name="prompt_menu">Write a prompt…</string>
+    <string name="prompt_body">Typed into this terminal when you send it. Attached files are uploaded to the machine first, and their paths go in after the text.</string>
+    <string name="prompt_hint">Write your prompt</string>
+    <string name="prompt_files_hint">A picture pasted into the box is attached; other files are added below.</string>
+    <string name="prompt_enter">Press Enter after the prompt</string>
+    <string name="prompt_empty">Write something or attach a file first.</string>
+    <string name="prompt_uploading">Uploading file %1$d of %2$d…</string>
+    <string name="prompt_paste_file">Paste file</string>
+    <string name="prompt_remove_file">Remove %1$s</string>
+    <string name="prompt_no_terminal">Open a terminal to write a prompt to it.</string>
 </resources>

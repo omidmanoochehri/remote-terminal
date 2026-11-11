@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capabilities the Remote Terminal window needs.",
-  "windows": ["main"],
+  "description": "Capabilities the Remote Terminal windows need: the main one and every terminal moved into a window of its own.",
+  "windows": ["main", "term-*"],
   "permissions": [
     "core:default",
     "core:window:allow-set-title",

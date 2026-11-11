@@ -27,6 +27,10 @@ data class SessionInfo(
     val exitCode: Int?,
     /** Where the shell is now, when the agent can resolve it; "" otherwise. */
     val cwd: String = "",
+    /** The last command this terminal ran, as the agent saw it; "" when unknown. */
+    val command: String = "",
+    /** True when the agent brought this terminal back after a restart. */
+    val restored: Boolean = false,
 ) {
     val isRunning: Boolean get() = state == "running"
 
@@ -44,6 +48,8 @@ data class SessionInfo(
             attached = o.optInt("attached", 0),
             exitCode = if (o.isNull("exitCode")) null else o.optInt("exitCode"),
             cwd = o.optString("cwd", ""),
+            command = o.optString("command", ""),
+            restored = o.optBoolean("restored", false),
         )
     }
 }

@@ -61,6 +61,12 @@ class Notifier(
             post(CHANNEL_ALERTS, (s.key + "|quiet").hashCode(), title, agents.agent(s.agentId)?.name ?: "", s)
             if (foreground) _inApp.tryEmit(title)
         }
+        sessions.onTriggerReplied = { s, w ->
+            _inApp.tryEmit(context.getString(R.string.trigger_fired, w.text, s.displayTitle))
+        }
+        sessions.onRecordingFull = { _, _ ->
+            _inApp.tryEmit(context.getString(R.string.recording_full))
+        }
         sessions.onBell = { s ->
             if (foreground && settings.bell == "vibrate") vibrate()
             if (!foreground && settings.notifyBell) notifyBell(s)

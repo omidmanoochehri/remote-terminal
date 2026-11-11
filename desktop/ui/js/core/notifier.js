@@ -11,10 +11,14 @@
 
 import { notify } from './platform.js';
 import { S } from '../ui/strings.js';
-import { TextWatch, QuietWatch } from './watches.js';
+import { TextWatch, QuietWatch, decodeReply } from './watches.js';
 
 export class Notifier {
-  constructor(settings, client, agents, sessions) {
+  /**
+   * [agentAlerts] is false in a terminal window: the main window already says
+   * when a machine goes offline, and once is enough.
+   */
+  constructor(settings, client, agents, sessions, { agentAlerts = true } = {}) {
     this.settings = settings;
     this.client = client;
     this.agents = agents;
@@ -24,6 +28,7 @@ export class Notifier {
     this.lastBell = 0;
     /** The app shows watch alerts in the window too (a toast); set by the shell. */
     this.onAlert = null;
+    this.agentAlerts = agentAlerts;
 
     sessions.on('liveOutput', (s, data) => this.onLiveOutput(s, data));
 
@@ -42,7 +47,7 @@ export class Notifier {
   noteAgentUsed(agentId) { this.usedAgents.add(agentId); }
 
   onEvent(event) {
-    if (event.kind !== 'agentOffline') return;
+    if (event.kind !== 'agentOffline' || !this.agentAlerts) return;
     // Two ways to opt in: the global "machine goes offline" setting for
     // machines you have opened, or per-machine connection alerts.
     const perMachine = this.settings.connectionAlerts(event.agentId);
@@ -55,8 +60,12 @@ export class Notifier {
 
   /* ------------------------------- watches ------------------------------ */
 
-  watchText(s, text, keepWatching) {
-    s.textWatch = new TextWatch(text, keepWatching);
+  /**
+   * Watch for [text] (a regular expression with [regex]). With [reply] the
+   * watch is a trigger: the reply is typed into the terminal when it matches.
+   */
+  watchText(s, text, keepWatching, { regex = false, reply = null } = {}) {
+    s.textWatch = new TextWatch(text, keepWatching, { regex, reply });
     s.bump();
   }
 
@@ -86,7 +95,14 @@ export class Notifier {
     s.quietWatch?.feed();
     const watch = s.textWatch;
     if (!watch || !watch.feed(data)) return;
+    if (!watch.allowFire()) return;
     if (!watch.keepWatching) { s.textWatch = null; s.bump(); }
+    if (watch.reply) {
+      // A trigger answers in the terminal; the notice says it did, in the window only.
+      this.sessions.input(s, decodeReply(watch.reply));
+      this.onAlert?.(S.watchTriggerFired(watch.text, s.displayTitle), this.machineName(s));
+      return;
+    }
     this.alert(S.watchMatchTitle(watch.text, s.displayTitle), this.machineName(s));
   }
 

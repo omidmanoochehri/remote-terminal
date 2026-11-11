@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="line_spacing_entries">
+        <item>فشرده</item><item>معمولی</item><item>راحت</item><item>باز</item>
+    </string-array>
+    <string-array name="cursor_style_entries">
+        <item>بلوک</item><item>زیرخط</item><item>خط عمودی</item>
+    </string-array>
+    <string-array name="terminal_theme_entries">
+        <item>ریموت ترمینال</item><item>تیره پیش فرض</item><item>AMOLED</item><item>روشن</item><item>Solarized Dark</item><item>Gruvbox Dark</item>
+    </string-array>
+    <string-array name="app_theme_entries">
+        <item>مطابق سیستم</item><item>تیره</item><item>روشن</item>
+    </string-array>
+    <string-array name="app_language_entries">
+        <item>مطابق سیستم</item><item>English</item><item>فارسی</item>
+    </string-array>
+    <string-array name="bell_entries">
+        <item>لرزش</item><item>بی صدا</item>
+    </string-array>
+    <string-array name="paste_confirm_entries">
+        <item>2 خط</item><item>3 خط</item><item>5 خط</item><item>10 خط</item><item>هرگز</item>
+    </string-array>
+</resources>

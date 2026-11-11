@@ -35,10 +35,14 @@ const { discoverShells, advertise } = require('./lib/shells');
 const { Metrics } = require('./lib/metrics');
 const { spawnPty, ptyAvailable } = require('./lib/pty');
 const { SessionManager } = require('./lib/sessions');
+const { SessionStore, restoreSessions } = require('./lib/restore');
+const { buildEnv } = require('./lib/env');
 const { chooseSpawner, probe, underSystemProfile } = require('./lib/win-user-pty');
 const { UploadManager } = require('./lib/uploads');
 const { FileService } = require('./lib/files');
 const { ProcessService } = require('./lib/procs');
+const { SystemService } = require('./lib/sys');
+const { PortService } = require('./lib/ports');
 const { RelayClient } = require('./lib/relay-client');
 const relayHttp = require('./lib/http');
 
@@ -202,6 +206,7 @@ async function cmdDoctor(cfg, state, log) {
   console.log(`  Uploads:      ${cfg.uploadsDir || path.join(os.homedir(), 'RemoteTerminal')} (max ${Math.round(cfg.maxUploadBytes / (1024 * 1024))} MiB)`);
   console.log(`  File browser: ${cfg.fileBrowser ? (cfg.filesRoot || 'home folder of the terminal owner') : 'off'}`);
   console.log(`  Processes:    ${cfg.processManager ? (cfg.allowProcessKill ? 'list and end' : 'list only') : 'off'}`);
+  console.log(`  System info:  ${cfg.systemInfo ? 'on' : 'off'}; listening ports: ${!cfg.portList ? 'off' : PortService.supported() ? 'on' : 'not supported here'}`);
   console.log(`  Data dir:     ${cfg.dataDir}${writable(cfg.dataDir) ? '' : '  (NOT WRITABLE)'}`);
   console.log(`  Log file:     ${cfg.logToFile ? logFileFor(cfg) : '(file logging disabled)'}${underSystemd() ? '  — under systemd; use journalctl' : ''}`);
   console.log(`  Limits:       maxSessions=${cfg.maxSessions} replayBytes=${cfg.replayBytes} idleTimeoutSec=${cfg.idleTimeoutSec}`);
@@ -417,6 +422,17 @@ async function runAgent(cfg, state, log, fileSink) {
   const sessions = new SessionManager({ cfg, log, shells, spawn: spawner.spawn, cwd });
   sessions.startSweeper(cfg.sweepIntervalMs);
 
+  // Terminals are processes and die with this one, so what crosses a restart
+  // is their description: the open ones are written down as they change and
+  // started again here — same id, so phones re-attach to the tabs they still
+  // have open. See lib/restore.js.
+  const store = new SessionStore({ file: cfg.sessionsFile, log });
+  restoreSessions({ sessions, store, cfg, log, env: buildEnv({ inherit: cfg.inheritEnv }) });
+  if (cfg.restoreSessions) {
+    sessions.on('session.changed', (snapshot) => store.schedule(snapshot));
+    store.write(sessions.snapshot());
+  }
+
   // Pasted files have to land where the shell can read them. Under the
   // service that is not the agent's home — SYSTEM's profile is readable only
   // by administrators — but the home of whoever the terminals belong to.
@@ -443,12 +459,18 @@ async function runAgent(cfg, state, log, fileSink) {
     owner: async () => (await terminalUser()).user,
     allowKill: cfg.allowProcessKill,
   }) : null;
+  // sys.info names the person terminals run as: under the Windows service,
+  // whoever is signed in (null when nobody is).
+  const sys = cfg.systemInfo ? new SystemService({ version: VERSION, user: async () => (await terminalUser()).user }) : null;
+  const ports = cfg.portList && PortService.supported() ? new PortService() : null;
   log.info('requests', {
     files: files ? (cfg.filesRoot || 'terminal home') : 'off',
     processes: !procs ? 'off' : !cfg.allowProcessKill ? 'list' : restricted ? 'list, end own' : 'list, end',
+    system: sys ? 'on' : 'off',
+    ports: ports ? 'on' : 'off',
   });
 
-  const client = new RelayClient({ cfg, state, log, sessions, uploads, files, procs, meta: machineMeta(VERSION), shells });
+  const client = new RelayClient({ cfg, state, log, sessions, uploads, files, procs, sys, ports, meta: machineMeta(VERSION), shells });
   let registered = false;
   let lastError = null;
 
@@ -529,6 +551,10 @@ async function runAgent(cfg, state, log, fileSink) {
     sessions.stopSweeper();
     uploads.stopSweeper();
     uploads.closeAll();
+    // Write the open terminals down before closing them: they are being
+    // stopped because this process is, and they come back with it.
+    if (cfg.restoreSessions) store.flush(sessions.snapshot());
+    store.stop();
     sessions.closeAll('shutdown');
     client.stop();
     process.exitCode = code; // also correct if the loop drains before the timer fires

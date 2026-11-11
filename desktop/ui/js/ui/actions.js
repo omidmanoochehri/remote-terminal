@@ -7,7 +7,8 @@
 
 import { menu, confirmDialog, promptDialog, toast, chooseDialog } from './overlays.js';
 import { S } from './strings.js';
-import { system } from '../core/platform.js';
+import { system, wakeOnLan } from '../core/platform.js';
+import { magicPacket } from '../core/wol.js';
 import { terminalTitle } from '../core/format.js';
 import { copyTitle } from '../core/naming.js';
 import { isRunning } from '../protocol/messages.js';
@@ -72,6 +73,21 @@ export async function confirmRemoveMachine(app, agent, onRemoved) {
   onRemoved?.();
 }
 
+/**
+ * Wake an offline machine: the magic packet to its remembered MAC, sent three
+ * times to the broadcast address. Only works from the machine's own network.
+ */
+export async function wakeMachine(app, agentId) {
+  const wol = app.settings.wol(agentId);
+  if (!wol) return;
+  try {
+    await wakeOnLan(magicPacket(wol.mac), wol.broadcast, wol.port);
+    toast(S.wolSent, { ms: 5000 });
+  } catch (err) {
+    toast(S.wolFailed(String(err?.message || err)), { error: true });
+  }
+}
+
 /* ------------------------------- terminals ------------------------------- */
 
 export function terminalMenu(app, anchor, agent, session) {
@@ -79,6 +95,10 @@ export function terminalMenu(app, anchor, agent, session) {
   const openLocally = app.sessions.find(agent.agentId, session.sessionId) != null;
   menu(anchor, [
     { label: S.open, icon: 'terminal_square', onClick: () => app.openTerminal(agent.agentId, session.sessionId) },
+    // Only the main window moves terminals into windows of their own.
+    !app.boot && agent.online && isRunning(session)
+      ? { label: S.windowOpen, icon: 'external', onClick: () => app.moveToWindow(app.sessions.get(agent.agentId, session.sessionId)) }
+      : null,
     agent.online
       ? { label: S.actionDuplicate, icon: 'copy', onClick: () => duplicateTerminal(app, agent, session) }
       : null,

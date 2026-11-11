@@ -20,6 +20,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.cactus.remoteterminal.App
 import com.cactus.remoteterminal.R
+import com.cactus.remoteterminal.data.TerminalPreset
 import com.cactus.remoteterminal.databinding.ActivityMainBinding
 import com.cactus.remoteterminal.net.RelayClient
 import com.cactus.remoteterminal.ui.design.BottomNavView
@@ -267,7 +268,36 @@ class MainActivity : AppCompatActivity() {
     fun openFiles(agentId: String, path: String? = null, sessionId: String? = null) =
         push(FilesFragment.newInstance(agentId, path, sessionId), "files:$agentId")
 
-    fun openProcesses(agentId: String) = push(ProcessesFragment.newInstance(agentId), "processes:$agentId")
+    fun openProcesses(agentId: String, filter: String? = null) = push(ProcessesFragment.newInstance(agentId, filter), "processes:$agentId")
+
+    fun openSystem(agentId: String) = push(SystemFragment.newInstance(agentId), "system:$agentId")
+
+    fun openSnippets() = push(SnippetsFragment(), "snippets")
+
+    fun openRecordings() = push(RecordingsFragment(), "recordings")
+
+    fun openPlayer(recordingId: String) = push(PlayerFragment.newInstance(recordingId), "player:$recordingId")
+
+    fun openColorSchemes() = push(ColorSchemesFragment(), "schemes")
+
+    /** The scheme editor: [schemeId] edits a user scheme; null makes a new one from [fromId]. */
+    fun openSchemeEditor(schemeId: String?, fromId: String?) =
+        push(SchemeEditorFragment.newInstance(schemeId, fromId), "scheme:${schemeId ?: "new"}")
+
+    fun openBackup() = push(BackupFragment(), "backup")
+
+    /**
+     * Hardware-keyboard shortcuts reach the terminal screen before any view
+     * (and so before the key encoder); everything it does not claim goes on
+     * to the shell as usual.
+     */
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (event.action == android.view.KeyEvent.ACTION_DOWN) {
+            val terminal = supportFragmentManager.findFragmentById(R.id.container) as? TerminalFragment
+            if (terminal != null && terminal.handleHardwareShortcut(event)) return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
 
     fun openTerminal(agentId: String, sessionId: String?) {
         app.notifier.noteAgentUsed(agentId)
@@ -281,6 +311,10 @@ class MainActivity : AppCompatActivity() {
     /** The New terminal form in preset mode: [presetId] null creates a new one. */
     fun openPresetEditor(presetId: String?, agentId: String?) =
         push(NewTerminalFragment.forPreset(presetId, agentId), "preset:${presetId ?: "new"}")
+
+    /** The preset editor, filled in from a terminal that is already running. */
+    fun openPresetDraft(draft: TerminalPreset) =
+        push(NewTerminalFragment.forDraft(draft), "preset:draft")
 
     fun openAddMachine(initial: Boolean = false) {
         supportFragmentManager.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE)

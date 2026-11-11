@@ -34,7 +34,7 @@ and picks up exactly where it left off when you come back.
   └────────────────────────────────────────┘  └────────────────────────────────┘
 ```
 
-Version **0.12.1**, wire protocol **v3** — see [`PROTOCOL.md`](./PROTOCOL.md)
+Version **0.15.0**, wire protocol **v3** — see [`PROTOCOL.md`](./PROTOCOL.md)
 for the complete wire format.
 
 ---
@@ -71,6 +71,10 @@ for the complete wire format.
   with *Keep running* — never touches the shell. Re-attaching replays exactly
   the output you missed, from a per-session ring buffer, using stream positions,
   so nothing is duplicated and gaps are detected rather than papered over.
+- **And outlive the machine's bad days.** When an agent is restarted, crashes
+  or the machine reboots, it opens its terminals again where they were: same
+  name, same folder, same command running, same session ids — so the tab you
+  left open simply carries on, under a line saying what was restored.
 - **Many machines, one account.** Enrol every machine once against your relay;
   pair each phone once. From then on the phone sees every machine of the
   account automatically — no rooms, no per-machine credentials, no port
@@ -144,8 +148,8 @@ Use TLS in production (`wss://`) — see [TLS and reverse proxies](#tls-and-reve
 
 ```bash
 cd agent
-./packaging/build-deb.sh                       # -> dist/remote-terminal-agent_0.12.1_amd64.deb
-sudo apt install ./dist/remote-terminal-agent_0.12.1_amd64.deb
+./packaging/build-deb.sh                       # -> dist/remote-terminal-agent_0.15.0_amd64.deb
+sudo apt install ./dist/remote-terminal-agent_0.15.0_amd64.deb
 
 sudo remote-terminal-agent configure \
   --server wss://relay.example.com \
@@ -220,7 +224,7 @@ journalctl -u remote-terminal-agent -f
 ```powershell
 cd agent\windows\installer
 powershell -ExecutionPolicy Bypass -File build-installer.ps1
-# -> RemoteTerminalAgentSetup-0.12.1.exe   (~4.6 MB)
+# -> RemoteTerminalAgentSetup-0.15.0.exe   (~4.6 MB)
 ```
 
 Double-click it. It asks for the relay URL, the enrolment token and a name for
@@ -437,9 +441,9 @@ confirmations wherever you tap it.
 - **Programs that take over the screen** — in `less`/`vim`, swipes send arrow
   keys; programs that enable mouse reporting get real mouse events instead.
 - **Menu** — new terminal, duplicate (same machine, same directory), start a
-  preset, rename, pin, shortcuts, paste, paste image, attach file, per-terminal
-  colour scheme, select all, clear, toggle the command bar or the key rows,
-  close.
+  preset, save as preset, rename, pin, shortcuts, paste, paste image, attach
+  file, per-terminal colour scheme, snippets, command palette, start/stop
+  recording, select all, clear, toggle the command bar or the key rows, close.
 
 ### Files
 
@@ -468,13 +472,56 @@ for the rest.
   desktop). *Settings → Terminal → Clickable links* turns it off.
 - **Transcript** — save or share everything the terminal holds, scrollback
   included, as plain text.
+- **Prompt** — the speech-bubble button opens a text box for a prompt to a
+  program such as a coding assistant, with files beside it: paste a picture
+  into the box, or attach files. On *Send* the files are uploaded to the
+  machine and the text goes in as one paste with their paths after it, then
+  Enter (untick it to edit before running).
+- **Terminal windows** (desktop) — *Open in new window* moves a terminal into
+  a window of its own, which its pin button can keep on top of the others;
+  closing it puts the terminal back as a tab.
 - **Broadcast input** — pick other open terminals, on any machine, and
   everything you type goes to all of them until you tap *Stop*. Handy for the
   same command on several servers.
 - **Watch for text** — get a notification when a word appears in the output
-  (a build's `FAILED`, a deploy's `ready`), once or every time.
+  (a build's `FAILED`, a deploy's `ready`), once or every time. The pattern can
+  be a regular expression.
+- **Triggers** — a watch can also *reply*: when it matches, the reply is typed
+  into the terminal (`\r`, `\n`, `\t`, `\e` and `\\` are understood), at most
+  once every two seconds — answer a `[y/N]` or a `Password:` you trust it
+  with. A small notice says each time it fires.
 - **Notify when output stops** — a notification when a busy terminal has been
   quiet for ten seconds: the long command has finished.
+- **Snippets** — a library of saved commands, grouped in folders, sent from
+  *Snippets…* in the menu. A snippet may hold fields — `{{host}}`,
+  `{{branch:main}}` — and asks for them before it is sent, remembering the last
+  values. A snippet either runs (ends with Enter) or is only inserted.
+- **Command palette** — one search field over every menu action, snippet,
+  preset, open terminal and machine, with fuzzy matching.
+- **Recording** — *Start recording* saves the output with its timing as an
+  [asciicast v2](https://docs.asciinema.org/manual/asciicast/v2/) file (up to
+  16 MiB; a red *REC* shows meanwhile). *Settings → Recordings* plays them back
+  in the app — pause, 0.5×–4×, skip idle gaps, seek — and exports, renames or
+  deletes them. Exported `.cast` files play in asciinema too.
+- **Hardware keyboard** — Ctrl+Shift+T new terminal, Ctrl+Shift+W close,
+  Ctrl+Tab / Ctrl+Shift+Tab switch tabs, Ctrl+Shift+C / V copy and paste,
+  Ctrl+Shift+F search, Ctrl+Shift+P palette, Ctrl+Shift+E snippets, Ctrl+= /
+  Ctrl+- / Ctrl+0 zoom. Every other key still goes to the shell. The list is
+  under *Settings → Keyboard*.
+
+### System and Wake-on-LAN
+
+A **System** tile beside Files and Processes shows what the machine is — OS and
+kernel, CPU model and count, memory, uptime, who terminals run as, time zone —
+its network interfaces with every address (tap to copy) and MAC, and every
+**listening port** with its protocol, address and process. Tap a port to copy
+`address:port` or to open that process in Processes.
+
+The MAC it reports is remembered, so an **offline** machine offers **Wake**:
+the app sends a Wake-on-LAN magic packet to the interface's directed broadcast
+(or whatever you set under *Machine settings → Wake-on-LAN*; addresses typed by
+hand are never overwritten). The phone has to be on the machine's LAN, and the
+machine's firmware has to have Wake-on-LAN turned on.
 
 ### Presets
 
@@ -484,6 +531,13 @@ into the new shell as its first line. Save one from the New terminal form, or
 manage them under *Settings → Terminal presets*. Presets live on the phone;
 launching one produces exactly the traffic that filling in the form by hand
 would, so nothing about the protocol changes.
+
+**From a terminal you are already in**, the menu's *Save as preset* writes one
+down as it stands: the tab's name, its machine and shell, the folder the shell
+is in **now**, and the last command it ran. Next time the preset puts you back
+there with that command running — the same thing the agent does by itself after
+a restart. The dialog shows what it captured before saving, and *Edit…* opens
+the full form if the preset should differ from the terminal in some way.
 
 ### Sending a file into a terminal
 
@@ -501,8 +555,17 @@ the cursor. Nothing is executed. Files larger than 16 MiB are refused.
   lines), keep screen on, OSC 52 clipboard, paste-confirmation threshold, bell
   (off / vibrate / sound), haptics. Colour schemes: Remote, Default Dark,
   AMOLED, Light, Solarized Dark, Gruvbox — set app-wide, or per terminal from
-  the terminal menu.
-- **Keyboard** — edit the three key rows, and your own command shortcuts.
+  the terminal menu — plus schemes of your own: copy one, edit every colour
+  with a live preview, or import a Windows Terminal scheme from JSON (and copy
+  yours out the same way).
+- **Snippets and recordings** — manage the snippet library and the saved
+  recordings.
+- **Keyboard** — edit the three key rows, your own command shortcuts, and the
+  list of hardware-keyboard shortcuts.
+- **Backup & restore** — export presets, snippets, colour schemes, command
+  shortcuts and appearance/terminal/keyboard preferences to one JSON file, and
+  import it by merging or replacing. The phone and the desktop app read each
+  other's backups. Nothing secret is in it: no tokens, relay URL or device id.
 - **Notifications** — machine went offline, terminal exited, terminal rang the
   bell. Quiet by design: raised only while the app is in the background, and
   never for ordinary output.
@@ -577,9 +640,22 @@ session.create ──▶ running ──(process exits)──▶ exited ──(re
 - Limits: `MAX_SESSIONS_PER_AGENT` (default 16, enforced by both agent and
   relay), `MAX_SESSIONS_PER_ACCOUNT` (64), `SESSION_CREATE_PER_MIN` per phone
   (30), `REPLAY_BYTES_PER_SESSION` (256 KiB of history per terminal).
-- Restarting the agent process ends its terminals — they are its child
-  processes. The app then shows the terminal as gone rather than attaching to
-  something else.
+- **Restarting the agent brings its terminals back.** A shell is a child of
+  the agent and dies with it, so what crosses a restart is a description of
+  each open terminal — its name, its directory, its shell and the last command
+  it ran — written to `sessions.json` as those change. On start-up the agent
+  opens them again with the **same session ids**, so a phone or desktop that
+  still has the tab open re-attaches to it; the scrollback starts fresh (the
+  ring buffer went with the old process) above a line saying what was restored.
+  The same thing covers a machine reboot and a relay restart.
+- The command is re-run by default (`RESTORE_COMMANDS=0` to come back at a
+  prompt instead), and only a line the shell **echoed** is ever remembered —
+  what is typed at a password prompt is not stored, not written down and not
+  sent anywhere. After two restarts in quick succession the command is left
+  alone, so a crash loop cannot keep re-running what caused it.
+- A terminal that *you* closed, one whose shell exited and one that idled out
+  are gone for good; only running terminals are brought back, and only if the
+  agent was last up within `RESTORE_MAX_AGE_SEC` (24 h).
 
 ---
 
@@ -670,6 +746,10 @@ default next to `index.js`; the installers use
 | `MAX_SESSIONS_PER_AGENT` | 16 | Terminal cap |
 | `SESSION_IDLE_TIMEOUT` | 21600 s | Close detached terminals silent this long |
 | `EXITED_RETENTION_SEC` | 300 | Keep exited terminals this long |
+| `RESTORE_SESSIONS` | 1 | Reopen the terminals that were running when the agent stopped |
+| `RESTORE_COMMANDS` | 1 | Re-run the command each restored terminal was running; 0 leaves it at a prompt |
+| `RESTORE_MAX_AGE_SEC` | 86400 | Ignore terminals described longer ago than this |
+| `SESSIONS_FILE` | beside `AGENT_STATE` | Where the open terminals are described, mode 0600 |
 | `REPLAY_BYTES_PER_SESSION` | 262144 | History kept per terminal |
 | `MAX_INPUT_BYTES` | 1 MiB | Largest accepted input message |
 | `INHERIT_ENV` | 0 | Pass the agent's **entire** environment to shells (not recommended) |
@@ -684,6 +764,8 @@ default next to `index.js`; the installers use
 | `MAX_FILE_WRITE_BYTES` | 512 MiB | Largest file the file browser accepts as an upload |
 | `PROCESS_MANAGER` | 1 | The app's process list (`proc.*` requests); 0 turns it off |
 | `ALLOW_PROCESS_KILL` | 1 | Whether the process list can end processes; 0 keeps it read-only |
+| `SYSTEM_INFO` | 1 | The System view's machine facts and network interfaces (`sys.info`); 0 turns it off |
+| `PORT_LIST` | 1 | The System view's listening ports (`net.ports`, Linux and Windows); 0 turns it off |
 | `ALLOW_ROOT` | 0 | Permit running as root on Linux |
 | `COALESCE_MS` / `MAX_CHUNK` | 16 / 32 KiB | Output coalescing window and chunk size |
 | `BASE_BACKOFF_MS` / `MAX_BACKOFF_MS` | 1000 / 30000 | Reconnect backoff |
@@ -780,7 +862,9 @@ Remote shell access deserves a careful setup.
   removes the link, never what it points at. Under the Windows service the
   agent is LocalSystem, so it ends only processes that belong to the signed-in
   user, and it never ends itself. `fileBrowser`, `processManager` and
-  `allowProcessKill` turn each part off.
+  `allowProcessKill` turn each part off. The System view is read-only: machine
+  facts, interface addresses and MACs, and listening ports with their owning
+  process — `systemInfo` and `portList` turn it off.
 - **Hardening you can turn up.** The systemd units ship with the protections
   that cost a terminal nothing (`ProtectSystem=full`, the `ProtectKernel*`
   family, `RestrictSUIDSGID`, an empty `CapabilityBoundingSet`). The stricter
@@ -870,7 +954,8 @@ Remote shell access deserves a careful setup.
 | No shells offered, or terminals fail to start | `node index.js --doctor`: it checks the PTY backend, lists discovered shells and reports configuration problems. |
 | Pairing code rejected | Codes last five minutes and are single-use. Too many wrong attempts from one IP triggers a 15-minute lockout. |
 | Phone connects but sees no machines | The phone and the agents must share an account, i.e. the same enrolment token. Check `/stats` for `agentsOnline`. |
-| Terminal shows "gone" after a while | The agent process restarted (its children died), or a detached terminal was idle past `SESSION_IDLE_TIMEOUT`. |
+| Terminal shows "gone" after a while | A detached terminal was idle past `SESSION_IDLE_TIMEOUT`, or recovery is off (`RESTORE_SESSIONS=0`) and the agent restarted. |
+| A restored terminal did not re-run its command | The agent restarted twice within a minute (the crash-loop guard), `RESTORE_COMMANDS=0`, or the command was typed where the shell did not echo it. |
 | Machine details say *not reported* | The platform could not answer that metric, or `METRICS_INTERVAL_MS=0`. Nothing is invented to fill the gap. |
 | Reverse proxy: pairing works, terminals do not | The proxy forwards `/v3/*` but not the WebSocket upgrade. Check the `Upgrade`/`Connection` headers and `proxy_read_timeout`. |
 | Output garbled in one program | The emulator covers what real programs use; a sequence it mishandles is a bug worth a test in `TerminalEmulator`. |
@@ -978,7 +1063,7 @@ terminating the session.
 ## Versioning and releases
 
 The project has **one version number**, shared by the server, the agent and the
-Android app and the desktop app — currently **0.12.1** — bumped by semver according to what the work
+Android app and the desktop app — currently **0.15.0** — bumped by semver according to what the work
 did. The Android `versionCode` is a plain integer that must strictly increase on
 every release. The wire protocol version (`v3`) is independent and changes only
 for an actual breaking wire change.

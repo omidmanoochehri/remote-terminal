@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A pushed tool screen built in code: back header, an optional filter field,
+  scrolling content with the shared empty/error block over it, and an
+  optional call to action pinned to the bottom (lifted by margin, see Insets).
+  Used by Snippets, Recordings, Colour schemes, Backup and System.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <include
+        android:id="@+id/headerBar"
+        layout="@layout/view_back_header" />
+
+    <include
+        android:id="@+id/searchBar"
+        layout="@layout/view_search_field"
+        android:visibility="gone" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.core.widget.NestedScrollView
+            android:id="@+id/scroll"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:id="@+id/content"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="@dimen/rt_gutter"
+                android:paddingEnd="@dimen/rt_gutter"
+                android:paddingBottom="@dimen/space_xl" />
+        </androidx.core.widget.NestedScrollView>
+
+        <include
+            android:id="@+id/stateBlock"
+            layout="@layout/view_state_block" />
+
+        <ProgressBar
+            android:id="@+id/loading"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="top|center_horizontal"
+            android:layout_marginTop="40dp"
+            android:indeterminateTint="@color/rt_primary"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:id="@+id/ctaButton"
+        style="@style/RtCta"
+        android:layout_height="52dp"
+        android:layout_marginStart="@dimen/rt_gutter"
+        android:layout_marginEnd="@dimen/rt_gutter"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="16dp"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/ctaIcon"
+            android:layout_width="@dimen/rt_icon_lg"
+            android:layout_height="@dimen/rt_icon_lg"
+            android:layout_marginEnd="14dp"
+            android:src="@drawable/ic_rt_plus"
+            android:importantForAccessibility="no"
+            app:tint="@color/rt_on_primary" />
+
+        <TextView
+            android:id="@+id/ctaLabel"
+            style="@style/RtText.Cta"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="14sp" />
+    </LinearLayout>
+</LinearLayout>

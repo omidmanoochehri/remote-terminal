@@ -325,3 +325,39 @@ test('agent requests are dispatched to their service, answered, and refused clea
   client.stop();
   await relay.close();
 });
+
+test('sys and ports are advertised and routed only when their services are present', async () => {
+  const relay = fakeRelay();
+  const { spawn } = makeFakeSpawn();
+  const cfg = testConfig({ server: `ws://127.0.0.1:${relay.port}` });
+  const sessions = new SessionManager({ cfg, log, shells: SHELLS, spawn });
+  const sys = { handle: async (method) => ({ method, hostname: 'h', platform: 'linux', interfaces: [] }) };
+  const ports = { handle: async (method) => ({ method, ports: [], sampledAt: 1, truncated: false }) };
+  const client = new RelayClient({ cfg, state: { agentId: 'a_x', agentToken: 't', name: '' }, log, sessions, sys, ports, meta: META, shells: SHELLS });
+  const connP = relay.nextConn();
+  client.start();
+  const c = await connP;
+  const reg = await c.next((m) => m.type === 'agent.register');
+  assert.ok(reg.caps.includes('sys') && reg.caps.includes('ports'), reg.caps.join(','));
+  assert.ok(!reg.caps.includes('fs') && !reg.caps.includes('procs'));
+
+  c.send({ type: 'agent.request', client: 'c_p', reqId: 'r1', method: 'sys.info', params: {} });
+  assert.strictEqual((await c.next((m) => m.reqId === 'r1')).result.method, 'sys.info');
+  c.send({ type: 'agent.request', client: 'c_p', reqId: 'r2', method: 'net.ports', params: {} });
+  assert.strictEqual((await c.next((m) => m.reqId === 'r2')).result.method, 'net.ports');
+  client.stop();
+
+  // Switched off: not advertised, and the methods answer unsupported.
+  const connQ = relay.nextConn();
+  const bare = new RelayClient({ cfg, state: { agentId: 'a_x', agentToken: 't', name: '' }, log, sessions, meta: META, shells: SHELLS });
+  bare.start();
+  const d = await connQ;
+  const reg2 = await d.next((m) => m.type === 'agent.register');
+  assert.ok(!reg2.caps.includes('sys') && !reg2.caps.includes('ports'));
+  for (const [reqId, method] of [['r3', 'sys.info'], ['r4', 'net.ports']]) {
+    d.send({ type: 'agent.request', client: 'c_p', reqId, method, params: {} });
+    assert.strictEqual((await d.next((m) => m.reqId === reqId)).code, 'unsupported', method);
+  }
+  bare.stop();
+  await relay.close();
+});

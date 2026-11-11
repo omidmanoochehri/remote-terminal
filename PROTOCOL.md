@@ -49,7 +49,7 @@ In routed messages the routing keys are the short names `agent`, `session`,
 // AgentInfo (relay → phone)
 { "agentId": "a_…", "name": "Production Server", "hostname": "prod-01",
   "platform": "linux",            // "win32" | "linux" | "darwin"
-  "os": "Ubuntu 24.04", "arch": "x64", "agentVersion": "0.12.1", "protocol": 3,
+  "os": "Ubuntu 24.04", "arch": "x64", "agentVersion": "0.15.0", "protocol": 3,
   "shells": [ { "id": "bash", "label": "bash", "default": true }, { "id": "sh", "label": "sh" } ],
   "caps": ["sessions", "replay", "resize", "ping", "files", "metrics", "fs", "procs"],
   "online": true, "lastSeen": 1725264000000,   // ms since epoch
@@ -72,7 +72,9 @@ In routed messages the routing keys are the short names `agent`, `session`,
   "cols": 120, "rows": 35, "seq": 48211,   // output stream position (see §6)
   "attached": 1,                  // number of attached clients
   "exitCode": null,
-  "cwd": "/srv/api" }             // where the shell is; "" when the platform cannot say
+  "cwd": "/srv/api",              // where the shell is; "" when the platform cannot say
+  "command": "tail -f app.log",   // the last command the shell echoed; "" when unknown (see §6c)
+  "restored": false }             // true when the agent reopened this terminal after a restart
 
 // DeviceInfo
 { "deviceId": "d_…", "name": "Pixel 8", "createdAt": 1725264000000,
@@ -161,7 +163,7 @@ and terminates sockets that miss a pong.
   "instanceId": "…",                  // random per process start
   "name": "…",                        // used only if the relay has no name for this agent yet
   "hostname": "prod-01", "platform": "linux", "os": "Ubuntu 24.04", "arch": "x64",
-  "agentVersion": "0.12.1", "protocol": 3,
+  "agentVersion": "0.15.0", "protocol": 3,
   "shells": [ { "id": "bash", "label": "bash", "default": true } ],
   "caps": ["sessions", "replay", "resize", "ping", "files", "metrics", "fs", "procs"],
   "metrics": { /* MachineMetrics, optional */ },
@@ -174,7 +176,7 @@ and terminates sockets that miss a pong.
 { "type": "session.created", "reqId": "…", "client": "c_…", "session": { /* SessionInfo */ } }
 { "type": "session.attached", "reqId": "…", "client": "c_…", "session": "s_…",
   "from": 47000, "seq": 48211, "cols": 120, "rows": 35 }     // see §6
-{ "type": "session.updated", "session": "s_…", "title": "…", "cols": 120, "rows": 35, "state": "running", "cwd": "/srv/api" }  // any subset
+{ "type": "session.updated", "session": "s_…", "title": "…", "cols": 120, "rows": 35, "state": "running", "cwd": "/srv/api", "command": "npm run build" }  // any subset
 { "type": "exit",           "session": "s_…", "code": 0 }     // shell process ended; session stays until closed/expired
 { "type": "session.closed", "session": "s_…", "reason": "closed" }  // "closed" | "exited" | "idle" | "shutdown" | "limit"
 { "type": "output",         "session": "s_…", "seq": 48211, "data": "…" }               // live: fan-out to attached clients
@@ -266,7 +268,7 @@ never sends any is fully conformant, and phones must render a missing field as
 { "type": "device.revoked", "device": "d_…", "by": "d_…" }
 { "type": "session.created",  "reqId": "…", "agent": "a_…", "session": { /* SessionInfo */ } }  // reqId only for the requester
 { "type": "session.attached", "reqId": "…", "agent": "a_…", "session": "s_…", "from": 47000, "seq": 48211, "cols": 120, "rows": 35 }
-{ "type": "session.updated",  "agent": "a_…", "session": "s_…", "title": "…", "cols": 120, "rows": 35, "state": "running", "cwd": "/srv/api" }
+{ "type": "session.updated",  "agent": "a_…", "session": "s_…", "title": "…", "cols": 120, "rows": 35, "state": "running", "cwd": "/srv/api", "command": "npm run build" }
 { "type": "exit",             "agent": "a_…", "session": "s_…", "code": 0 }
 { "type": "session.closed",   "agent": "a_…", "session": "s_…", "reason": "closed" }
 { "type": "session.lag",      "agent": "a_…", "session": "s_…" }  // output was dropped for you: re-attach with `since`
@@ -328,8 +330,9 @@ agent   → output { seq, data }          …   live from then on       (fan-out
   detect a gap or receive `session.lag`.
 - Terminal query replies (DSR, DA) must be **muted** while applying replayed
   output; they would otherwise inject stale answers into the shell.
-- `instanceId` changes when the agent process restarts; all of its old sessions
-  are gone, and phones must discard cached `lastSeq` values for that agent.
+- `instanceId` changes when the agent process restarts; every stream it had is
+  gone, and phones must discard cached `lastSeq` values for that agent — even
+  for a session id they recognise (see §6c).
 
 ### 6a. Sending a file into a session
 
@@ -362,10 +365,11 @@ agent   → file.stored { reqId, session, path, size }        or error { reqId, 
 - The capability is advertised by the agent as `files` in `AgentInfo.caps`;
   clients must not offer the feature to agents that lack it.
 
-### 6b. Agent requests: files and processes
+### 6b. Agent requests: files, processes and system
 
 Some things a phone wants from a machine are not a terminal: the files in a
-folder, the processes that are running. They travel as a request and a single
+folder, the processes that are running, what the machine is and which ports it
+listens on. They travel as a request and a single
 answer, correlated by `reqId` (required), and the relay treats them like
 `session.create` — the agent must be in the caller's account and online —
 without looking at what they mean.
@@ -413,6 +417,42 @@ agent is LocalSystem, so it ends only processes of the signed-in user
 machine than a terminal does. `processManager`, `allowProcessKill` and
 `fileBrowser` in the agent's configuration turn each part off.
 
+**System** (`sys`).
+
+| method | params | result |
+|---|---|---|
+| `sys.info` | — | `{ hostname, platform, os?, release?, arch?, cpuModel?, cpus?, memoryTotal?, uptimeSec?, agentUptimeSec?, nodeVersion?, agentVersion?, user?, timezone?, interfaces }` — see below |
+
+```jsonc
+{ "hostname": "prod-01", "platform": "linux", "os": "Ubuntu 24.04", "release": "6.8.0-45-generic",
+  "arch": "x64", "cpuModel": "AMD Ryzen 7 5800X", "cpus": 16, "memoryTotal": 16687661056,
+  "uptimeSec": 279484, "agentUptimeSec": 3600, "nodeVersion": "v24.1.0", "agentVersion": "0.15.0",
+  "user": "omid",                 // who terminals run as; under the Windows service the signed-in user, or null
+  "timezone": "Europe/Berlin",    // the IANA zone, when the agent can tell
+  "interfaces": [                 // non-internal interfaces only, at most 32
+    { "name": "eth0", "mac": "aa:bb:cc:dd:ee:ff",   // lowercase, colon separated; omitted when all zeros
+      "addresses": [ { "family": "IPv4", "address": "192.168.1.20", "cidr": "192.168.1.20/24" },
+                     { "family": "IPv6", "address": "fe80::1", "cidr": "fe80::1/64" } ] } ] }
+```
+
+Every field but `hostname`, `platform` and `interfaces` may be missing (a
+value the agent could not read is left out, never guessed); clients show a
+missing one as "not reported". `cidr` is omitted when the OS does not give a
+prefix length. Clients remember the MACs for Wake-on-LAN.
+
+**Listening ports** (`ports`).
+
+| method | params | result |
+|---|---|---|
+| `net.ports` | — | `{ ports, sampledAt, truncated }` — each port is `{ proto: "tcp"\|"udp", family: "IPv4"\|"IPv6", address, port, pid, process }`: TCP sockets in LISTEN and bound UDP sockets, sorted by port then proto, at most 1000 (`truncated` says whether there were more). `pid` and `process` are `null` where the agent cannot tell. |
+
+On Linux the agent reads `/proc/net/{tcp,tcp6,udp,udp6}` and finds owners
+through the `/proc/<pid>/fd` links it may read — as an ordinary account that
+is only its own processes, as with `ss -p`. On Windows it asks `netstat -ano`
+and names the pids with `tasklist`. IPv6 zone ids (`%12`) are dropped. Other
+platforms answer `unsupported` and do not advertise `ports`. `systemInfo` and
+`portList` in the agent's configuration turn either area off.
+
 ### Backpressure
 
 The relay checks `bufferedAmount` of each phone socket before forwarding
@@ -420,6 +460,33 @@ output. Above the high-water mark it stops forwarding to that phone and, once
 the socket drains again, sends `session.lag` for each session that lost
 output. The phone then re-attaches with `since`. Agents pause their PTYs while
 their own socket buffer is high.
+### 6c. Terminals that outlive the agent
+
+A shell is a child of the agent, so an agent that restarts — a crash, a service
+restart, a reboot — loses every shell it was hosting. An agent **may** describe
+its running terminals to itself (name, shell, working directory, geometry and
+the last command) and start them again on the next run. When it does:
+
+- the **session ids are reused**. A client that still has the tab open attaches
+  to the same `s_…` and continues, and `session.create` is not involved;
+- the stream is new: `seq` restarts at 0 and the replay buffer is empty. The
+  `instanceId` in `agent.register` has changed, which already means "discard
+  every cached stream position for this agent", so a client that follows §6
+  needs no special case. A client must never assume a known session id implies
+  a known stream;
+- `restored: true` marks such a session in `SessionInfo` until it is closed;
+- the agent announces itself in the stream, not in a message: it writes one
+  dim line (`[terminal restored · /srv/api · re-running: npm start]`) into the
+  session's output, so every client reads the same explanation in the
+  scrollback;
+- `command` is the last command line the shell **echoed**, which is what an
+  agent re-runs and what the apps offer when saving a terminal as a preset.
+  Input the terminal does not echo — a password prompt — is never recorded, so
+  `command` can be a stale or truncated line and is advisory: never a thing to
+  run without the user asking for it.
+
+An agent that does none of this is fully conformant; its old sessions simply
+disappear, as they did before, and clients mark the tabs gone.
 
 ---
 
@@ -439,7 +506,9 @@ session.create ──▶ running ──(shell exits)──▶ exited ──(rete
 - A **detached** running session with no output for `SESSION_IDLE_TIMEOUT`
   (default 6 hours) is closed with `reason: "idle"`. Output resets the timer,
   so long-running jobs are not killed.
-- Agent shutdown (SIGTERM) closes every session with `reason: "shutdown"`.
+- Agent shutdown (SIGTERM) closes every session with `reason: "shutdown"`. An
+  agent that recovers terminals (§6c) writes the running ones down first and
+  opens them again on its next run, under the same ids.
 - A relay or phone disconnect never touches sessions.
 - Limits: `MAX_SESSIONS_PER_AGENT` (agent-enforced and relay-enforced),
   `MAX_SESSIONS_PER_ACCOUNT` and `SESSION_CREATE_PER_MIN` per phone
@@ -498,6 +567,8 @@ Advertised in `welcome.caps` (relay), `agent.register.caps` (agent, echoed in
 | `requests` | the relay routes `agent.request` / `agent.response` (§6b) |
 | `fs` | the agent answers `fs.*` requests: the file browser (§6b) |
 | `procs` | the agent answers `proc.*` requests: the process manager (§6b) |
+| `sys` | the agent answers `sys.*` requests: what the machine is (§6b) |
+| `ports` | the agent answers `net.*` requests: its listening ports (§6b) |
 | `metrics` | the agent publishes CPU/memory/disk/uptime samples (§4a) |
 | `pairing` | the relay exposes the `/v3/pair/*` endpoints |
 | `color` | phone renders full SGR/ANSI (informational) |

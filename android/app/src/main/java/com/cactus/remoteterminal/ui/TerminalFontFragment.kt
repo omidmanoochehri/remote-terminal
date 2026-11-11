@@ -77,10 +77,13 @@ class TerminalFontFragment : Fragment(), RtScreen {
             .row(
                 R.drawable.ic_rt_moon_star, R.color.rt_primary,
                 getString(R.string.setting_terminal_colours), null,
-                value = labelFor(R.array.terminal_theme_entries, R.array.terminal_theme_values, s.terminalTheme),
-            ) { choose(R.string.setting_terminal_colours, R.array.terminal_theme_entries, R.array.terminal_theme_values, s.terminalTheme) { value ->
-                s.raw.edit().putString(Settings.KEY_TERMINAL_THEME, value).apply()
-            } }
+                value = TerminalTheme.byId(s.terminalTheme).name,
+            ) { chooseScheme() }
+            .row(
+                R.drawable.ic_rt_sliders, R.color.rt_purple,
+                getString(R.string.schemes_title), getString(R.string.schemes_subtitle),
+                value = TerminalTheme.all().size.toString(),
+            ) { host.openColorSchemes() }
             .row(
                 R.drawable.ic_rt_command, R.color.rt_accent,
                 getString(R.string.setting_cursor), null,
@@ -104,6 +107,27 @@ class TerminalFontFragment : Fragment(), RtScreen {
         val theme = TerminalTheme.byId(s.terminalTheme)
         preview.setTextColor(theme.foreground)
         preview.setBackgroundColor(theme.background)
+    }
+
+    /** Every scheme, the user's own included; "Colour schemes" manages them. */
+    private fun chooseScheme() {
+        val all = TerminalTheme.all()
+        val current = all.indexOfFirst { it.id == app.settings.terminalTheme }.coerceAtLeast(0)
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.setting_terminal_colours)
+            .setSingleChoiceItems(all.map { it.name }.toTypedArray<CharSequence>(), current) { dialog, which ->
+                app.settings.raw.edit().putString(Settings.KEY_TERMINAL_THEME, all[which].id).apply()
+                dialog.dismiss()
+                build()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Back from the scheme screens: names and colours may have changed.
+        if (_binding != null) build()
     }
 
     private fun typefaceFor(family: String): Typeface =

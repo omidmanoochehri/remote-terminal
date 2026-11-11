@@ -250,6 +250,10 @@ class Registry {
       attached: att ? att.size : 0,
       exitCode: s.exitCode === undefined ? null : s.exitCode,
       cwd: s.cwd || '',
+      // What the terminal is running, and whether it is one the agent brought
+      // back after a restart. Both are advisory: an older agent sends neither.
+      command: s.command || '',
+      restored: !!s.restored,
     };
   }
 

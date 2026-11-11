@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.SharedPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import com.cactus.remoteterminal.terminal.ColorSchemes
+import com.cactus.remoteterminal.terminal.TerminalTheme
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -12,15 +14,27 @@ import org.json.JSONObject
  * match `res/xml/preferences.xml` so the settings screen edits the same
  * values. [version] bumps on every change so observers can re-read cheaply.
  */
-class Settings(context: Context) {
+class Settings(context: Context) : SharedPreferences.OnSharedPreferenceChangeListener {
     private val prefs: SharedPreferences = context.applicationContext.getSharedPreferences(NAME, Context.MODE_PRIVATE)
 
     private val _version = MutableStateFlow(0)
     val version: StateFlow<Int> = _version
 
-    private val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> _version.value = _version.value + 1 }
+    /*
+     * SharedPreferences holds its listeners weakly. A listener kept only in a
+     * private field was removed by R8 in release builds (the field is never
+     * read), so the lambda was collected and [version] stopped moving; screens
+     * then showed stale values until reopened. Settings itself is the listener
+     * now, and the App holds Settings for the life of the process.
+     */
+    override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
+        _version.value = _version.value + 1
+    }
 
-    init { prefs.registerOnSharedPreferenceChangeListener(listener) }
+    init {
+        prefs.registerOnSharedPreferenceChangeListener(this)
+        TerminalTheme.custom = customSchemes
+    }
 
     val raw: SharedPreferences get() = prefs
 
@@ -38,6 +52,7 @@ class Settings(context: Context) {
      * system when the user asks.
      */
     val appTheme: String get() = prefs.getString(KEY_APP_THEME, "dark") ?: "dark"
+    val appLanguage: String get() = prefs.getString(KEY_APP_LANGUAGE, "system") ?: "system"
     val keepAwake: Boolean get() = prefs.getBoolean(KEY_KEEP_AWAKE, true)
     val scrollbackLines: Int get() = (prefs.getString(KEY_SCROLLBACK, "5000")?.toIntOrNull() ?: 5000).coerceIn(500, 50000)
 
@@ -53,6 +68,11 @@ class Settings(context: Context) {
     var commandBar: Boolean
         get() = prefs.getBoolean(KEY_COMMAND_BAR, true)
         set(v) { prefs.edit().putBoolean(KEY_COMMAND_BAR, v).apply() }
+
+    /** The prompt composer presses Enter after what it types; the last choice sticks. */
+    var promptEnter: Boolean
+        get() = prefs.getBoolean(KEY_PROMPT_ENTER, true)
+        set(v) { prefs.edit().putBoolean(KEY_PROMPT_ENTER, v).apply() }
     val extraKeysRow1: String get() = prefs.getString(KEY_KEYS_ROW1, DEFAULT_ROW1) ?: DEFAULT_ROW1
     val extraKeysRow2: String get() = prefs.getString(KEY_KEYS_ROW2, DEFAULT_ROW2) ?: DEFAULT_ROW2
     val extraKeysRow3: String get() = prefs.getString(KEY_KEYS_ROW3, DEFAULT_ROW3) ?: DEFAULT_ROW3
@@ -217,6 +237,128 @@ class Settings(context: Context) {
         terminalPresets = terminalPresets.filterNot { it.id == id }
     }
 
+    /* ------------------------------ snippets ------------------------------ */
+
+    /** The snippet library (B1), in the order the user saved them. */
+    var snippets: List<Snippet>
+        get() = Snippet.listFromJson(prefs.getString(KEY_SNIPPETS, null))
+        set(v) { prefs.edit().putString(KEY_SNIPPETS, Snippet.listToJson(v).toString()).apply() }
+
+    fun saveSnippet(snippet: Snippet) {
+        val current = snippets
+        snippets = if (current.any { it.id == snippet.id }) current.map { if (it.id == snippet.id) snippet else it } else current + snippet
+    }
+
+    fun deleteSnippet(id: String) {
+        snippets = snippets.filterNot { it.id == id }
+        prefs.edit().remove("snippet_values.$id").apply()
+    }
+
+    /** What was typed into each placeholder of a snippet the last time it was used. */
+    fun snippetValues(id: String): Map<String, String> {
+        val raw = prefs.getString("snippet_values.$id", null) ?: return emptyMap()
+        return try {
+            val o = JSONObject(raw)
+            o.keys().asSequence().associateWith { o.optString(it) }
+        } catch (_: Exception) { emptyMap() }
+    }
+
+    fun setSnippetValues(id: String, values: Map<String, String>) =
+        prefs.edit().putString("snippet_values.$id", JSONObject(values as Map<*, *>).toString()).apply()
+
+    /* --------------------------- colour schemes --------------------------- */
+
+    /** The user's own colour schemes (B5); also published to [TerminalTheme.custom]. */
+    var customSchemes: List<TerminalTheme>
+        get() = ColorSchemes.listFromJson(prefs.getString(KEY_CUSTOM_SCHEMES, null))
+        set(v) {
+            prefs.edit().putString(KEY_CUSTOM_SCHEMES, ColorSchemes.listToJson(v).toString()).apply()
+            TerminalTheme.custom = v
+        }
+
+    fun saveScheme(scheme: TerminalTheme) {
+        val current = customSchemes
+        customSchemes = if (current.any { it.id == scheme.id }) current.map { if (it.id == scheme.id) scheme else it } else current + scheme
+    }
+
+    /** Remove a user scheme; the app-wide setting and any terminal using it fall back to the default. */
+    fun deleteScheme(id: String) {
+        customSchemes = customSchemes.filterNot { it.id == id }
+        val edit = prefs.edit()
+        if (terminalTheme == id) edit.remove(KEY_TERMINAL_THEME)
+        for ((key, value) in prefs.all) if (key.startsWith("theme.") && value == id) edit.remove(key)
+        edit.apply()
+    }
+
+    /* ---------------------------- wake-on-lan ----------------------------- */
+
+    /** Where to send a machine's magic packet (B8), or null when no MAC is known. */
+    fun wakeTarget(agentId: String): WakeOnLan.Target? =
+        WakeOnLan.Target.fromJson(prefs.getString("wol.$agentId", null))?.takeIf { WakeOnLan.parseMac(it.mac) != null }
+
+    fun wakeTargetRaw(agentId: String): WakeOnLan.Target? = WakeOnLan.Target.fromJson(prefs.getString("wol.$agentId", null))
+
+    fun setWakeTarget(agentId: String, target: WakeOnLan.Target?) = prefs.edit()
+        .apply { if (target == null) remove("wol.$agentId") else putString("wol.$agentId", target.toJson().toString()) }
+        .apply()
+
+    /**
+     * A fresh `sys.info` names the machine's MAC: remember it unless the user
+     * already set this machine's target by hand.
+     */
+    fun noteSysInfo(agentId: String, info: com.cactus.remoteterminal.protocol.SysInfo) {
+        val suggested = WakeOnLan.suggest(info) ?: return
+        val current = wakeTargetRaw(agentId)
+        if (current != null && current.manual) return
+        if (current == suggested) return
+        setWakeTarget(agentId, suggested)
+    }
+
+    /** Details the user typed (kept over later `sys.info` answers), or null to forget them. */
+    fun setWakeTargetManually(agentId: String, target: WakeOnLan.Target?) =
+        setWakeTarget(agentId, target?.copy(manual = true))
+
+    /* ------------------------------- backup ------------------------------- */
+
+    /** The portable settings as [Backup] wants them (only keys that were set). */
+    fun portableSettings(): Map<String, Any> {
+        val out = LinkedHashMap<String, Any>()
+        val all = prefs.all
+        for (key in Backup.SETTINGS.keys) {
+            val v = all[key] ?: continue
+            Backup.value(key, v)?.let { out[key] = it }
+        }
+        return out
+    }
+
+    fun backupData(): Backup.Data = Backup.Data(
+        presets = terminalPresets,
+        snippets = snippets,
+        schemes = customSchemes,
+        commandShortcuts = commandShortcuts,
+        settings = portableSettings(),
+    )
+
+    /** Write a merged or replaced [Backup.Data] back. */
+    fun applyBackup(d: Backup.Data) {
+        terminalPresets = d.presets
+        snippets = d.snippets
+        customSchemes = d.schemes
+        commandShortcuts = d.commandShortcuts
+        val edit = prefs.edit()
+        for ((key, value) in d.settings) {
+            when (Backup.SETTINGS[key]) {
+                // These are kept as strings, as the list preferences always were.
+                Backup.Kind.FLOAT -> edit.putString(key, (value as Number).toFloat().toString())
+                Backup.Kind.INT -> edit.putString(key, (value as Number).toInt().toString())
+                Backup.Kind.BOOL -> edit.putBoolean(key, value as Boolean)
+                Backup.Kind.STRING -> edit.putString(key, value as String)
+                null -> {}
+            }
+        }
+        edit.apply()
+    }
+
     /* ------------------------- command history ---------------------------- */
 
     /** Commands sent from the command bar, newest first, capped at [COMMAND_HISTORY_MAX]. */
@@ -252,6 +394,7 @@ class Settings(context: Context) {
         const val KEY_CURSOR_BLINK = "cursor_blink"
         const val KEY_TERMINAL_THEME = "terminal_theme"
         const val KEY_APP_THEME = "app_theme"
+        const val KEY_APP_LANGUAGE = "app_language"
         const val KEY_KEEP_AWAKE = "keep_awake"
         const val KEY_SCROLLBACK = "scrollback_lines"
         const val KEY_HAPTICS = "haptics"
@@ -259,6 +402,7 @@ class Settings(context: Context) {
         const val KEY_OSC52 = "osc52_clipboard"
         const val KEY_PASTE_CONFIRM = "paste_confirm_lines"
         const val KEY_COMMAND_BAR = "command_bar"
+        const val KEY_PROMPT_ENTER = "prompt_enter"
         const val KEY_KEYS_ROW1 = "extra_keys_row1"
         const val KEY_KEYS_ROW2 = "extra_keys_row2"
         const val KEY_KEYS_ROW3 = "extra_keys_row3"
@@ -279,6 +423,8 @@ class Settings(context: Context) {
         const val KEY_SWIPE_TABS = "swipe_switch_tabs"
         const val KEY_CLICKABLE_LINKS = "clickable_links"
         const val KEY_PRESETS = "terminal_presets"
+        const val KEY_SNIPPETS = "snippets"
+        const val KEY_CUSTOM_SCHEMES = "custom_schemes"
 
         const val SORT_STATUS = "status"
         const val SORT_NAME = "name"

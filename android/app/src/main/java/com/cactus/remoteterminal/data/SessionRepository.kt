@@ -30,6 +30,12 @@ class TerminalSession(val agentId: String, val sessionId: String, scrollback: In
      * everything that uses it treats that as "do not assume".
      */
     var cwd: String = ""
+    /**
+     * The last command the agent saw run here. It is what "Save as preset"
+     * writes down with the directory, and what a recovered terminal starts
+     * again by itself. Empty when the agent is older or nothing has run yet.
+     */
+    var command: String = ""
     var state: String = "running"          // "running" | "exited" | "closed"
     var exitCode: Int? = null
     var closedReason: String? = null
@@ -55,8 +61,12 @@ class TerminalSession(val agentId: String, val sessionId: String, scrollback: In
      */
     var replayUntil: Long = Long.MAX_VALUE
 
-    /** "Watch for text…", while armed. */
+    /** "Watch for text…" (or a trigger, when it has a reply), while armed. */
     var watch: OutputWatch? = null
+
+    /** "Start recording": the recording in progress, if any. */
+    var recorder: Recordings.Recorder? = null
+    val isRecording: Boolean get() = recorder != null
     /** "Notify when output stops", while armed; [quietSawOutput] once output arrived after arming. */
     var quietAlert: Boolean = false
     var quietSawOutput: Boolean = false
@@ -82,6 +92,7 @@ class TerminalSession(val agentId: String, val sessionId: String, scrollback: In
     fun applyInfo(info: SessionInfo) {
         title = info.title; shell = info.shell; state = info.state; exitCode = info.exitCode
         if (info.cwd.isNotEmpty()) cwd = info.cwd
+        if (info.command.isNotEmpty()) command = info.command
         bump()
     }
 
@@ -120,6 +131,10 @@ class SessionRepository(
     var onWatchMatched: ((TerminalSession, String) -> Unit)? = null
     /** A terminal with "Notify when output stops" armed went quiet. */
     var onQuiet: ((TerminalSession) -> Unit)? = null
+    /** A trigger typed its reply into a terminal. */
+    var onTriggerReplied: ((TerminalSession, OutputWatch) -> Unit)? = null
+    /** A recording reached its size limit and was stopped. */
+    var onRecordingFull: ((TerminalSession, Recordings.Meta) -> Unit)? = null
 
     init {
         client.addListener(this)
@@ -199,6 +214,7 @@ class SessionRepository(
         sessions.remove(s.key)
         setQuietAlert(s, false)
         s.watch = null
+        stopRecording(s)
         s.broadcastTo.clear()
         dropBroadcastTarget(s)
         publish(s.agentId)
@@ -283,10 +299,36 @@ class SessionRepository(
 
     /* ------------------------------- alerts ------------------------------- */
 
-    fun setWatch(s: TerminalSession, text: String, keepWatching: Boolean) {
-        s.watch = if (text.isEmpty()) null else OutputWatch(text, keepWatching)
+    fun setWatch(s: TerminalSession, text: String, keepWatching: Boolean, regex: Boolean = false, reply: String? = null) {
+        s.watch = if (text.isEmpty()) null else OutputWatch(text, keepWatching, regex, reply?.ifEmpty { null })
         s.bump()
     }
+
+    /* ------------------------------ recording ----------------------------- */
+
+    fun startRecording(s: TerminalSession, recorder: Recordings.Recorder) {
+        stopRecording(s)
+        s.recorder = recorder
+        s.bump()
+    }
+
+    /** Stop and keep the recording; null when there was none. */
+    fun stopRecording(s: TerminalSession): Recordings.Meta? {
+        val r = s.recorder ?: return null
+        s.recorder = null
+        s.bump()
+        return r.stop()
+    }
+
+    private fun record(s: TerminalSession, data: String) {
+        val r = s.recorder ?: return
+        if (!r.output(data) && r.full) {
+            val meta = stopRecording(s) ?: return
+            onRecordingFull?.invoke(s, meta)
+        }
+    }
+
+    private fun recordSize(s: TerminalSession) { s.recorder?.resize(s.emulator.cols, s.emulator.rows) }
 
     fun clearWatch(s: TerminalSession) { s.watch = null; s.bump() }
 
@@ -305,9 +347,18 @@ class SessionRepository(
     private fun onLiveOutput(s: TerminalSession, data: String) {
         s.watch?.let { w ->
             if (w.feed(data)) {
-                if (!w.keepWatching) s.watch = null
-                s.bump()
-                onWatchMatched?.invoke(s, w.text)
+                if (w.isTrigger) {
+                    // A trigger replies at most every two seconds; a match inside that window is let go.
+                    val reply = w.replyNow(android.os.SystemClock.elapsedRealtime()) ?: return@let
+                    if (!w.keepWatching) s.watch = null
+                    input(s, reply)
+                    s.bump()
+                    onTriggerReplied?.invoke(s, w)
+                } else {
+                    if (!w.keepWatching) s.watch = null
+                    s.bump()
+                    onWatchMatched?.invoke(s, w.text)
+                }
             }
         }
         if (s.quietAlert) {
@@ -330,6 +381,7 @@ class SessionRepository(
     fun resize(s: TerminalSession, cols: Int, rows: Int) {
         if (s.emulator.cols == cols && s.emulator.rows == rows) return
         s.emulator.resize(cols, rows)
+        recordSize(s)
         s.stream.noteGeometry(cols, rows)
         if (s.stream.state == SessionStream.State.ATTACHED) client.send(Outgoing.resize(s.agentId, s.sessionId, cols, rows))
         s.onOutput?.invoke()
@@ -424,6 +476,7 @@ class SessionRepository(
                 if (event.cols > 0 && event.rows > 0 && (event.cols != s.emulator.cols || event.rows != s.emulator.rows)) {
                     // The agent's PTY is a different size (another phone set it); follow it until our resize lands.
                     s.emulator.resize(event.cols, event.rows)
+                    recordSize(s)
                 }
                 s.emulator.muteResponses = false
                 s.replayUntil = event.seq
@@ -438,6 +491,7 @@ class SessionRepository(
                         s.emulator.muteResponses = replaying
                         s.emulator.feed(event.data)
                         s.emulator.muteResponses = false
+                        record(s, event.data)
                         s.onOutput?.invoke()
                         if (event.seq > s.replayUntil) onLiveOutput(s, event.data)
                     }
@@ -451,9 +505,10 @@ class SessionRepository(
                 event.state?.let { s.state = it }
                 event.exitCode?.let { s.exitCode = it }
                 event.cwd?.let { s.noteDirectory(it) }
+                event.command?.let { if (it.isNotEmpty()) s.command = it }
                 if (event.cols != null && event.rows != null && event.cols > 0 && event.rows > 0 && s.stream.state == SessionStream.State.ATTACHED
                     && (event.cols != s.emulator.cols || event.rows != s.emulator.rows)) {
-                    s.emulator.resize(event.cols, event.rows); s.onOutput?.invoke()
+                    s.emulator.resize(event.cols, event.rows); recordSize(s); s.onOutput?.invoke()
                 }
                 s.bump()
             }

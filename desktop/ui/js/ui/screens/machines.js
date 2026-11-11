@@ -10,7 +10,7 @@ import { Screen } from './base.js';
 import { el, clear, svgIcon, header, headerAction, stateBlock, debounce } from '../dom.js';
 import { S } from '../strings.js';
 import { menu, alertDialog } from '../overlays.js';
-import { machineMenu } from '../actions.js';
+import { machineMenu, wakeMachine } from '../actions.js';
 import { ConnectionState } from '../../core/relay.js';
 import { SORT_NAME, SORT_RECENT, SORT_STATUS } from '../../core/settings.js';
 import {
@@ -223,8 +223,11 @@ export function machinesScreen(app) {
       agent.online
         ? el('button.cta', { onClick: () => connect(agent) },
           svgIcon('terminal_square'), el('span', { text: S.actionConnect }))
-        : el('button.cta', { disabled: true },
-          svgIcon('wifi_off'), el('span', { text: S.actionUnavailable })));
+        : app.settings.wol(agent.agentId)
+          ? el('button.cta', { onClick: () => wakeMachine(app, agent.agentId), title: S.wolLanNote },
+            svgIcon('lightbulb'), el('span', { text: S.wolWake }))
+          : el('button.cta', { disabled: true },
+            svgIcon('wifi_off'), el('span', { text: S.actionUnavailable })));
   }
 
   function statBox(caption, value, color) {

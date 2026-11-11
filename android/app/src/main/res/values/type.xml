@@ -7,7 +7,7 @@
 
     <style name="RtText" parent="TextAppearance.Material3.BodyMedium">
         <item name="android:textColor">@color/rt_text</item>
-        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:fontFamily">@font/peyda</item>
     </style>
 
     <!-- Screen title, e.g. "Remote Terminal" / "Machines" (19 / 700) -->

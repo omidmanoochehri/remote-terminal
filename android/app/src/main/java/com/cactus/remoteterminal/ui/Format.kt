@@ -133,6 +133,15 @@ object Format {
         }
     }
 
+    /** "0:07" / "12:03" / "1:02:03": a recording's length and the player's clock. */
+    fun clock(seconds: Double): String {
+        val total = seconds.coerceAtLeast(0.0).toLong()
+        val h = total / 3600
+        val m = (total % 3600) / 60
+        val s = total % 60
+        return if (h > 0) String.format(Locale.ROOT, "%d:%02d:%02d", h, m, s) else String.format(Locale.ROOT, "%d:%02d", m, s)
+    }
+
     /** Relay host without the scheme, for the settings and details rows. */
     fun relayHost(relayUrl: String?): String {
         if (relayUrl.isNullOrBlank()) return "—"

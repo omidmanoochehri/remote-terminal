@@ -39,6 +39,8 @@ const CONTROL_RE = /[\x00-\x1F\x7F]/;
 const MAX_COLS = 500;
 const MAX_ROWS = 300;
 const MAX_NAME = 64;
+/** The longest command line a session may report (agent/lib/sessions.js agrees). */
+const MAX_COMMAND = 256;
 const PLATFORMS = new Set(['win32', 'linux', 'darwin']);
 const SESSION_STATES = new Set(['running', 'exited']);
 const CLOSE_REASONS = new Set(['closed', 'exited', 'idle', 'shutdown', 'limit']);
@@ -69,13 +71,23 @@ function cleanName(v) {
 function bad(message) { return { ok: false, message }; }
 const OK = { ok: true };
 
+/**
+ * The last command line a terminal ran, as the agent reports it. It is shown
+ * in the app and kept in presets, so it is bounded and free of control
+ * characters like any other display string, but it may be long enough to be a
+ * real command.
+ */
+const validCommand = (v) => v === undefined || v === '' || (typeof v === 'string' && v.length <= MAX_COMMAND && !CONTROL_RE.test(v));
+
 /** Validate a SessionInfo object announced by an agent. */
 function validSessionInfo(s) {
   return !!s && typeof s === 'object' && isId(s.sessionId, 's') && optShort(s.title)
     && (s.shell === undefined || (typeof s.shell === 'string' && SHELL_ID_RE.test(s.shell)))
     && (s.state === undefined || SESSION_STATES.has(s.state))
     && (s.cols === undefined || isInt(s.cols, 1, MAX_COLS)) && (s.rows === undefined || isInt(s.rows, 1, MAX_ROWS))
-    && (s.seq === undefined || isInt(s.seq, 0, Number.MAX_SAFE_INTEGER));
+    && (s.seq === undefined || isInt(s.seq, 0, Number.MAX_SAFE_INTEGER))
+    && validCommand(s.command)
+    && (s.restored === undefined || typeof s.restored === 'boolean');
 }
 
 /**
@@ -230,6 +242,7 @@ function validateAgentMessage(m) {
       if (m.state !== undefined && !SESSION_STATES.has(m.state)) return bad('invalid state');
       if ((m.cols !== undefined || m.rows !== undefined) && !isDims(m)) return bad('invalid cols/rows');
       if (m.exitCode !== undefined && m.exitCode !== null && !Number.isInteger(m.exitCode)) return bad('invalid exitCode');
+      if (!validCommand(m.command)) return bad('invalid command');
       return OK;
     case 'exit':
       if (!isId(m.session, 's')) return bad('invalid session');
@@ -266,6 +279,6 @@ function validateAgentMessage(m) {
 }
 
 module.exports = {
-  PROTOCOL_VERSION, CLOSE, ERR, MAX_COLS, MAX_ROWS, MAX_NAME, MAX_UPLOAD_BYTES,
+  PROTOCOL_VERSION, CLOSE, ERR, MAX_COLS, MAX_ROWS, MAX_NAME, MAX_COMMAND, MAX_UPLOAD_BYTES,
   validatePhoneMessage, validateAgentMessage, cleanName, isShort, SHELL_ID_RE,
 };
